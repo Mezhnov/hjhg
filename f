@@ -1,71 +1,14 @@
 import socket
 import threading
 
-PORT = 8080
-
-
-def receive_messages(sock):
-    while True:
-        try:
-            data = sock.recv(1024).decode()
-            if not data:
-                break
-            print(f"\nReceived message:\n{data}")
-        except:
-            break
-
-
-def send_message(sock, username):
-    while True:
-        receiver = input("Send message to: ")
-        message = input("Enter message: ")
-        if receiver == username:
-            print("You can't send a message to yourself.")
-            continue
-        request = f"SMP 1.0\nACTION: SEND\nTO: {receiver}\nFROM: {username}\nLENGTH: {len(message)}\n\n{message}"
-        sock.send(request.encode())
-        response = sock.recv(1024).decode()
-        print(f"Server response:\n{response}")
-
-
-def main():
-    HOST = input("Enter server IP address: ")
-
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
-        try:
-            client_socket.connect((HOST, PORT))
-        except ConnectionRefusedError:
-            print(f"Unable to connect to {HOST}:{PORT}. Make sure the server is running.")
-            return
-
-        username = input("Enter your username: ")
-
-        # Connect to server
-        connect_request = f"SMP 1.0\nACTION: CONNECT\nFROM: {username}\n"
-        client_socket.send(connect_request.encode())
-        response = client_socket.recv(1024).decode()
-        print(f"Server response:\n{response}")
-
-        # Start threads for sending and receiving messages
-        threading.Thread(target=receive_messages, args=(client_socket,), daemon=True).start()
-        send_message(client_socket, username)
-
-
-if __name__ == "__main__":
-    main()
-
-
-
-import socket
-import threading
-
-HOST = '0.0.0.0'  # This allows connections from any IP
+HOST = '0.0.0.0'  # Позволяет подключения с любого IP
 PORT = 8080
 
 clients = {}
 
 def handle_client(conn, addr):
     username = None
+    print(f"Подключен: {addr}")
     while True:
         try:
             data = conn.recv(1024).decode()
@@ -102,20 +45,21 @@ def handle_client(conn, addr):
 
             conn.send(response.encode())
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Ошибка: {e}")
             break
 
     if username in clients:
         del clients[username]
+        print(f"{username} отключен.")
     conn.close()
 
-with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
-    server_socket.bind((HOST, PORT))
-    server_socket.listen()
-    print(f"Server started on {HOST}:{PORT}")
-    print(f"Server's IP address: {socket.gethostbyname(socket.gethostname())}")
+if __name__ == "__main__":
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+        server_socket.bind((HOST, PORT))
+        server_socket.listen()
+        print(f"Сервер запущен на {HOST}:{PORT}")
+        print(f"IP адрес сервера: {socket.gethostbyname(socket.gethostname())}")
 
-    while True:
-        conn, addr = server_socket.accept()
-        print(f"New connection from {addr}")
-        threading.Thread(target=handle_client, args=(conn, addr)).start()
+        while True:
+            conn, addr = server_socket.accept()
+            threading.Thread(target=handle_client, args=(conn, addr)).start()

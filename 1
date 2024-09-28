@@ -1,0 +1,104 @@
+import sys
+import socket
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QTabWidget, QLineEdit, QPushButton,
+    QVBoxLayout, QWidget, QTextBrowser, QMessageBox, QHBoxLayout, QLabel
+)
+from PyQt5.QtGui import QPixmap
+
+HOST = 'IP_СЕРВЕРА'  # IP-адрес сервера
+PORT = 8080
+
+class Browser(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("SMP Browser")
+        self.setGeometry(100, 100, 1000, 600)
+
+        self.tabWidget = QTabWidget()
+        self.setCentralWidget(self.tabWidget)
+
+        self.createMainTab()
+
+    def createMainTab(self):
+        urlWidget = QWidget()
+
+        self.urlEdit = QLineEdit()
+        self.urlEdit.setPlaceholderText("Введите URL (smp://...)")
+
+        self.loadButton = self.createButton("Загрузить")
+        self.loadButton.clicked.connect(self.loadUrlInCurrentTab)
+
+        buttonLayout = QHBoxLayout()
+        buttonLayout.addWidget(self.loadButton)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.urlEdit)
+        layout.addLayout(buttonLayout)
+
+        self.contentWidget = QTextBrowser()
+        self.imageLabel = QLabel()
+        layout.addWidget(self.contentWidget)
+        layout.addWidget(self.imageLabel)
+
+        urlWidget.setLayout(layout)
+
+        self.tabWidget.addTab(urlWidget, "Главная")
+
+    def createButton(self, text):
+        button = QPushButton(text)
+        return button
+
+    def loadUrlInCurrentTab(self):
+        url = self.urlEdit.text()
+        self.loadSmpUrl(url, self.contentWidget)
+
+    def loadSmpUrl(self, url, view):
+        parts = url.split('://')
+        if len(parts) != 2:
+            self.showError("Неверный URL: должен содержать 'smp://'")
+            return
+
+        protocol, resource = parts
+        if protocol != 'smp':
+            self.showError("Неверный протокол: ожидается 'smp'")
+            return
+
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            try:
+                sock.connect((HOST, PORT))
+                request = f"SMP 1.0\nACTION: GET\nRESOURCE: {resource}\n"
+                sock.send(request.encode())
+
+                response = sock.recv(4096)
+
+                if response.startswith(b'\x89PNG') or response.startswith(b'\xFF\xD8'):
+                    pixmap = QPixmap()
+                    pixmap.loadFromData(response)
+                    self.imageLabel.setPixmap(pixmap)
+                    self.imageLabel.setScaledContents(True)
+                    self.imageLabel.show()
+                else:
+                    content = response.decode()
+                    if "RESOURCE:" in content:
+                        resource_value = content.split('RESOURCE: ')[1].strip()
+                        try:
+                            with open(resource_value, 'r', encoding='utf-8') as f:
+                                page_content = f.read()
+                            view.setHtml(page_content)
+                        except FileNotFoundError:
+                            self.showError(f"Файл {resource_value} не найден")
+                    else:
+                        view.setPlainText(content)
+            except Exception as e:
+                self.showError(f"Ошибка подключения: {str(e)}")
+
+    def showError(self, message):
+        QMessageBox.critical(self, "Ошибка", message)
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    browser = Browser()
+    browser.show()
+    sys.exit(app.exec_())

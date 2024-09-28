@@ -1,12 +1,15 @@
 import sys
 import socket
+import threading
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QLineEdit, QPushButton,
     QVBoxLayout, QWidget, QTextBrowser, QMessageBox, QHBoxLayout, QLabel
 )
 from PyQt5.QtGui import QPixmap
+from PyQt5.QtCore import Qt
 
-HOST = 'IP_СЕРВЕРА'  # IP-адрес сервера
+# Настройки сервера
+HOST = '127.0.0.1'
 PORT = 8080
 
 class Browser(QMainWindow):
@@ -14,10 +17,12 @@ class Browser(QMainWindow):
         super().__init__()
         self.setWindowTitle("SMP Browser")
         self.setGeometry(100, 100, 1000, 600)
+        self.setStyleSheet("background-color: #ffffff; font-family: 'Arial', sans-serif;")
 
         self.tabWidget = QTabWidget()
         self.setCentralWidget(self.tabWidget)
 
+        self.history = []  # To store browsing history
         self.createMainTab()
 
     def createMainTab(self):
@@ -25,12 +30,29 @@ class Browser(QMainWindow):
 
         self.urlEdit = QLineEdit()
         self.urlEdit.setPlaceholderText("Введите URL (smp://...)")
+        self.urlEdit.setStyleSheet("padding: 10px; border: 1px solid #ccc; border-radius: 4px;")
 
         self.loadButton = self.createButton("Загрузить")
         self.loadButton.clicked.connect(self.loadUrlInCurrentTab)
 
+        self.addTabButton = self.createButton("Добавить вкладку")
+        self.addTabButton.clicked.connect(self.addTab)
+
+        self.backButton = self.createButton("Назад")
+        self.backButton.clicked.connect(self.goBack)
+
+        self.forwardButton = self.createButton("Вперед")
+        self.forwardButton.clicked.connect(self.goForward)
+
+        self.refreshButton = self.createButton("Обновить")
+        self.refreshButton.clicked.connect(self.refreshPage)
+
         buttonLayout = QHBoxLayout()
+        buttonLayout.addWidget(self.backButton)
+        buttonLayout.addWidget(self.forwardButton)
+        buttonLayout.addWidget(self.refreshButton)
         buttonLayout.addWidget(self.loadButton)
+        buttonLayout.addWidget(self.addTabButton)
 
         layout = QVBoxLayout()
         layout.addWidget(self.urlEdit)
@@ -47,11 +69,45 @@ class Browser(QMainWindow):
 
     def createButton(self, text):
         button = QPushButton(text)
+        button.setStyleSheet(
+            "padding: 10px; "
+            "background-color: #4285f4; "
+            "color: white; "
+            "border: none; "
+            "border-radius: 4px; "
+            "font-size: 14px; "
+            "cursor: pointer; "
+        )
+        button.setFixedHeight(40)
+        button.setStyleSheet(button.styleSheet() + "QPushButton:hover { background-color: #357ae8; }")
         return button
 
+    def addTab(self):
+        tabWidget = QWidget()
+        view = QTextBrowser()
+        view.setOpenExternalLinks(True)
+
+        urlEdit = QLineEdit()
+        urlEdit.setPlaceholderText("Введите URL (smp://...)")
+        urlEdit.setStyleSheet("padding: 10px; border: 1px solid #ccc; border-radius: 4px;")
+
+        loadButton = self.createButton("Загрузить")
+        loadButton.clicked.connect(lambda: self.loadSmpUrl(urlEdit.text(), view))
+
+        layout = QVBoxLayout()
+        layout.addWidget(urlEdit)
+        layout.addWidget(loadButton)
+        layout.addWidget(view)
+
+        tabWidget.setLayout(layout)
+        self.tabWidget.addTab(tabWidget, "Новая вкладка")
+        self.tabWidget.setCurrentWidget(tabWidget)
+
     def loadUrlInCurrentTab(self):
-        url = self.urlEdit.text()
-        self.loadSmpUrl(url, self.contentWidget)
+        current_tab = self.tabWidget.currentWidget()
+        if current_tab:
+            url = self.urlEdit.text()
+            self.loadSmpUrl(url, self.contentWidget)
 
     def loadSmpUrl(self, url, view):
         parts = url.split('://')
@@ -80,7 +136,7 @@ class Browser(QMainWindow):
                     self.imageLabel.show()
                 else:
                     content = response.decode()
-                    if "RESOURCE:" in content:
+                                       if "RESOURCE:" in content:
                         resource_value = content.split('RESOURCE: ')[1].strip()
                         try:
                             with open(resource_value, 'r', encoding='utf-8') as f:
@@ -95,6 +151,18 @@ class Browser(QMainWindow):
 
     def showError(self, message):
         QMessageBox.critical(self, "Ошибка", message)
+
+    def goBack(self):
+        if len(self.history) > 1:
+            self.history.pop()
+            self.urlEdit.setText(self.history[-1])
+            self.loadUrlInCurrentTab()
+
+    def goForward(self):
+        pass  # Реализуйте по необходимости
+
+    def refreshPage(self):
+        self.loadUrlInCurrentTab()
 
 
 if __name__ == "__main__":

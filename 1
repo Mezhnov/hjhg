@@ -210,3 +210,157 @@ if __name__ == "__main__":
     browser = Browser()
     browser.show()
     sys.exit(app.exec_())
+
+
+
+import socket
+import threading
+import logging
+import os
+
+# Настройки сервера
+HOST = '0.0.0.0'
+PORT = 8080
+
+# Настройка логирования
+logging.basicConfig(filename='smp_server.log', level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
+
+clients = {}
+domain_mapping = {
+    'example.com': {
+        'html_file': 'index.html',
+        'css_file': 'styles.css',
+        'image_file': 'img.png'
+    },
+    'test.com': {
+        'html_file': 'test.html',
+        'css_file': 'style_test.css',
+        'image_file': 'image_test.jpg'
+    }
+}
+
+
+def send_response(conn, response):
+    """Отправка ответа клиенту."""
+    conn.sendall(response.encode())  # Используем sendall для полной отправки
+
+
+def handle_connect(username, conn, addr):
+    """Обработка подключения клиента."""
+    clients[username] = conn
+    logging.info(f"{username} connected from {addr[0]}:{addr[1]}")
+    send_response(conn, f"SMP 1.0\nSTATUS: OK\nMESSAGE: Connected successfully\nIP: {addr[0]}\n")
+    print(f"{username} connected from {addr[0]}:{addr[1]}")  # Вывод IP-адреса в консоль
+
+
+def handle_send(sender, receiver, message):
+    """Обработка отправки сообщения."""
+    if receiver in clients:
+        try:
+            clients[receiver].sendall(
+                f"SMP 1.0\nACTION: RECEIVE\nFROM: {sender}\nLENGTH: {len(message)}\n\n{message}".encode())
+            logging.info(f"Message from {sender} to {receiver}: {message[:50]}... delivered successfully.")
+            return "SMP 1.0\nSTATUS: OK\nMESSAGE: Message delivered successfully\n"
+        except Exception as e:
+            logging.error(f"Failed to deliver message from {sender} to {receiver}: {str(e)}")
+            return "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Failed to deliver message\n"
+    logging.warning(f"Recipient {receiver} not found for message from {sender}.")
+    return "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Recipient not found\n"
+
+
+def handle_get(resource):
+    """Обработка запроса на получение ресурса."""
+    if resource in domain_mapping:
+        logging.info(f"Resource {resource} requested. Sending HTML file.")
+        return f"SMP 1.0\nSTATUS: OK\nRESOURCE: {domain_mapping[resource]['html_file']}\n"
+    elif resource.endswith('.css'):
+        for mapping in domain_mapping.values():
+            if mapping['css_file'] == resource:
+                try:
+                    with open(mapping['css_file'], 'r', encoding='utf-8') as f:
+                        css_content = f.read()
+                    logging.info(f"Resource {resource} requested. Sending CSS file.")
+                    return f"SMP 1.0\nSTATUS: OK\nRESOURCE: {mapping['css_file']}\n\n{css_content}"
+                except FileNotFoundError:
+                    logging.error(f"CSS file {resource} not found.")
+                    return f"SMP 1.0\nSTATUS: ERROR\nMESSAGE: CSS file not found\n"
+    elif resource.endswith(('.jpg', '.png')):
+        try:
+            with open(resource, 'rb') as f:
+                image_data = f.read()  # Возвращаем бинарные данные
+            logging.info(f"Resource {resource} requested. Sending image file.")
+            return image_data  # Возвращаем данные изображения
+        except FileNotFoundError:
+            logging.error(f"Image resource {resource} not found.")
+            return "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Resource not found\n"
+
+    logging.warning(f"Resource {resource} not found.")
+    return "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Resource not found\n"
+
+
+def handle_client(conn, addr):
+    username = None
+    logging.info(f"Connected: {addr}")
+    try:
+        while True:
+            data = conn.recv(4096).decode()  # Увеличен размер буфера до 4096
+            if not data:
+                break
+
+            lines = data.split('\n')
+            headers = {}
+            message = ""
+            for line in lines:
+                if ': ' in line:
+                    key, value = line.split(': ', 1)
+                    headers[key] = value.strip()
+                else:
+                    message = line.strip()
+
+            action = headers.get('ACTION')
+            sender = headers.get('FROM')
+            receiver = headers.get('TO')
+
+            if action == 'CONNECT':
+                username = sender
+                handle_connect(username, conn, addr)
+            elif action == 'SEND':
+                response = handle_send(sender, receiver, message)
+                send_response(conn, response)
+            elif action == 'GET':
+                resource = headers.get('RESOURCE')
+                response = handle_get(resource)
+                if isinstance(response, bytes):
+                    conn.sendall(response)  # Отправляем бинарный файл
+                else:
+                    send_response(conn, response)
+            elif action == 'CHECK_IP':
+                target_ip = headers.get('TARGET_IP')
+                if target_ip == addr[0]:
+                    send_response(conn, "SMP 1.0\nSTATUS: OK\nMESSAGE: You are connected to the correct IP.\n")
+                else:
+                    send_response(conn, "SMP 1.0\nSTATUS: ERROR\nMESSAGE: You are NOT connected to the correct IP.\n")
+            else:
+                send_response(conn, "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Invalid action\n")
+    except Exception as e:
+        logging.error(f"Error: {e}")
+    finally:
+        if username in clients:
+            del clients[username]
+            logging.info(f"{username} disconnected.")
+        conn.close()
+
+
+def start_server():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+        server_socket.bind((HOST, PORT))
+        server_socket.listen()
+        logging.info(f"Server started on {HOST}:{PORT}")
+
+        while True:
+            conn, addr = server_socket.accept()
+            threading.Thread(target=handle_client, args=(conn, addr)).start()
+
+
+if __name__ == "__main__":
+    start_server()

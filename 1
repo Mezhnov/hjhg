@@ -54,6 +54,9 @@ class Browser(QMainWindow):
         self.history = []  # To store browsing history
         self.createMainTab()
 
+        # Показать сообщение о подключении к серверу
+        self.connectToServer()
+
     def createMainTab(self):
         urlWidget = QWidget()
 
@@ -185,6 +188,22 @@ class Browser(QMainWindow):
 
     def refreshPage(self):
         self.loadUrlInCurrentTab()
+
+    def connectToServer(self):
+        """Соединение с сервером и вывод сообщения о подключении."""
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.connect((HOST, PORT))
+                message = f"SMP 1.0\nACTION: CONNECT\nFROM: {HOST}\n"
+                sock.send(message.encode())
+                response = sock.recv(4096).decode()
+                if "STATUS: OK" in response:
+                    QMessageBox.information(self, "Успех", "Подключение к серверу успешно!")
+                else:
+                    QMessageBox.warning(self, "Ошибка", "Не удалось подключиться к серверу.")
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка подключения", str(e))
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

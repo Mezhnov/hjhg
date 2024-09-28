@@ -6,11 +6,40 @@ from PyQt5.QtWidgets import (
     QVBoxLayout, QWidget, QTextBrowser, QMessageBox, QHBoxLayout, QLabel
 )
 from PyQt5.QtGui import QPixmap
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal, QObject
 
 # Настройки сервера
 HOST = '127.0.0.1'
 PORT = 8080
+
+class Worker(QObject):
+    finished = pyqtSignal()
+    error = pyqtSignal(str)
+    result = pyqtSignal(bytes, QTextBrowser)
+
+    def load_smp_url(self, url, view):
+        parts = url.split('://')
+        if len(parts) != 2:
+            self.error.emit("Неверный URL: должен содержать 'smp://'")
+            return
+
+        protocol, resource = parts
+        if protocol != 'smp':
+            self.error.emit("Неверный протокол: ожидается 'smp'")
+            return
+
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            try:
+                sock.connect((HOST, PORT))
+                request = f"SMP 1.0\nACTION: GET\nRESOURCE: {resource}\n"
+                sock.send(request.encode())
+
+                response = sock.recv(4096)
+                self.result.emit(response, view)
+            except Exception as e:
+                self.error.emit(f"Ошибка подключения: {str(e)}")
+            finally:
+                self.finished.emit()
 
 class Browser(QMainWindow):
     def __init__(self):
@@ -110,44 +139,37 @@ class Browser(QMainWindow):
             self.loadSmpUrl(url, self.contentWidget)
 
     def loadSmpUrl(self, url, view):
-        parts = url.split('://')
-        if len(parts) != 2:
-            self.showError("Неверный URL: должен содержать 'smp://'")
-            return
+        self.worker = Worker()
+        self.worker.result.connect(self.handleResult)
+        self.worker.error.connect(self.showError)
+        self.worker.finished.connect(self.workerFinished)
 
-        protocol, resource = parts
-        if protocol != 'smp':
-            self.showError("Неверный протокол: ожидается 'smp'")
-            return
+        # Start a new thread for loading the URL
+        thread = threading.Thread(target=self.worker.load_smp_url, args=(url, view))
+        thread.start()
 
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            try:
-                sock.connect((HOST, PORT))
-                request = f"SMP 1.0\nACTION: GET\nRESOURCE: {resource}\n"
-                sock.send(request.encode())
+    def handleResult(self, response, view):
+        if response.startswith(b'\x89PNG') or response.startswith(b'\xFF\xD8'):
+            pixmap = QPixmap()
+            pixmap.loadFromData(response)
+            self.imageLabel.setPixmap(pixmap)
+            self.imageLabel.setScaledContents(True)
+            self.imageLabel.show()
+        else:
+            content = response.decode()
+            if "RESOURCE:" in content:
+                resource_value = content.split('RESOURCE: ')[1].strip()
+                try:
+                    with open(resource_value, 'r', encoding='utf-8') as f:
+                        page_content = f.read()
+                    view.setHtml(page_content)
+                except FileNotFoundError:
+                    self.showError(f"Файл {resource_value} не найден")
+            else:
+                view.setPlainText(content)
 
-                response = sock.recv(4096)
-
-                if response.startswith(b'\x89PNG') or response.startswith(b'\xFF\xD8'):
-                    pixmap = QPixmap()
-                    pixmap.loadFromData(response)
-                    self.imageLabel.setPixmap(pixmap)
-                    self.imageLabel.setScaledContents(True)
-                    self.imageLabel.show()
-                else:
-                    content = response.decode()
-                                       if "RESOURCE:" in content:
-                        resource_value = content.split('RESOURCE: ')[1].strip()
-                        try:
-                            with open(resource_value, 'r', encoding='utf-8') as f:
-                                page_content = f.read()
-                            view.setHtml(page_content)
-                        except FileNotFoundError:
-                            self.showError(f"Файл {resource_value} не найден")
-                    else:
-                        view.setPlainText(content)
-            except Exception as e:
-                self.showError(f"Ошибка подключения: {str(e)}")
+    def workerFinished(self):
+        pass  # Вы можете добавить здесь код, если необходимо что-то выполнить после завершения
 
     def showError(self, message):
         QMessageBox.critical(self, "Ошибка", message)
@@ -163,7 +185,6 @@ class Browser(QMainWindow):
 
     def refreshPage(self):
         self.loadUrlInCurrentTab()
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

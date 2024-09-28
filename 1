@@ -1,225 +1,10 @@
 import sys
 import socket
 import threading
-from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QTabWidget, QLineEdit, QPushButton,
-    QVBoxLayout, QWidget, QTextBrowser, QMessageBox, QHBoxLayout, QLabel
-)
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtCore import Qt, pyqtSignal, QObject
+import logging
 
 # Настройки сервера
 HOST = '127.0.0.1'
-PORT = 8080
-
-class Worker(QObject):
-    finished = pyqtSignal()
-    error = pyqtSignal(str)
-    result = pyqtSignal(bytes, QTextBrowser)
-
-    def load_smp_url(self, url, view):
-        parts = url.split('://')
-        if len(parts) != 2:
-            self.error.emit("Неверный URL: должен содержать 'smp://'")
-            return
-
-        protocol, resource = parts
-        if protocol != 'smp':
-            self.error.emit("Неверный протокол: ожидается 'smp'")
-            return
-
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            try:
-                sock.connect((HOST, PORT))
-                request = f"SMP 1.0\nACTION: GET\nRESOURCE: {resource}\n"
-                sock.send(request.encode())
-
-                response = sock.recv(4096)
-                self.result.emit(response, view)
-            except Exception as e:
-                self.error.emit(f"Ошибка подключения: {str(e)}")
-            finally:
-                self.finished.emit()
-
-class Browser(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("SMP Browser")
-        self.setGeometry(100, 100, 1000, 600)
-        self.setStyleSheet("background-color: #ffffff; font-family: 'Arial', sans-serif;")
-
-        self.tabWidget = QTabWidget()
-        self.setCentralWidget(self.tabWidget)
-
-        self.history = []  # To store browsing history
-        self.createMainTab()
-
-        # Показать сообщение о подключении к серверу
-        self.connectToServer()
-
-    def createMainTab(self):
-        urlWidget = QWidget()
-
-        self.urlEdit = QLineEdit()
-        self.urlEdit.setPlaceholderText("Введите URL (smp://...)")
-        self.urlEdit.setStyleSheet("padding: 10px; border: 1px solid #ccc; border-radius: 4px;")
-
-        self.loadButton = self.createButton("Загрузить")
-        self.loadButton.clicked.connect(self.loadUrlInCurrentTab)
-
-        self.addTabButton = self.createButton("Добавить вкладку")
-        self.addTabButton.clicked.connect(self.addTab)
-
-        self.backButton = self.createButton("Назад")
-        self.backButton.clicked.connect(self.goBack)
-
-        self.forwardButton = self.createButton("Вперед")
-        self.forwardButton.clicked.connect(self.goForward)
-
-        self.refreshButton = self.createButton("Обновить")
-        self.refreshButton.clicked.connect(self.refreshPage)
-
-        buttonLayout = QHBoxLayout()
-        buttonLayout.addWidget(self.backButton)
-        buttonLayout.addWidget(self.forwardButton)
-        buttonLayout.addWidget(self.refreshButton)
-        buttonLayout.addWidget(self.loadButton)
-        buttonLayout.addWidget(self.addTabButton)
-
-        layout = QVBoxLayout()
-        layout.addWidget(self.urlEdit)
-        layout.addLayout(buttonLayout)
-
-        self.contentWidget = QTextBrowser()
-        self.imageLabel = QLabel()
-        layout.addWidget(self.contentWidget)
-        layout.addWidget(self.imageLabel)
-
-        urlWidget.setLayout(layout)
-
-        self.tabWidget.addTab(urlWidget, "Главная")
-
-    def createButton(self, text):
-        button = QPushButton(text)
-        button.setStyleSheet(
-            "padding: 10px; "
-            "background-color: #4285f4; "
-            "color: white; "
-            "border: none; "
-            "border-radius: 4px; "
-            "font-size: 14px; "
-            "cursor: pointer; "
-        )
-        button.setFixedHeight(40)
-        button.setStyleSheet(button.styleSheet() + "QPushButton:hover { background-color: #357ae8; }")
-        return button
-
-    def addTab(self):
-        tabWidget = QWidget()
-        view = QTextBrowser()
-        view.setOpenExternalLinks(True)
-
-        urlEdit = QLineEdit()
-        urlEdit.setPlaceholderText("Введите URL (smp://...)")
-        urlEdit.setStyleSheet("padding: 10px; border: 1px solid #ccc; border-radius: 4px;")
-
-        loadButton = self.createButton("Загрузить")
-        loadButton.clicked.connect(lambda: self.loadSmpUrl(urlEdit.text(), view))
-
-        layout = QVBoxLayout()
-        layout.addWidget(urlEdit)
-        layout.addWidget(loadButton)
-        layout.addWidget(view)
-
-        tabWidget.setLayout(layout)
-        self.tabWidget.addTab(tabWidget, "Новая вкладка")
-        self.tabWidget.setCurrentWidget(tabWidget)
-
-    def loadUrlInCurrentTab(self):
-        current_tab = self.tabWidget.currentWidget()
-        if current_tab:
-            url = self.urlEdit.text()
-            self.loadSmpUrl(url, self.contentWidget)
-
-    def loadSmpUrl(self, url, view):
-        self.worker = Worker()
-        self.worker.result.connect(self.handleResult)
-        self.worker.error.connect(self.showError)
-        self.worker.finished.connect(self.workerFinished)
-
-        # Start a new thread for loading the URL
-        thread = threading.Thread(target=self.worker.load_smp_url, args=(url, view))
-        thread.start()
-
-    def handleResult(self, response, view):
-        if response.startswith(b'\x89PNG') or response.startswith(b'\xFF\xD8'):
-            pixmap = QPixmap()
-            pixmap.loadFromData(response)
-            self.imageLabel.setPixmap(pixmap)
-            self.imageLabel.setScaledContents(True)
-            self.imageLabel.show()
-        else:
-            content = response.decode()
-            if "RESOURCE:" in content:
-                resource_value = content.split('RESOURCE: ')[1].strip()
-                try:
-                    with open(resource_value, 'r', encoding='utf-8') as f:
-                        page_content = f.read()
-                    view.setHtml(page_content)
-                except FileNotFoundError:
-                    self.showError(f"Файл {resource_value} не найден")
-            else:
-                view.setPlainText(content)
-
-    def workerFinished(self):
-        pass  # Вы можете добавить здесь код, если необходимо что-то выполнить после завершения
-
-    def showError(self, message):
-        QMessageBox.critical(self, "Ошибка", message)
-
-    def goBack(self):
-        if len(self.history) > 1:
-            self.history.pop()
-            self.urlEdit.setText(self.history[-1])
-            self.loadUrlInCurrentTab()
-
-    def goForward(self):
-        pass  # Реализуйте по необходимости
-
-    def refreshPage(self):
-        self.loadUrlInCurrentTab()
-
-    def connectToServer(self):
-        """Соединение с сервером и вывод сообщения о подключении."""
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                sock.connect((HOST, PORT))
-                message = f"SMP 1.0\nACTION: CONNECT\nFROM: {HOST}\n"
-                sock.send(message.encode())
-                response = sock.recv(4096).decode()
-                if "STATUS: OK" in response:
-                    QMessageBox.information(self, "Успех", "Подключение к серверу успешно!")
-                else:
-                    QMessageBox.warning(self, "Ошибка", "Не удалось подключиться к серверу.")
-        except Exception as e:
-            QMessageBox.critical(self, "Ошибка подключения", str(e))
-
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    browser = Browser()
-    browser.show()
-    sys.exit(app.exec_())
-
-
-
-import socket
-import threading
-import logging
-import os
-
-# Настройки сервера
-HOST = '0.0.0.0'
 PORT = 8080
 
 # Настройка логирования
@@ -240,70 +25,14 @@ domain_mapping = {
 }
 
 
-def send_response(conn, response):
-    """Отправка ответа клиенту."""
-    conn.sendall(response.encode())  # Используем sendall для полной отправки
-
-
-def handle_connect(username, conn, addr):
-    """Обработка подключения клиента."""
-    clients[username] = conn
-    logging.info(f"{username} connected from {addr[0]}:{addr[1]}")
-    send_response(conn, f"SMP 1.0\nSTATUS: OK\nMESSAGE: Connected successfully\nIP: {addr[0]}\n")
-    print(f"{username} connected from {addr[0]}:{addr[1]}")  # Вывод IP-адреса в консоль
-
-
-def handle_send(sender, receiver, message):
-    """Обработка отправки сообщения."""
-    if receiver in clients:
-        try:
-            clients[receiver].sendall(
-                f"SMP 1.0\nACTION: RECEIVE\nFROM: {sender}\nLENGTH: {len(message)}\n\n{message}".encode())
-            logging.info(f"Message from {sender} to {receiver}: {message[:50]}... delivered successfully.")
-            return "SMP 1.0\nSTATUS: OK\nMESSAGE: Message delivered successfully\n"
-        except Exception as e:
-            logging.error(f"Failed to deliver message from {sender} to {receiver}: {str(e)}")
-            return "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Failed to deliver message\n"
-    logging.warning(f"Recipient {receiver} not found for message from {sender}.")
-    return "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Recipient not found\n"
-
-
-def handle_get(resource):
-    """Обработка запроса на получение ресурса."""
-    if resource in domain_mapping:
-        logging.info(f"Resource {resource} requested. Sending HTML file.")
-        return f"SMP 1.0\nSTATUS: OK\nRESOURCE: {domain_mapping[resource]['html_file']}\n"
-    elif resource.endswith('.css'):
-        for mapping in domain_mapping.values():
-            if mapping['css_file'] == resource:
-                try:
-                    with open(mapping['css_file'], 'r', encoding='utf-8') as f:
-                        css_content = f.read()
-                    logging.info(f"Resource {resource} requested. Sending CSS file.")
-                    return f"SMP 1.0\nSTATUS: OK\nRESOURCE: {mapping['css_file']}\n\n{css_content}"
-                except FileNotFoundError:
-                    logging.error(f"CSS file {resource} not found.")
-                    return f"SMP 1.0\nSTATUS: ERROR\nMESSAGE: CSS file not found\n"
-    elif resource.endswith(('.jpg', '.png')):
-        try:
-            with open(resource, 'rb') as f:
-                image_data = f.read()  # Возвращаем бинарные данные
-            logging.info(f"Resource {resource} requested. Sending image file.")
-            return image_data  # Возвращаем данные изображения
-        except FileNotFoundError:
-            logging.error(f"Image resource {resource} not found.")
-            return "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Resource not found\n"
-
-    logging.warning(f"Resource {resource} not found.")
-    return "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Resource not found\n"
-
-
 def handle_client(conn, addr):
     username = None
     logging.info(f"Connected: {addr}")
-    try:
-        while True:
-            data = conn.recv(4096).decode()  # Увеличен размер буфера до 4096
+    conn.send("SMP 1.0\nSTATUS: OK\nMESSAGE: Connected successfully\n".encode())
+
+    while True:
+        try:
+            data = conn.recv(1024).decode()
             if not data:
                 break
 
@@ -323,32 +52,57 @@ def handle_client(conn, addr):
 
             if action == 'CONNECT':
                 username = sender
-                handle_connect(username, conn, addr)
+                clients[username] = conn
+                response = "SMP 1.0\nSTATUS: OK\nMESSAGE: Connected successfully\n"
             elif action == 'SEND':
-                response = handle_send(sender, receiver, message)
-                send_response(conn, response)
+                if receiver in clients:
+                    clients[receiver].send(
+                        f"SMP 1.0\nACTION: RECEIVE\nFROM: {sender}\nLENGTH: {len(message)}\n\n{message}".encode())
+                    response = "SMP 1.0\nSTATUS: OK\nMESSAGE: Message delivered successfully\n"
+                else:
+                    response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Recipient not found\n"
             elif action == 'GET':
                 resource = headers.get('RESOURCE')
-                response = handle_get(resource)
-                if isinstance(response, bytes):
-                    conn.sendall(response)  # Отправляем бинарный файл
+                if resource in domain_mapping:
+                    response = f"SMP 1.0\nSTATUS: OK\nRESOURCE: {domain_mapping[resource]['html_file']}\n"
+                elif resource.endswith('.css'):
+                    css_found = False
+                    for mapping in domain_mapping.values():
+                        if mapping['css_file'] == resource:
+                            css_found = True
+                            try:
+                                with open(mapping['css_file'], 'r', encoding='utf-8') as f:
+                                    css_content = f.read()
+                                response = f"SMP 1.0\nSTATUS: OK\nRESOURCE: {mapping['css_file']}\n\n{css_content}"
+                            except FileNotFoundError:
+                                response = f"SMP 1.0\nSTATUS: ERROR\nMESSAGE: CSS file not found\n"
+                            break
+                    if not css_found:
+                        response = f"SMP 1.0\nSTATUS: ERROR\nMESSAGE: CSS file not found\n"
+                elif resource.endswith(('.jpg', '.png', '.js')):
+                    try:
+                        with open(resource, 'rb') as f:
+                            file_content = f.read()
+                        conn.sendall(file_content)  # Отправка бинарного файла без декодирования
+                        continue  # Пропускаем дальнейшую обработку
+                    except FileNotFoundError:
+                        response = f"SMP 1.0\nSTATUS: ERROR\nMESSAGE: Resource not found\n"
                 else:
-                    send_response(conn, response)
-            elif action == 'CHECK_IP':
-                target_ip = headers.get('TARGET_IP')
-                if target_ip == addr[0]:
-                    send_response(conn, "SMP 1.0\nSTATUS: OK\nMESSAGE: You are connected to the correct IP.\n")
-                else:
-                    send_response(conn, "SMP 1.0\nSTATUS: ERROR\nMESSAGE: You are NOT connected to the correct IP.\n")
+                    response = f"SMP 1.0\nSTATUS: ERROR\nMESSAGE: Resource not found\n"
+
             else:
-                send_response(conn, "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Invalid action\n")
-    except Exception as e:
-        logging.error(f"Error: {e}")
-    finally:
-        if username in clients:
-            del clients[username]
-            logging.info(f"{username} disconnected.")
-        conn.close()
+                response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Invalid action\n"
+
+            conn.send(response.encode())
+        except Exception as e:
+            logging.error(f"Error: {e}")
+            break
+
+    if username in clients:
+        del clients[username]
+        logging.info(f"{username} disconnected.")
+    conn.close()
+    logging.info(f"Disconnected: {addr}")
 
 
 def start_server():

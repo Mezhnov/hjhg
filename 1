@@ -1,18 +1,16 @@
-import sys
 import socket
 import threading
 import logging
 import os
 
 # Настройки сервера
-HOST = '127.0.0.1'
+HOST = '127.0.0.1'  # Локальный хост для тестирования
 PORT = 8080
-BUFFER_SIZE = 10 * 1024 * 1024  # 10 MB (для передачи больших файлов)
+BUFFER_SIZE = 10 * 1024 * 1024  # Размер буфера для передачи больших файлов
 
-# Настройка логирования
+# Логирование
 logging.basicConfig(filename='smp_server.log', level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
 
-clients = {}
 domain_mapping = {
     'example.com': {
         'html_file': 'index.html',
@@ -39,43 +37,20 @@ def send_large_file(conn, filepath):
         logging.error(f"Error while sending file {filepath}: {e}")
 
 def handle_client(conn, addr):
-    username = None
     logging.info(f"Connected: {addr}")
     conn.send("SMP 1.0\nSTATUS: OK\nMESSAGE: Connected successfully\n".encode())
 
     while True:
         try:
-            data = conn.recv(4096).decode()  # Увеличиваем буфер для команд
+            data = conn.recv(4096).decode()
             if not data:
                 break
 
-            lines = data.split('\n')
-            headers = {}
-            message = ""
-            for line in lines:
-                if ': ' in line:
-                    key, value = line.split(': ', 1)
-                    headers[key] = value.strip()
-                else:
-                    message = line.strip()
-
+            headers = dict(line.split(': ', 1) for line in data.split('\n') if ': ' in line)
             action = headers.get('ACTION')
-            sender = headers.get('FROM')
-            receiver = headers.get('TO')
+            resource = headers.get('RESOURCE')
 
-            if action == 'CONNECT':
-                username = sender
-                clients[username] = conn
-                response = "SMP 1.0\nSTATUS: OK\nMESSAGE: Connected successfully\n"
-            elif action == 'SEND':
-                if receiver in clients:
-                    clients[receiver].send(
-                        f"SMP 1.0\nACTION: RECEIVE\nFROM: {sender}\nLENGTH: {len(message)}\n\n{message}".encode())
-                    response = "SMP 1.0\nSTATUS: OK\nMESSAGE: Message delivered successfully\n"
-                else:
-                    response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Recipient not found\n"
-            elif action == 'GET':
-                resource = headers.get('RESOURCE')
+            if action == 'GET' and resource:
                 if resource in domain_mapping:
                     html_file = domain_mapping[resource]['html_file']
                     try:
@@ -83,44 +58,17 @@ def handle_client(conn, addr):
                             html_content = f.read()
                         response = f"SMP 1.0\nSTATUS: OK\nRESOURCE: {html_file}\n\n{html_content}"
                     except FileNotFoundError:
-                        response = f"SMP 1.0\nSTATUS: ERROR\nMESSAGE: HTML file not found\n"
-                elif resource.endswith('.css'):
-                    css_found = False
-                    for mapping in domain_mapping.values():
-                        if mapping['css_file'] == resource:
-                            css_found = True
-                            try:
-                                with open(mapping['css_file'], 'r', encoding='utf-8') as f:
-                                    css_content = f.read()
-                                response = f"SMP 1.0\nSTATUS: OK\nRESOURCE: {mapping['css_file']}\n\n{css_content}"
-                            except FileNotFoundError:
-                                response = f"SMP 1.0\nSTATUS: ERROR\nMESSAGE: CSS file not found\n"
-                            break
-                    if not css_found:
-                        response = f"SMP 1.0\nSTATUS: ERROR\nMESSAGE: CSS file not found\n"
-                elif resource.endswith(('.jpg', '.png', '.js')):
-                    # Отправляем файл по частям
-                    file_path = resource
-                    if os.path.exists(file_path):
-                        response = "SMP 1.0\nSTATUS: OK\nMESSAGE: Sending file...\n"
-                        conn.send(response.encode())  # Сообщаем клиенту, что файл будет отправлен
-                        send_large_file(conn, file_path)
-                        continue  # Пропускаем дальнейшую обработку
-                    else:
-                        response = f"SMP 1.0\nSTATUS: ERROR\nMESSAGE: Resource not found\n"
+                        response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: HTML file not found\n"
                 else:
-                    response = f"SMP 1.0\nSTATUS: ERROR\nMESSAGE: Resource not found\n"
+                    response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Resource not found\n"
             else:
-                response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Invalid action\n"
+                response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Invalid action or resource\n"
 
             conn.send(response.encode())
         except Exception as e:
             logging.error(f"Error: {e}")
             break
 
-    if username in clients:
-        del clients[username]
-        logging.info(f"{username} disconnected.")
     conn.close()
     logging.info(f"Disconnected: {addr}")
 

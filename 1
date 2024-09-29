@@ -27,12 +27,16 @@ domain_mapping = {
 def send_large_file(conn, filepath):
     """Отправка больших файлов по частям."""
     try:
+        file_size = os.path.getsize(filepath)
+        conn.send(f"SMP 1.0\nSTATUS: OK\nMESSAGE: Starting file transfer\nFILE_SIZE: {file_size}\n".encode())
+        
         with open(filepath, 'rb') as f:
             while True:
                 chunk = f.read(BUFFER_SIZE)
                 if not chunk:
                     break
                 conn.sendall(chunk)
+        logging.info(f"File {filepath} sent successfully.")
     except Exception as e:
         logging.error(f"Error while sending file {filepath}: {e}")
 
@@ -57,14 +61,20 @@ def handle_client(conn, addr):
                         with open(html_file, 'r', encoding='utf-8') as f:
                             html_content = f.read()
                         response = f"SMP 1.0\nSTATUS: OK\nRESOURCE: {html_file}\n\n{html_content}"
+                        conn.send(response.encode())
                     except FileNotFoundError:
                         response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: HTML file not found\n"
+                        conn.send(response.encode())
                 else:
                     response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Resource not found\n"
+                    conn.send(response.encode())
+            elif action == 'SEND_FILE' and resource:
+                file_path = domain_mapping[resource]['image_file']  # Укажите правильный путь к файлу
+                send_large_file(conn, file_path)
             else:
                 response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Invalid action or resource\n"
+                conn.send(response.encode())
 
-            conn.send(response.encode())
         except Exception as e:
             logging.error(f"Error: {e}")
             break

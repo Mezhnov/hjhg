@@ -26,6 +26,11 @@ domain_mapping = {
 
 def send_large_file(conn, filepath):
     """Отправка больших файлов по частям."""
+    if not os.path.exists(filepath):
+        logging.error(f"File not found: {filepath}")
+        conn.send(f"SMP 1.0\nSTATUS: ERROR\nMESSAGE: File not found: {filepath}\n".encode())
+        return
+    
     try:
         file_size = os.path.getsize(filepath)
         conn.send(f"SMP 1.0\nSTATUS: OK\nMESSAGE: Starting file transfer\nFILE_SIZE: {file_size}\n".encode())
@@ -39,6 +44,7 @@ def send_large_file(conn, filepath):
         logging.info(f"File {filepath} sent successfully.")
     except Exception as e:
         logging.error(f"Error while sending file {filepath}: {e}")
+        conn.send(f"SMP 1.0\nSTATUS: ERROR\nMESSAGE: Error while sending file: {e}\n".encode())
 
 def handle_client(conn, addr):
     logging.info(f"Connected: {addr}")
@@ -75,8 +81,13 @@ def handle_client(conn, addr):
                     conn.send(response.encode())
                     logging.error(f"Resource not found: {resource}")
             elif action == 'SEND_FILE' and resource:
-                file_path = domain_mapping[resource]['image_file']
-                send_large_file(conn, file_path)
+                file_path = domain_mapping.get(resource, {}).get('image_file')
+                if file_path:
+                    send_large_file(conn, file_path)
+                else:
+                    response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Invalid resource for file transfer\n"
+                    conn.send(response.encode())
+                    logging.error(f"Invalid resource for file transfer: {resource}")
             else:
                 response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Invalid action or resource\n"
                 conn.send(response.encode())

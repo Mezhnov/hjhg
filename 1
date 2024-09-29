@@ -7,7 +7,7 @@ import os
 # Настройки сервера
 HOST = '127.0.0.1'
 PORT = 8080
-BUFFER_SIZE = 10 * 1024 * 1024  # 10 MB (Увеличение размера буфера для больших данных)
+BUFFER_SIZE = 10 * 1024 * 1024  # 10 MB (для передачи больших файлов)
 
 # Настройка логирования
 logging.basicConfig(filename='smp_server.log', level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
@@ -26,7 +26,6 @@ domain_mapping = {
     }
 }
 
-
 def send_large_file(conn, filepath):
     """Отправка больших файлов по частям."""
     try:
@@ -39,7 +38,6 @@ def send_large_file(conn, filepath):
     except Exception as e:
         logging.error(f"Error while sending file {filepath}: {e}")
 
-
 def handle_client(conn, addr):
     username = None
     logging.info(f"Connected: {addr}")
@@ -47,7 +45,7 @@ def handle_client(conn, addr):
 
     while True:
         try:
-            data = conn.recv(4096).decode()  # Можно увеличить буфер для команд
+            data = conn.recv(4096).decode()  # Увеличиваем буфер для команд
             if not data:
                 break
 
@@ -79,7 +77,13 @@ def handle_client(conn, addr):
             elif action == 'GET':
                 resource = headers.get('RESOURCE')
                 if resource in domain_mapping:
-                    response = f"SMP 1.0\nSTATUS: OK\nRESOURCE: {domain_mapping[resource]['html_file']}\n"
+                    html_file = domain_mapping[resource]['html_file']
+                    try:
+                        with open(html_file, 'r', encoding='utf-8') as f:
+                            html_content = f.read()
+                        response = f"SMP 1.0\nSTATUS: OK\nRESOURCE: {html_file}\n\n{html_content}"
+                    except FileNotFoundError:
+                        response = f"SMP 1.0\nSTATUS: ERROR\nMESSAGE: HTML file not found\n"
                 elif resource.endswith('.css'):
                     css_found = False
                     for mapping in domain_mapping.values():
@@ -96,7 +100,7 @@ def handle_client(conn, addr):
                         response = f"SMP 1.0\nSTATUS: ERROR\nMESSAGE: CSS file not found\n"
                 elif resource.endswith(('.jpg', '.png', '.js')):
                     # Отправляем файл по частям
-                    file_path = resource  # Предполагаем, что полный путь уже известен
+                    file_path = resource
                     if os.path.exists(file_path):
                         response = "SMP 1.0\nSTATUS: OK\nMESSAGE: Sending file...\n"
                         conn.send(response.encode())  # Сообщаем клиенту, что файл будет отправлен
@@ -120,7 +124,6 @@ def handle_client(conn, addr):
     conn.close()
     logging.info(f"Disconnected: {addr}")
 
-
 def start_server():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         server_socket.bind((HOST, PORT))
@@ -130,7 +133,6 @@ def start_server():
         while True:
             conn, addr = server_socket.accept()
             threading.Thread(target=handle_client, args=(conn, addr)).start()
-
 
 if __name__ == "__main__":
     start_server()

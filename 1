@@ -42,11 +42,14 @@ def send_large_file(conn, filepath):
 
 def handle_client(conn, addr):
     logging.info(f"Connected: {addr}")
-    conn.send("SMP 1.0\nSTATUS: OK\nMESSAGE: Connected successfully\n".encode())
+    initial_message = "SMP 1.0\nSTATUS: OK\nMESSAGE: Connected successfully\n"
+    conn.send(initial_message.encode())
+    logging.info(f"Sent to {addr}:\n{initial_message}")
 
     while True:
         try:
             data = conn.recv(4096).decode()
+            logging.info(f"Received from {addr}:\n{data}")
             if not data:
                 break
 
@@ -62,18 +65,22 @@ def handle_client(conn, addr):
                             html_content = f.read()
                         response = f"SMP 1.0\nSTATUS: OK\nRESOURCE: {html_file}\n\n{html_content}"
                         conn.send(response.encode())
+                        logging.info(f"Sent to {addr}:\n{response[:100]}...")  # Отправляем первые 100 символов
                     except FileNotFoundError:
                         response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: HTML file not found\n"
                         conn.send(response.encode())
+                        logging.error(f"File not found: {html_file}")
                 else:
                     response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Resource not found\n"
                     conn.send(response.encode())
+                    logging.error(f"Resource not found: {resource}")
             elif action == 'SEND_FILE' and resource:
-                file_path = domain_mapping[resource]['image_file']  # Укажите правильный путь к файлу
+                file_path = domain_mapping[resource]['image_file']
                 send_large_file(conn, file_path)
             else:
                 response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Invalid action or resource\n"
                 conn.send(response.encode())
+                logging.error(f"Invalid action or resource: ACTION={action}, RESOURCE={resource}")
 
         except Exception as e:
             logging.error(f"Error: {e}")
@@ -83,6 +90,7 @@ def handle_client(conn, addr):
     logging.info(f"Disconnected: {addr}")
 
 def start_server():
+    """Запуск сервера."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         server_socket.bind((HOST, PORT))
         server_socket.listen()
@@ -90,7 +98,8 @@ def start_server():
 
         while True:
             conn, addr = server_socket.accept()
-            threading.Thread(target=handle_client, args=(conn, addr)).start()
+            client_thread = threading.Thread(target=handle_client, args=(conn, addr))
+            client_thread.start()
 
 if __name__ == "__main__":
     start_server()

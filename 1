@@ -4,13 +4,14 @@ import logging
 import os
 
 # Настройки сервера
-HOST = '127.0.0.1'  # Локальный хост для тестирования
+HOST = '0.0.0.0'  # Привязка к всем интерфейсам
 PORT = 8080
-BUFFER_SIZE = 10 * 1024 * 1024  # Размер буфера для передачи больших файлов
+BUFFER_SIZE = 4096  # Размер буфера для передачи данных
 
 # Логирование
 logging.basicConfig(filename='smp_server.log', level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
 
+# Карта ресурсов
 domain_mapping = {
     'example.com': {
         'html_file': 'index.html',
@@ -28,84 +29,128 @@ def send_large_file(conn, filepath):
     """Отправка больших файлов по частям."""
     if not os.path.exists(filepath):
         logging.error(f"File not found: {filepath}")
-        conn.send(f"SMP 1.0\nSTATUS: ERROR\nMESSAGE: File not found: {filepath}\n".encode())
+        response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: File not found\n\n"
+        conn.send(response.encode())
         return
-    
+
     try:
         file_size = os.path.getsize(filepath)
-        conn.send(f"SMP 1.0\nSTATUS: OK\nMESSAGE: Starting file transfer\nFILE_SIZE: {file_size}\n".encode())
-        
+        response = f"SMP 1.0\nSTATUS: OK\nMESSAGE: Starting file transfer\nFILE_SIZE: {file_size}\n\n"
+        conn.send(response.encode())
+        logging.info(f"Начинаем отправку файла {filepath}")
+
         with open(filepath, 'rb') as f:
             while True:
                 chunk = f.read(BUFFER_SIZE)
                 if not chunk:
                     break
                 conn.sendall(chunk)
-        logging.info(f"File {filepath} sent successfully.")
+        logging.info(f"Файл {filepath} успешно отправлен.")
     except Exception as e:
-        logging.error(f"Error while sending file {filepath}: {e}")
-        conn.send(f"SMP 1.0\nSTATUS: ERROR\nMESSAGE: Error while sending file: {e}\n".encode())
+        logging.error(f"Ошибка при отправке файла {filepath}: {e}")
+        response = f"SMP 1.0\nSTATUS: ERROR\nMESSAGE: Error while sending file: {e}\n\n"
+        conn.send(response.encode())
 
 def handle_client(conn, addr):
-    logging.info(f"Connected: {addr}")
-    initial_message = "SMP 1.0\nSTATUS: OK\nMESSAGE: Connected successfully\n"
+    logging.info(f"Подключен: {addr}")
+    initial_message = "SMP 1.0\nSTATUS: OK\nMESSAGE: Connected successfully\n\n"
     conn.send(initial_message.encode())
-    logging.info(f"Sent to {addr}:\n{initial_message}")
+    logging.info(f"Отправлено {addr}:\n{initial_message}")
 
     while True:
         try:
             data = conn.recv(4096).decode()
-            logging.info(f"Received from {addr}:\n{data}")
             if not data:
                 break
+            logging.info(f"Получено от {addr}:\n{data}")
 
-            headers = dict(line.split(': ', 1) for line in data.split('\n') if ': ' in line)
+            headers = {}
+            for line in data.split('\n'):
+                if ': ' in line:
+                    key, value = line.split(': ', 1)
+                    headers[key.strip()] = value.strip()
+
             action = headers.get('ACTION')
             resource = headers.get('RESOURCE')
 
             if action == 'GET' and resource:
                 if resource in domain_mapping:
                     html_file = domain_mapping[resource]['html_file']
-                    try:
+                    css_file = domain_mapping[resource]['css_file']
+                    image_file = domain_mapping[resource]['image_file']
+
+                    if os.path.exists(html_file):
                         with open(html_file, 'r', encoding='utf-8') as f:
                             html_content = f.read()
                         response = f"SMP 1.0\nSTATUS: OK\nRESOURCE: {html_file}\n\n{html_content}"
                         conn.send(response.encode())
-                        logging.info(f"Sent to {addr}:\n{response[:100]}...")  # Отправляем первые 100 символов
-                    except FileNotFoundError:
-                        response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: HTML file not found\n"
+                        logging.info(f"Отправлено HTML {html_file} клиенту {addr}.")
+                    else:
+                        response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: HTML file not found\n\n"
                         conn.send(response.encode())
-                        logging.error(f"File not found: {html_file}")
+                        logging.error(f"HTML файл не найден: {html_file}")
                 else:
-                    response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Resource not found\n"
+                    response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Resource not found\n\n"
                     conn.send(response.encode())
-                    logging.error(f"Resource not found: {resource}")
+                    logging.error(f"Ресурс не найден: {resource}")
+
+            elif action == 'GET_RESOURCE' and resource:
+                # Обработка дополнительных ресурсов (CSS, изображения)
+                if resource.startswith('css/'):
+                    css_filename = resource.split('/', 1)[1]
+                    css_file = domain_mapping.get(resource.split('.')[0], {}).get('css_file')
+                    if css_file and os.path.exists(css_file):
+                        with open(css_file, 'r', encoding='utf-8') as f:
+                            css_content = f.read()
+                        response = f"SMP 1.0\nSTATUS: OK\nRESOURCE: {css_file}\n\n{css_content}"
+                        conn.send(response.encode())
+                        logging.info(f"Отправлено CSS {css_file} клиенту {addr}.")
+                    else:
+                        response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: CSS file not found\n\n"
+                        conn.send(response.encode())
+                        logging.error(f"CSS файл не найден: {css_file}")
+
+                elif resource.startswith('img/'):
+                    image_filename = resource.split('/', 1)[1]
+                    image_file = domain_mapping.get(resource.split('.')[0], {}).get('image_file')
+                    if image_file:
+                        send_large_file(conn, image_file)
+                    else:
+                        response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Image file not found\n\n"
+                        conn.send(response.encode())
+                        logging.error(f"Image файл не найден: {image_file}")
+                else:
+                    response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Unknown resource type\n\n"
+                    conn.send(response.encode())
+                    logging.error(f"Неизвестный тип ресурса: {resource}")
+
             elif action == 'SEND_FILE' and resource:
+                # Дополнительная обработка действие SEND_FILE, если требуется
                 file_path = domain_mapping.get(resource, {}).get('image_file')
                 if file_path:
                     send_large_file(conn, file_path)
                 else:
-                    response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Invalid resource for file transfer\n"
+                    response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Invalid resource for file transfer\n\n"
                     conn.send(response.encode())
-                    logging.error(f"Invalid resource for file transfer: {resource}")
+                    logging.error(f"Неверный ресурс для передачи файла: {resource}")
             else:
-                response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Invalid action or resource\n"
+                response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Invalid action or resource\n\n"
                 conn.send(response.encode())
-                logging.error(f"Invalid action or resource: ACTION={action}, RESOURCE={resource}")
+                logging.error(f"Неверное действие или ресурс: ACTION={action}, RESOURCE={resource}")
 
         except Exception as e:
-            logging.error(f"Error: {e}")
+            logging.error(f"Ошибка: {e}")
             break
 
     conn.close()
-    logging.info(f"Disconnected: {addr}")
+    logging.info(f"Отключен: {addr}")
 
 def start_server():
     """Запуск сервера."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         server_socket.bind((HOST, PORT))
         server_socket.listen()
-        logging.info(f"Server started on {HOST}:{PORT}")
+        logging.info(f"Сервер запущен на {HOST}:{PORT}")
 
         while True:
             conn, addr = server_socket.accept()

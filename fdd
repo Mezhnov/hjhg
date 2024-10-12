@@ -1,179 +1,55 @@
 #include <windows.h>
-#include <commctrl.h>
-#include <gdiplus.h>
-#include <vector>
-#include <string>
-#include <iostream>
 
-#pragma comment(lib, "gdiplus.lib")
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    switch (uMsg) {
+        case WM_DESTROY:
+            PostQuitMessage(0);
+            return 0;
+        default:
+            return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }
+}
 
-using namespace Gdiplus;
-
-#define BUTTON_1 101
-#define BUTTON_2 102
-#define EDIT_TEXT 103
-#define LIST_VIEW 104
-
-ULONG_PTR gdiplusToken;
-
-// Global variables for storing icons
-HIMAGELIST hImageList;
-
-// Function prototypes
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-void DrawGradientBackground(HDC hdc, RECT rect);
-void AddListViewItems(HWND hwndListView);
-void InitializeListView(HWND hwndListView);
-void LoadIcons();
-void OnButtonClick(HWND hwnd, WPARAM wParam);
-void OnDoubleClickListView(HWND hwnd);
-
-// Main function
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
-    GdiplusStartupInput gdiplusStartupInput;
-    GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
+    const wchar_t CLASS_NAME[] = L"FullscreenWindowClass";
 
-    INITCOMMONCONTROLSEX icex;
-    icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
-    icex.dwICC = ICC_LISTVIEW_CLASSES;
-    InitCommonControlsEx(&icex);
-
-    const wchar_t CLASS_NAME[] = L"WindowClass";
+    // Определяем класс окна
     WNDCLASS wc = {};
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
     wc.lpszClassName = CLASS_NAME;
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-    wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
 
     RegisterClass(&wc);
 
-    HWND hwnd = CreateWindowEx(0, CLASS_NAME, L"My Unreal-Like Window", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-                               CW_USEDEFAULT, CW_USEDEFAULT, 800, 600, NULL, NULL, hInstance, NULL);
+    // Получаем размеры экрана
+    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+    // Создаем окно
+    HWND hwnd = CreateWindowEx(
+        WS_EX_TOPMOST, // Окно всегда поверх остальных
+        CLASS_NAME,
+        L"My Fullscreen Window",
+        WS_POPUP, // Убираем рамку окна
+        0, 0, screenWidth, screenHeight, // Положение и размер окна
+        NULL,
+        NULL,
+        hInstance,
+        NULL
+    );
+
     if (hwnd == NULL) return 0;
-
-    // Create ListView for displaying folders
-    HWND hListView = CreateWindow(WC_LISTVIEW, L"", WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SINGLESEL,
-                                  50, 200, 700, 350, hwnd, (HMENU)LIST_VIEW, hInstance, NULL);
-    InitializeListView(hListView);
-
-    // Load icons into ImageList
-    LoadIcons();
-    SendMessage(hListView, LVM_SETIMAGELIST, LVSIL_NORMAL, (LPARAM)hImageList);
-
-    // Add items to ListView
-    AddListViewItems(hListView);
-
-    // Create buttons
-    CreateWindow(L"BUTTON", L"Button 1", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
-                 50, 50, 100, 30, hwnd, (HMENU)BUTTON_1, hInstance, NULL);
-
-    CreateWindow(L"BUTTON", L"Button 2", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
-                 200, 50, 100, 30, hwnd, (HMENU)BUTTON_2, hInstance, NULL);
-
-    // Create edit box
-    CreateWindow(L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_BORDER,
-                 350, 50, 400, 30, hwnd, (HMENU)EDIT_TEXT, hInstance, NULL);
 
     ShowWindow(hwnd, nCmdShow);
 
-    // Main message loop
+    // Главный цикл сообщений
     MSG msg = {};
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
-    // Resource cleanup
-    GdiplusShutdown(gdiplusToken);
     return 0;
-}
-
-// Window procedure
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    switch (uMsg) {
-        case WM_DESTROY:
-            PostQuitMessage(0);
-            return 0;
-        case WM_COMMAND:
-            OnButtonClick(hwnd, wParam);
-            return 0;
-        case WM_NOTIFY:
-            if (((LPNMHDR)lParam)->hwndFrom == GetDlgItem(hwnd, LIST_VIEW) && ((LPNMHDR)lParam)->code == NM_DBLCLK) {
-                OnDoubleClickListView(hwnd);
-            }
-            break;
-        case WM_PAINT: {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hwnd, &ps);
-
-            // Draw gradient background
-            RECT rect;
-            GetClientRect(hwnd, &rect);
-            DrawGradientBackground(hdc, rect);
-
-            EndPaint(hwnd, &ps);
-            return 0;
-        }
-        default:
-            return DefWindowProc(hwnd, uMsg, wParam, lParam);
-    }
-}
-
-// Draw gradient background
-void DrawGradientBackground(HDC hdc, RECT rect) {
-    Graphics graphics(hdc);
-    LinearGradientBrush brush(Point(0, 0), Point(0, rect.bottom), Color(255, 220, 220, 255), Color(255, 255, 200, 255));
-    // Using Rect instead of RECT to avoid ambiguity
-    Rect gradientRect(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
-    graphics.FillRectangle(&brush, gradientRect);
-}
-
-// Add items to ListView
-void AddListViewItems(HWND hwndListView) {
-    LVITEM lvItem;
-    lvItem.mask = LVIF_TEXT | LVIF_IMAGE;
-
-    std::vector<std::wstring> folders = { L"Assets", L"Scripts", L"Scenes", L"Prefabs" };
-
-    for (size_t i = 0; i < folders.size(); ++i) {
-        lvItem.iItem = static_cast<int>(i); // Explicit cast to avoid warnings
-        lvItem.iSubItem = 0;
-        lvItem.pszText = const_cast<LPWSTR>(folders[i].c_str()); // Use const_cast for safe conversion
-        lvItem.iImage = 0; // Index of icon
-        SendMessage(hwndListView, LVM_INSERTITEM, 0, (LPARAM)&lvItem);
-    }
-}
-
-// Initialize ListView
-void InitializeListView(HWND hwndListView) {
-    LVCOLUMN lvCol;
-    lvCol.mask = LVCF_TEXT | LVCF_WIDTH;
-    lvCol.pszText = const_cast<LPWSTR>(L"Folders"); // Use const_cast for safe conversion
-    lvCol.cx = 200;
-    SendMessage(hwndListView, LVM_INSERTCOLUMN, 0, (LPARAM)&lvCol);
-}
-
-// Load icons into ImageList
-void LoadIcons() {
-    hImageList = ImageList_Create(16, 16, ILC_COLOR32, 4, 0);
-    // Load icons here (for example, using ImageList_AddIcon)
-}
-
-// Handle button clicks
-void OnButtonClick(HWND hwnd, WPARAM wParam) {
-    switch (LOWORD(wParam)) {
-        case BUTTON_1:
-            MessageBox(hwnd, L"Button 1 Clicked!", L"Notification", MB_OK);
-            break;
-        case BUTTON_2:
-            MessageBox(hwnd, L"Button 2 Clicked!", L"Notification", MB_OK);
-            break;
-    }
-}
-
-// Handle double-click events on ListView
-void OnDoubleClickListView(HWND hwnd) {
-    MessageBox(hwnd, L"Item double-clicked!", L"Notification", MB_OK);
 }

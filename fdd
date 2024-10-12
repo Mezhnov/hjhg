@@ -100,8 +100,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     case WM_PAINT: {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
+        Graphics graphics(hdc);
+
+        // Рисуем изображение как фон
         if (backgroundImage) {
-            Graphics graphics(hdc);
             graphics.DrawImage(backgroundImage, 0, 0, ps.rcPaint.right, ps.rcPaint.bottom);
         }
 
@@ -114,7 +116,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         std::wstring langString = L"РУС"; // Статичное значение языка
 
         // Используем GDI+ для рисования текста
-        Graphics graphics(hdc);
         FontFamily fontFamily(L"Segoe UI"); // Выбор шрифта
         Font font(&fontFamily, 16, FontStyleRegular, UnitPixel); // Устанавливаем размер шрифта на 16
         SolidBrush brush(Color(255, 0, 0, 0)); // Черный цвет текста

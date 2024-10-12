@@ -1,17 +1,72 @@
 #include <windows.h>
 #include <gdiplus.h>
+#include <wininet.h>
 #include <string>
 #include <vector>
 #include <chrono>
 #include <iomanip>
 #include <sstream>
+#include <locale>
+#include <codecvt>
 
 #pragma comment(lib, "gdiplus.lib")
+#pragma comment(lib, "wininet.lib")
 
 using namespace Gdiplus;
 
 // Объявляем переменную для изображения на уровне модуля
 Image* backgroundImage = nullptr;
+
+// Функция для загрузки изображения из URL
+bool LoadImageFromURL(const std::wstring& url) {
+    HINTERNET hInternet = InternetOpen(L"ImageLoader", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+    if (!hInternet) return false;
+
+    HINTERNET hConnect = InternetOpenUrl(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD, 0);
+    if (!hConnect) {
+        InternetCloseHandle(hInternet);
+        return false;
+    }
+
+    // Получаем размер загружаемого изображения
+    DWORD fileSize = 0;
+    DWORD bytesRead = 0;
+    if (!InternetQueryDataAvailable(hConnect, &fileSize, 0, 0)) {
+        InternetCloseHandle(hConnect);
+        InternetCloseHandle(hInternet);
+        return false;
+    }
+
+    // Создаем буфер для хранения данных изображения
+    std::vector<BYTE> buffer(fileSize);
+    if (!InternetReadFile(hConnect, buffer.data(), fileSize, &bytesRead) || bytesRead != fileSize) {
+        InternetCloseHandle(hConnect);
+        InternetCloseHandle(hInternet);
+        return false;
+    }
+
+    // Закрываем дескрипторы
+    InternetCloseHandle(hConnect);
+    InternetCloseHandle(hInternet);
+
+    // Загружаем изображение в GDI+
+    IStream* stream = nullptr;
+    if (FAILED(CreateStreamOnHGlobal(NULL, TRUE, &stream))) {
+        return false;
+    }
+
+    ULONG written;
+    if (FAILED(stream->Write(buffer.data(), fileSize, &written)) || written != fileSize) {
+        stream->Release();
+        return false;
+    }
+    stream->Seek({ 0 }, STREAM_SEEK_SET, NULL);
+
+    backgroundImage = new Image(stream);
+    stream->Release();
+
+    return backgroundImage != nullptr;
+}
 
 // Функция для получения текущего времени в строковом формате
 std::wstring GetCurrentTimeString() {
@@ -20,7 +75,6 @@ std::wstring GetCurrentTimeString() {
     std::time_t now_c = system_clock::to_time_t(now);
     std::tm parts;
 
-    // Используем localtime_s вместо localtime
     localtime_s(&parts, &now_c);
 
     std::wstringstream ss;
@@ -98,7 +152,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     // Инициализация GDI+
     GdiplusStartupInput gdiplusStartupInput;
     ULONG_PTR gdiplusToken;
-    GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
+    if (GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL) != GdiplusOk) {
+        return 0; // Не удалось инициализировать GDI+
+    }
 
     // Определяем класс окна
     WNDCLASS wc = {};
@@ -133,7 +189,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     std::wstring imagePath = L"Resources/afrikanskii-lev.orig.jpg"; // Путь к изображению в папке проекта
     backgroundImage = new Gdiplus::Image(imagePath.c_str());
 
-    // Показываем окно
+    // Проверяем, удалось ли загрузить изображение
+    if (backgroundImage->GetLastStatus() != Ok) {
+        delete backgroundImage; // Удаляем объект изображения в случае ошибки
+        backgroundImage = nullptr;
+    }
+
     ShowWindow(hwnd, nCmdShow);
 
     // Главный цикл сообщений

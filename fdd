@@ -8,11 +8,14 @@ using namespace Gdiplus;
 
 // Глобальные переменные
 HINSTANCE hInst;
-LPWSTR szWindowClass = L"DesktopApp";
-LPWSTR szTitle = L"Full Screen Image Viewer";
+const wchar_t* szWindowClass = L"DesktopApp";
+const wchar_t* szTitle = L"Full Screen Image Viewer";
 Image* image = nullptr;
 bool isFullScreen = false;
 HWND hWndMain;
+
+// Идентификаторы
+#define ID_EXIT 1
 
 // Функция для отрисовки
 void OnPaint(HDC hdc)

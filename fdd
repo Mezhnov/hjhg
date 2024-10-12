@@ -1,13 +1,53 @@
 #include <windows.h>
 #include <gdiplus.h>
+#include <wininet.h>
 #include <string>
+#include <vector>
 
 #pragma comment(lib, "gdiplus.lib")
+#pragma comment(lib, "wininet.lib")
 
 using namespace Gdiplus;
 
 // Объявляем переменную для изображения на уровне модуля
 Image* backgroundImage = nullptr;
+
+// Функция для загрузки изображения из URL
+bool LoadImageFromURL(const std::wstring& url) {
+    HINTERNET hInternet = InternetOpen(L"ImageLoader", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+    if (!hInternet) return false;
+
+    HINTERNET hConnect = InternetOpenUrl(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD, 0);
+    if (!hConnect) {
+        InternetCloseHandle(hInternet);
+        return false;
+    }
+
+    // Получаем размер загружаемого изображения
+    DWORD fileSize = 0;
+    DWORD bytesRead = 0;
+    InternetQueryDataAvailable(hConnect, &fileSize, 0, 0);
+
+    // Создаем буфер для хранения данных изображения
+    std::vector<BYTE> buffer(fileSize);
+    InternetReadFile(hConnect, buffer.data(), fileSize, &bytesRead);
+
+    // Закрываем дескрипторы
+    InternetCloseHandle(hConnect);
+    InternetCloseHandle(hInternet);
+
+    // Загружаем изображение в GDI+
+    IStream* stream = NULL;
+    CreateStreamOnHGlobal(NULL, TRUE, &stream);
+    ULONG written;
+    stream->Write(buffer.data(), fileSize, &written);
+    stream->Seek({0}, STREAM_SEEK_SET, NULL);
+
+    backgroundImage = new Image(stream);
+    stream->Release();
+
+    return backgroundImage != nullptr;
+}
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
@@ -76,9 +116,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     if (hwnd == NULL) return 0;
 
-    // Загружаем изображение (замените путь к изображению)
-    std::wstring imagePath = L"path_to_your_image.jpg"; // Путь к изображению
-    backgroundImage = new Image(imagePath.c_str());
+    // Загружаем изображение из интернета
+    std::wstring imageUrl = L"https://example.com/your_image.jpg"; // URL к изображению
+    if (!LoadImageFromURL(imageUrl)) {
+        MessageBox(NULL, L"Не удалось загрузить изображение", L"Ошибка", MB_OK);
+        return 0;
+    }
 
     ShowWindow(hwnd, nCmdShow);
 

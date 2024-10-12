@@ -1,19 +1,45 @@
 #include <windows.h>
 #include <gdiplus.h>
 #include <string>
+#include <vector>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
 
 #pragma comment(lib, "gdiplus.lib")
 
 using namespace Gdiplus;
 
-// Объявляем переменную для изображения
+// Объявляем переменную для изображения на уровне модуля
 Image* backgroundImage = nullptr;
+
+// Функция для получения текущего времени в строковом формате
+std::wstring GetCurrentTimeString() {
+    using namespace std::chrono;
+    auto now = system_clock::now();
+    std::time_t now_c = system_clock::to_time_t(now);
+    std::tm parts;
+
+    // Используем localtime_s вместо localtime
+    localtime_s(&parts, &now_c);
+
+    std::wstringstream ss;
+    ss << std::put_time(&parts, L"%H:%M"); // Формат времени HH:MM
+    return ss.str();
+}
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
         case WM_DESTROY:
             delete backgroundImage; // Удаляем изображение
             PostQuitMessage(0);
+            return 0;
+
+        case WM_KEYDOWN:
+            // Проверяем нажатие клавиши Esc
+            if (wParam == VK_ESCAPE) {
+                DestroyWindow(hwnd); // Закрыть окно
+            }
             return 0;
 
         case WM_PAINT: {
@@ -25,6 +51,37 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             if (backgroundImage) {
                 graphics.DrawImage(backgroundImage, 0, 0, ps.rcPaint.right, ps.rcPaint.bottom);
             }
+
+            // Рисуем нижнюю панель
+            RECT panelRect = { 0, ps.rcPaint.bottom - 40, ps.rcPaint.right, ps.rcPaint.bottom };
+            FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1)); // Цвет панели
+
+            // Получаем текущее время
+            std::wstring timeString = GetCurrentTimeString();
+            std::wstring langString = L"РУС"; // Статичное значение языка
+
+            // Используем GDI+ для рисования текста
+            FontFamily fontFamily(L"Segoe UI"); // Выбор шрифта
+            Font font(&fontFamily, 16, FontStyleRegular, UnitPixel); // Устанавливаем размер шрифта на 16
+            SolidBrush brush(Color(255, 0, 0, 0)); // Черный цвет текста
+
+            // Находим размеры текста для центрирования
+            RectF timeRect;
+            graphics.MeasureString(timeString.c_str(), -1, &font, PointF(0, 0), &timeRect);
+            RectF langRect;
+            graphics.MeasureString(langString.c_str(), -1, &font, PointF(0, 0), &langRect);
+
+            // Рассчитываем координаты для расположения текста
+            float xTime = panelRect.right - timeRect.Width - langRect.Width - 30; // Увеличен отступ от правого края
+            float y = panelRect.bottom - timeRect.Height - 10; // Отступ от нижней границы
+
+            // Рисуем текст без фона
+            PointF timePoint(xTime, y);
+            graphics.DrawString(timeString.c_str(), -1, &font, timePoint, nullptr, &brush);
+
+            // Рисуем язык рядом с временем
+            PointF langPoint(xTime - langRect.Width - 10, y); // Отступ слева от времени
+            graphics.DrawString(langString.c_str(), -1, &font, langPoint, nullptr, &brush);
 
             EndPaint(hwnd, &ps);
             return 0;
@@ -73,7 +130,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     if (hwnd == NULL) return 0;
 
     // Загружаем изображение из локального файла
-    std::wstring imagePath = L"Resources/afrikanskii-lev.orig.jpg"; // Путь к изображению
+    std::wstring imagePath = L"Resources/afrikanskii-lev.orig.jpg"; // Путь к изображению в папке проекта
     backgroundImage = new Gdiplus::Image(imagePath.c_str());
 
     // Показываем окно

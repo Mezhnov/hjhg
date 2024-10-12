@@ -113,11 +113,19 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         // Используем GDI+ для рисования текста
         Graphics graphics(hdc);
         FontFamily fontFamily(L"Segoe UI"); // Выбор шрифта
-        Font font(&fontFamily, 20, FontStyleRegular, UnitPixel); // Устанавливаем размер и стиль шрифта
+        Font font(&fontFamily, 16, FontStyleRegular, UnitPixel); // Устанавливаем размер шрифта на 16
         SolidBrush brush(Color(255, 0, 0, 0)); // Черный цвет текста
 
+        // Находим размеры текста для центрирования
+        RectF textRect;
+        graphics.MeasureString(timeString.c_str(), -1, &font, PointF(0, 0), &textRect);
+
+        // Рассчитываем координаты для центрирования текста
+        float x = (panelRect.right - textRect.Width) / 2;
+        float y = panelRect.bottom - textRect.Height - 10; // Отступ от нижней границы
+
         // Рисуем текст без фона
-        PointF point(static_cast<float>(panelRect.right - 100), static_cast<float>(panelRect.bottom - 30));
+        PointF point(x, y);
         graphics.DrawString(timeString.c_str(), -1, &font, point, nullptr, &brush);
 
         EndPaint(hwnd, &ps);

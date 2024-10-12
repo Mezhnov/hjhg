@@ -75,7 +75,6 @@ std::wstring GetCurrentTimeString() {
     std::time_t now_c = system_clock::to_time_t(now);
     std::tm parts;
 
-    // Используем localtime_s вместо localtime
     localtime_s(&parts, &now_c);
 
     std::wstringstream ss;
@@ -85,69 +84,90 @@ std::wstring GetCurrentTimeString() {
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
-        case WM_DESTROY:
-            delete backgroundImage; // Удаляем изображение
-            PostQuitMessage(0);
-            return 0;
+    case WM_DESTROY:
+        delete backgroundImage; // Удаляем изображение
+        PostQuitMessage(0);
+        return 0;
 
-        case WM_KEYDOWN:
-            // Проверяем нажатие клавиши Esc
-            if (wParam == VK_ESCAPE) {
-                DestroyWindow(hwnd); // Закрыть окно
-            }
-            return 0;
+    case WM_KEYDOWN:
+        // Проверяем нажатие клавиши Esc
+        if (wParam == VK_ESCAPE) {
+            DestroyWindow(hwnd); // Закрыть окно
+        }
+        return 0;
 
-        case WM_PAINT: {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hwnd, &ps);
-            Graphics graphics(hdc);
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
+        Graphics graphics(hdc);
 
-            // Рисуем изображение как фон
-            if (backgroundImage) {
-                graphics.DrawImage(backgroundImage, 0, 0, ps.rcPaint.right, ps.rcPaint.bottom);
-            }
-
-            // Рисуем нижнюю панель
-            RECT panelRect = { 0, ps.rcPaint.bottom - 40, ps.rcPaint.right, ps.rcPaint.bottom };
-            FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1)); // Цвет панели
-
-            // Получаем текущее время
-            std::wstring timeString = GetCurrentTimeString();
-            std::wstring langString = L"РУС"; // Статичное значение языка
-
-            // Используем GDI+ для рисования текста
-            FontFamily fontFamily(L"Segoe UI"); // Выбор шрифта
-            Font font(&fontFamily, 16, FontStyleRegular, UnitPixel); // Устанавливаем размер шрифта на 16
-            SolidBrush brush(Color(255, 0, 0, 0)); // Черный цвет текста
-
-            // Находим размеры текста для центрирования
-            RectF timeRect;
-            graphics.MeasureString(timeString.c_str(), -1, &font, PointF(0, 0), &timeRect);
-            RectF langRect;
-            graphics.MeasureString(langString.c_str(), -1, &font, PointF(0, 0), &langRect);
-
-            // Рассчитываем координаты для расположения текста
-            float xTime = panelRect.right - timeRect.Width - langRect.Width - 30; // Увеличен отступ от правого края
-            float y = panelRect.bottom - timeRect.Height - 10; // Отступ от нижней границы
-
-            // Рисуем текст без фона
-            PointF timePoint(xTime, y);
-            graphics.DrawString(timeString.c_str(), -1, &font, timePoint, nullptr, &brush);
-
-            // Рисуем язык рядом с временем
-            PointF langPoint(xTime - langRect.Width - 10, y); // Отступ слева от времени
-            graphics.DrawString(langString.c_str(), -1, &font, langPoint, nullptr, &brush);
-
-            EndPaint(hwnd, &ps);
-            return 0;
+        // Рисуем изображение как фон
+        if (backgroundImage) {
+            graphics.DrawImage(backgroundImage, 0, 0, ps.rcPaint.right, ps.rcPaint.bottom);
         }
 
-        default:
-            return DefWindowProc(hwnd, uMsg, wParam, lParam);
+        // Рисуем нижнюю панель
+        RECT panelRect = { 0, ps.rcPaint.bottom - 60, ps.rcPaint.right, ps.rcPaint.bottom };
+        FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1)); // Цвет панели
+
+        // Получаем текущее время
+        std::wstring timeString = GetCurrentTimeString();
+        std::wstring langString = L"РУС"; // Статичное значение языка
+
+        // Используем GDI+ для рисования текста
+        FontFamily fontFamily(L"Segoe UI"); // Выбор шрифта
+        Font font(&fontFamily, 16, FontStyleRegular, UnitPixel); // Устанавливаем размер шрифта на 16
+        SolidBrush brush(Color(255, 0, 0, 0)); // Черный цвет текста
+
+        // Находим размеры текста для центрирования
+        RectF timeRect;
+        graphics.MeasureString(timeString.c_str(), -1, &font, PointF(0, 0), &timeRect);
+        RectF langRect;
+        graphics.MeasureString(langString.c_str(), -1, &font, PointF(0, 0), &langRect);
+
+        // Рассчитываем координаты для расположения текста
+        float xTime = panelRect.right - timeRect.Width - langRect.Width - 30; // Увеличен отступ от правого края
+        float y = panelRect.bottom - timeRect.Height - 10; // Отступ от нижней границы
+
+        // Рисуем текст без фона
+        PointF timePoint(xTime, y);
+        graphics.DrawString(timeString.c_str(), -1, &font, timePoint, nullptr, &brush);
+
+        // Рисуем язык рядом с временем
+        PointF langPoint(xTime - langRect.Width - 10, y); // Отступ слева от времени
+        graphics.DrawString(langString.c_str(), -1, &font, langPoint, nullptr, &brush);
+
+        // Рисуем иконки "Этот компьютер" и "Корзина"
+        const wchar_t* computerText = L"Этот компьютер";
+        const wchar_t* recycleBinText = L"Корзина";
+
+        // Позиции иконок
+        PointF computerPoint(20.0f, panelRect.top + 10.0f);
+        PointF recycleBinPoint(20.0f, panelRect.top + 40.0f);
+
+        // Рисуем текст иконок
+        graphics.DrawString(computerText, -1, &font, computerPoint, nullptr, &brush);
+        graphics.DrawString(recycleBinText, -1, &font, recycleBinPoint, nullptr, &brush);
+
+        // Рисуем панель задач с полем поиска
+        RECT taskbarRect = { 0, 0, ps.rcPaint.right, 40 };
+        FillRect(hdc, &taskbarRect, (HBRUSH)(COLOR_WINDOW + 1)); // Цвет панели задач
+
+        // Рисуем поле поиска
+        RECT searchBox = { 10, 5, 200, 30 }; // Позиция и размер поля поиска
+        FillRect(hdc, &searchBox, (HBRUSH)(COLOR_BTNFACE + 1)); // Цвет поля поиска
+        graphics.DrawString(L"Поиск...", -1, &font, PointF(15.0f, 10.0f), nullptr, &brush); // Текст в поле поиска
+
+        EndPaint(hwnd, &ps);
+        return 0;
+    }
+
+    default:
+        return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
 }
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     const wchar_t CLASS_NAME[] = L"FullscreenWindowClass";
 
     // Инициализация GDI+
@@ -185,7 +205,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     if (hwnd == NULL) return 0;
 
     // Загружаем изображение из локального файла
-    std::wstring imagePath = L"C:\\Users\\User\\source\\repos\\Проверка проекта\\Resources\\afrikanskii-lev.orig.jpg"; // Путь к изображению в папке проекта
+    std::wstring imagePath = L"Resources\\afrikanskii-lev.orig.jpg"; // Путь к изображению в папке проекта
     backgroundImage = new Gdiplus::Image(imagePath.c_str());
 
     ShowWindow(hwnd, nCmdShow);
@@ -197,8 +217,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         DispatchMessage(&msg);
     }
 
-    // Завершаем работу GDI+
+    // Завершение GDI+
     GdiplusShutdown(gdiplusToken);
-
     return 0;
 }

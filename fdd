@@ -17,6 +17,10 @@ using namespace Gdiplus;
 // Объявляем переменную для изображения на уровне модуля
 Image* backgroundImage = nullptr;
 
+// Массив языков
+std::vector<std::wstring> languages = { L"РУС", L"ENG" }; // Русский и английский
+int currentLanguageIndex = 0; // Индекс текущего языка
+
 // Функция для загрузки изображения из URL
 bool LoadImageFromURL(const std::wstring& url) {
     HINTERNET hInternet = InternetOpen(L"ImageLoader", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
@@ -95,6 +99,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             if (wParam == VK_ESCAPE) {
                 DestroyWindow(hwnd); // Закрыть окно
             }
+
+            // Обработка переключения языка на Alt+Shift или Win+Space
+            if ((GetAsyncKeyState(VK_MENU) & 0x8000) && wParam == VK_SHIFT || 
+                (GetAsyncKeyState(VK_LWIN) & 0x8000) && wParam == VK_SPACE) {
+                currentLanguageIndex = (currentLanguageIndex + 1) % languages.size(); // Переключаем язык
+                InvalidateRect(hwnd, NULL, TRUE); // Перерисовываем окно
+            }
             return 0;
 
         case WM_PAINT: {
@@ -113,7 +124,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
             // Получаем текущее время
             std::wstring timeString = GetCurrentTimeString();
-            std::wstring langString = L"РУС"; // Статичное значение языка
+            std::wstring langString = languages[currentLanguageIndex]; // Текущий язык
 
             // Используем GDI+ для рисования текста
             FontFamily fontFamily(L"Segoe UI"); // Выбор шрифта
@@ -198,13 +209,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     if (hwnd == NULL) return 0;
 
-    // Загружаем изображение из локального файла
-    std::wstring imagePath = L"Resources\\afrikanskii-lev.orig.jpg"; // Путь к изображению в папке проекта
-    backgroundImage = new Gdiplus::Image(imagePath.c_str());
+    // Загружаем изображение фона из URL
+    LoadImageFromURL(L"https://example.com/background.jpg");
 
     ShowWindow(hwnd, nCmdShow);
 
-    // Главный цикл сообщений
+    // Основной цикл сообщений
     MSG msg = {};
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);

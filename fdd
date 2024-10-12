@@ -1,972 +1,184 @@
-Улучшение вашего C++ кода до уровня профессиональных игровых движков, таких как Unreal Engine 5 (UE5), требует внедрения современных практик программирования, структурирования кода, управления ресурсами и расширяемости. Ниже представлен переработанный пример вашего приложения с использованием объектно-ориентированного подхода, современного C++ (C++17 и выше), улучшенного управления ресурсами с помощью умных указателей, а также с более чистой архитектурой.
-
-## Основные улучшения
-
-1. **Объектно-ориентированное проектирование (ООП)**: Разделение функциональности на классы, такие как `Application`, `Window`, `Renderer` и `UIComponent`.
-
-2. **Управление ресурсами**: Использование умных указателей (`std::unique_ptr`, `std::shared_ptr`) для автоматического управления временем жизни объектов и предотвращения утечек памяти.
-
-3. **Обработка ошибок**: Более тщательная обработка ошибок с использованием исключений и проверок `HRESULT`.
-
-4. **Модульность и расширяемость**: Легкость добавления новых компонентов и функциональностей благодаря четкому разделению ответственности между классами.
-
-5. **Современный C++**: Использование современных возможностей языка для улучшения читаемости и безопасности кода.
-
-6. **Инкапсуляция Direct3D**: Выделение логики рендеринга в отдельный класс.
-
-7. **Реализация интерфейсов и событий**: Создание более гибкой системы взаимодействия между компонентами.
-
-## Переработанный Код
-
-### Основная структура проекта
-
-Для улучшения архитектуры проекта рекомендуем использовать следующую структуру файлов:
-
-```
-/Project
-│
-├── src
-│   ├── Application.h
-│   ├── Application.cpp
-│   ├── Window.h
-│   ├── Window.cpp
-│   ├── Renderer.h
-│   ├── Renderer.cpp
-│   ├── UIComponent.h
-│   ├── UIComponent.cpp
-│   └── main.cpp
-│
-├── include
-│   └── (заголовочные файлы библиотек, если необходимо)
-│
-├── resources
-│   └── (ресурсы, такие как иконки, шрифты и т.д.)
-│
-├── CMakeLists.txt (или другой файл сборки)
-│
-└── README.md
-```
-
-### `Application.h`
-
-```cpp
-#pragma once
-
 #include <windows.h>
-#include <memory>
-#include "Window.h"
-#include "Renderer.h"
-
-class Application {
-public:
-    Application(HINSTANCE hInstance);
-    ~Application();
-
-    bool Initialize(int nCmdShow);
-    int Run();
-
-private:
-    HINSTANCE m_hInstance;
-    std::unique_ptr<Window> m_mainWindow;
-    std::unique_ptr<Renderer> m_renderer;
-
-    // Prevent copying
-    Application(const Application&) = delete;
-    Application& operator=(const Application&) = delete;
-};
-```
-
-### `Application.cpp`
-
-```cpp
-#include "Application.h"
+#include <commctrl.h>
 #include <gdiplus.h>
-#include <stdexcept>
-#include <filesystem>
+#include <vector>
+#include <string>
+#include <iostream>
 
 #pragma comment(lib, "gdiplus.lib")
-#pragma comment(lib, "d3d11.lib")
 
-Application::Application(HINSTANCE hInstance)
-    : m_hInstance(hInstance), m_mainWindow(nullptr), m_renderer(nullptr) {
-    // Создание структуры папок проекта
-    std::vector<std::string> folders = {
-        "Assets",
-        "Scripts",
-        "Textures",
-        "Models",
-        "Shaders",
-        "Projects"
-    };
+using namespace Gdiplus;
 
-    for (const auto& folder : folders) {
-        std::filesystem::create_directory(folder);
-    }
+#define BUTTON_1 101
+#define BUTTON_2 102
+#define EDIT_TEXT 103
+#define LIST_VIEW 104
+#define BUTTON_MY_COMPUTER 105
 
-    // Инициализация GDI+
-    Gdiplus::GdiplusStartupInput gdiplusStartupInput;
-    ULONG_PTR gdiplusToken;
-    if (Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, nullptr) != Gdiplus::Ok) {
-        throw std::runtime_error("Failed to initialize GDI+.");
-    }
-}
+ULONG_PTR gdiplusToken;
 
-Application::~Application() {
-    // Освобождение ресурсов производится автоматически благодаря умным указателям
-    Gdiplus::GdiplusShutdown(0);
-}
+// Global variables for storing icons
+HIMAGELIST hImageList;
 
-bool Application::Initialize(int nCmdShow) {
-    // Создание главного окна
-    m_mainWindow = std::make_unique<Window>(m_hInstance, L"UnrealEditorClass", L"Unreal Engine 5 Editor");
-    if (!m_mainWindow->Create()) {
-        return false;
-    }
+// Function prototypes
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+void DrawGradientBackground(HDC hdc, RECT rect);
+void AddListViewItems(HWND hwndListView);
+void InitializeListView(HWND hwndListView);
+void LoadIcons();
+void OnButtonClick(HWND hwnd, WPARAM wParam);
+void OnDoubleClickListView(HWND hwnd);
 
-    m_mainWindow->Show(nCmdShow);
-
-    // Создание рендерера
-    m_renderer = std::make_unique<Renderer>(m_mainWindow->GetHWND());
-    if (!m_renderer->Initialize()) {
-        return false;
-    }
-
-    return true;
-}
-
-int Application::Run() {
-    MSG msg = {};
-    while (msg.message != WM_QUIT) {
-        if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        } else {
-            // Главный цикл рендеринга
-            m_renderer->RenderFrame();
-        }
-    }
-    return static_cast<int>(msg.wParam);
-}
-```
-
-### `Window.h`
-
-```cpp
-#pragma once
-
-#include <windows.h>
-#include <string>
-
-class Window {
-public:
-    Window(HINSTANCE hInstance, const std::wstring& className, const std::wstring& windowTitle);
-    ~Window();
-
-    bool Create();
-    void Show(int nCmdShow);
-    HWND GetHWND() const { return m_hwnd; }
-
-    // Регистрация WNDCLASS один раз для всех окон
-    static bool RegisterWindowClass(HINSTANCE hInstance, const std::wstring& className);
-
-private:
-    HINSTANCE m_hInstance;
-    std::wstring m_className;
-    std::wstring m_windowTitle;
-    HWND m_hwnd;
-
-    // Статический указатель на экземпляр окна для использования в WindowProc
-    static Window* s_instance;
-
-    static LRESULT CALLBACK WindowProcStatic(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-    LRESULT HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam);
-};
-```
-
-### `Window.cpp`
-
-```cpp
-#include "Window.h"
-#include <commctrl.h>
-#include <stdexcept>
-
-// Инициализация статического члена
-Window* Window::s_instance = nullptr;
-
-Window::Window(HINSTANCE hInstance, const std::wstring& className, const std::wstring& windowTitle)
-    : m_hInstance(hInstance), m_className(className), m_windowTitle(windowTitle), m_hwnd(nullptr) {}
-
-Window::~Window() {
-    if (m_hwnd) {
-        DestroyWindow(m_hwnd);
-    }
-}
-
-bool Window::RegisterWindowClass(HINSTANCE hInstance, const std::wstring& className) {
-    WNDCLASS wc = {};
-    wc.lpfnWndProc = WindowProcStatic;
-    wc.hInstance = hInstance;
-    wc.lpszClassName = className.c_str();
-    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wc.hbrBackground = reinterpret_cast<HBRUSH>(GetStockObject(BLACK_BRUSH));
-
-    return RegisterClass(&wc);
-}
-
-bool Window::Create() {
-    if (!s_instance) {
-        s_instance = this;
-    } else {
-        return false; // Одновременно только один экземпляр окна
-    }
-
-    m_hwnd = CreateWindowEx(
-        0,
-        m_className.c_str(),
-        m_windowTitle.c_str(),
-        WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, 1280, 720,
-        NULL, NULL, m_hInstance, NULL
-    );
-
-    if (!m_hwnd) {
-        return false;
-    }
-
-    return true;
-}
-
-void Window::Show(int nCmdShow) {
-    ShowWindow(m_hwnd, nCmdShow);
-    UpdateWindow(m_hwnd);
-}
-
-LRESULT CALLBACK Window::WindowProcStatic(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    if (uMsg == WM_NCCREATE) {
-        CREATESTRUCT* pCreate = reinterpret_cast<CREATESTRUCT*>(lParam);
-        Window* pWindow = reinterpret_cast<Window*>(pCreate->lpCreateParams);
-        SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pWindow));
-        pWindow->m_hwnd = hwnd;
-    } else {
-        Window* pWindow = reinterpret_cast<Window*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
-        if (pWindow) {
-            return pWindow->HandleMessage(uMsg, wParam, lParam);
-        }
-    }
-    return DefWindowProc(hwnd, uMsg, wParam, lParam);
-}
-
-LRESULT Window::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    switch (uMsg) {
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        return 0;
-
-    case WM_SIZE:
-        // Обработка изменения размера окна
-        // Может быть передано в рендерер
-        return 0;
-
-    // Добавьте обработку других сообщений по необходимости
-
-    default:
-        return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
-    }
-}
-```
-
-### `Renderer.h`
-
-```cpp
-#pragma once
-
-#include <windows.h>
-#include <d3d11.h>
-#include <wrl/client.h>
-
-class Renderer {
-public:
-    Renderer(HWND hwnd);
-    ~Renderer();
-
-    bool Initialize();
-    void RenderFrame();
-
-private:
-    HWND m_hwnd;
-    Microsoft::WRL::ComPtr<ID3D11Device> m_device;
-    Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_deviceContext;
-    Microsoft::WRL::ComPtr<IDXGISwapChain> m_swapChain;
-    Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_renderTargetView;
-
-    void CreateDeviceAndSwapChain();
-    void CreateRenderTargetView();
-    void CleanupRenderTarget();
-};
-```
-
-### `Renderer.cpp`
-
-```cpp
-#include "Renderer.h"
-#include <stdexcept>
-
-Renderer::Renderer(HWND hwnd)
-    : m_hwnd(hwnd) {}
-
-Renderer::~Renderer() {
-    CleanupRenderTarget();
-}
-
-bool Renderer::Initialize() {
-    try {
-        CreateDeviceAndSwapChain();
-        CreateRenderTargetView();
-    } catch (const std::runtime_error& e) {
-        // Логирование ошибки
-        return false;
-    }
-    return true;
-}
-
-void Renderer::CreateDeviceAndSwapChain() {
-    DXGI_SWAP_CHAIN_DESC sd = {};
-    sd.BufferCount = 1;
-    sd.BufferDesc.Width = 1280;
-    sd.BufferDesc.Height = 720;
-    sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    sd.BufferDesc.RefreshRate.Numerator = 60;
-    sd.BufferDesc.RefreshRate.Denominator = 1;
-    sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    sd.OutputWindow = m_hwnd;
-    sd.SampleDesc.Count = 1;
-    sd.Windowed = TRUE;
-
-    D3D_FEATURE_LEVEL featureLevels[] = { D3D_FEATURE_LEVEL_11_0 };
-    UINT numFeatureLevels = ARRAYSIZE(featureLevels);
-
-    HRESULT hr = D3D11CreateDeviceAndSwapChain(
-        nullptr,
-        D3D_DRIVER_TYPE_HARDWARE,
-        nullptr,
-        0,
-        featureLevels,
-        numFeatureLevels,
-        D3D11_SDK_VERSION,
-        &sd,
-        &m_swapChain,
-        &m_device,
-        nullptr,
-        &m_deviceContext
-    );
-
-    if (FAILED(hr)) {
-        throw std::runtime_error("Failed to create D3D11 device and swap chain.");
-    }
-}
-
-void Renderer::CreateRenderTargetView() {
-    Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
-    HRESULT hr = m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), &backBuffer);
-    if (FAILED(hr)) {
-        throw std::runtime_error("Failed to get back buffer.");
-    }
-
-    hr = m_device->CreateRenderTargetView(backBuffer.Get(), nullptr, &m_renderTargetView);
-    if (FAILED(hr)) {
-        throw std::runtime_error("Failed to create render target view.");
-    }
-
-    m_deviceContext->OMSetRenderTargets(1, m_renderTargetView.GetAddressOf(), nullptr);
-
-    // Установка вьюпорта
-    D3D11_VIEWPORT vp;
-    vp.Width = 1280.0f;
-    vp.Height = 720.0f;
-    vp.MinDepth = 0.0f;
-    vp.MaxDepth = 1.0f;
-    vp.TopLeftX = 0;
-    vp.TopLeftY = 0;
-    m_deviceContext->RSSetViewports(1, &vp);
-}
-
-void Renderer::RenderFrame() {
-    // Очистка экрана
-    float ClearColor[4] = { 0.0f, 0.2f, 0.4f, 1.0f }; // Темно-синий цвет
-    m_deviceContext->ClearRenderTargetView(m_renderTargetView.Get(), ClearColor);
-
-    // Добавьте сюда код рендеринга вашего пользовательского интерфейса
-
-    // Презентация изображения
-    m_swapChain->Present(1, 0);
-}
-
-void Renderer::CleanupRenderTarget() {
-    if (m_renderTargetView) {
-        m_renderTargetView.Reset();
-    }
-}
-```
-
-### `UIComponent.h`
-
-Если вы планируете добавлять различные UI-компоненты, было бы хорошо создать базовый класс для них:
-
-```cpp
-#pragma once
-
-#include <windows.h>
-
-class UIComponent {
-public:
-    virtual ~UIComponent() = default;
-    virtual void Create(HWND parent) = 0;
-    virtual void Show(bool show) = 0;
-    virtual HWND GetHWND() const = 0;
-};
-```
-
-Вы можете далее создавать конкретные компоненты, такие как `Toolbar`, `ContentBrowser` и т.д., наследуясь от `UIComponent`.
-
-### `main.cpp`
-
-```cpp
-#include "Application.h"
-
+// Main function
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
-    try {
-        Application app(hInstance);
-        if (!app.Initialize(nCmdShow)) {
-            return -1;
-        }
-        return app.Run();
-    } catch (const std::exception& e) {
-        // Здесь можно показать сообщение об ошибке пользователю
-        MessageBoxA(nullptr, e.what(), "Error", MB_ICONERROR | MB_OK);
-        return -1;
-    }
-}
-```
+    GdiplusStartupInput gdiplusStartupInput;
+    GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
 
-## Дополнительные Улучшения
+    INITCOMMONCONTROLSEX icex;
+    icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
+    icex.dwICC = ICC_LISTVIEW_CLASSES;
+    InitCommonControlsEx(&icex);
 
-### 1. **Добавление UI-компонентов**
+    const char CLASS_NAME[] = "WindowClass";
+    WNDCLASS wc = {};
+    wc.lpfnWndProc = WindowProc;
+    wc.hInstance = hInstance;
+    wc.lpszClassName = CLASS_NAME;
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
 
-Создайте отдельные классы для ваших UI-компонентов (Toolbar, Content Browser, Properties Panel, Viewport), наследуясь от `UIComponent`. Это позволит легко управлять каждым компонентом независимо и улучшит масштабируемость.
+    RegisterClass(&wc);
 
-**Пример: Toolbar**
+    HWND hwnd = CreateWindowEx(0, CLASS_NAME, "My Unreal-Like Window", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+                               CW_USEDEFAULT, CW_USEDEFAULT, 800, 600, NULL, NULL, hInstance, NULL);
+    if (hwnd == NULL) return 0;
 
-```cpp
-// Toolbar.h
-#pragma once
-#include "UIComponent.h"
-#include <commctrl.h>
+    // Create ListView for displaying folders
+    HWND hListView = CreateWindow(WC_LISTVIEW, "", WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SINGLESEL,
+                                  50, 200, 700, 350, hwnd, (HMENU)LIST_VIEW, hInstance, NULL);
+    InitializeListView(hListView);
 
-class Toolbar : public UIComponent {
-public:
-    Toolbar();
-    ~Toolbar();
+    // Load icons into ImageList
+    LoadIcons();
+    SendMessage(hListView, LVM_SETIMAGELIST, LVSIL_NORMAL, (LPARAM)hImageList);
 
-    void Create(HWND parent) override;
-    void Show(bool show) override;
-    HWND GetHWND() const override { return m_hToolbar; }
+    // Add items to ListView
+    AddListViewItems(hListView);
 
-private:
-    HWND m_hToolbar;
-    void InitializeToolbarButtons();
-};
-```
+    // Create buttons
+    CreateWindow("BUTTON", "Этот компьютер", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+                 50, 50, 150, 30, hwnd, (HMENU)BUTTON_MY_COMPUTER, hInstance, NULL);
 
-```cpp
-// Toolbar.cpp
-#include "Toolbar.h"
-#include <vector>
-#include <string>
+    CreateWindow("BUTTON", "Button 1", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+                 220, 50, 100, 30, hwnd, (HMENU)BUTTON_1, hInstance, NULL);
 
-Toolbar::Toolbar()
-    : m_hToolbar(nullptr) {}
+    CreateWindow("BUTTON", "Button 2", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+                 350, 50, 100, 30, hwnd, (HMENU)BUTTON_2, hInstance, NULL);
 
-Toolbar::~Toolbar() {
-    if (m_hToolbar) {
-        DestroyWindow(m_hToolbar);
-    }
-}
+    // Create edit box
+    CreateWindow("EDIT", "", WS_CHILD | WS_VISIBLE | WS_BORDER,
+                 470, 50, 400, 30, hwnd, (HMENU)EDIT_TEXT, hInstance, NULL);
 
-void Toolbar::Create(HWND parent) {
-    m_hToolbar = CreateWindowEx(0, TOOLBARCLASSNAME, NULL,
-        WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | TBSTYLE_TOOLTIPS,
-        0, 0, 0, 0, parent, NULL, GetModuleHandle(NULL), NULL);
+    ShowWindow(hwnd, nCmdShow);
 
-    if (!m_hToolbar) {
-        throw std::runtime_error("Failed to create toolbar.");
-    }
-
-    InitializeToolbarButtons();
-
-    // Обновление размеров и размещения
-    SendMessage(m_hToolbar, TB_AUTOSIZE, 0, 0);
-}
-
-void Toolbar::Show(bool show) {
-    ShowWindow(m_hToolbar, show ? SW_SHOW : SW_HIDE);
-}
-
-void Toolbar::InitializeToolbarButtons() {
-    std::vector<TBBUTTON> tbButtons = {
-        { MAKELONG(STD_FILENEW, 0), 1001, TBSTATE_ENABLED, TBSTYLE_BUTTON, {0}, 0, (INT_PTR)L"New" },
-        { MAKELONG(STD_FILEOPEN, 0), 1002, TBSTATE_ENABLED, TBSTYLE_BUTTON, {0}, 0, (INT_PTR)L"Open" },
-        { MAKELONG(STD_FILESAVE, 0), 1003, TBSTATE_ENABLED, TBSTYLE_BUTTON, {0}, 0, (INT_PTR)L"Save" }
-    };
-
-    SendMessage(m_hToolbar, TB_BUTTONSTRUCTSIZE, (WPARAM)sizeof(TBBUTTON), 0);
-    SendMessage(m_hToolbar, TB_ADDBUTTONS, (WPARAM)tbButtons.size(), (LPARAM)&tbButtons[0]);
-}
-```
-
-### 2. **Реализация Менеджера Компонентов**
-
-Создайте менеджер компонентов, который будет управлять созданием и хранением различных UI-компонентов.
-
-```cpp
-// ComponentManager.h
-#pragma once
-#include <memory>
-#include <vector>
-#include "UIComponent.h"
-
-class ComponentManager {
-public:
-    void AddComponent(std::unique_ptr<UIComponent> component) {
-        m_components.emplace_back(std::move(component));
-    }
-
-    void CreateAll(HWND parent) {
-        for (auto& component : m_components) {
-            component->Create(parent);
-        }
-    }
-
-    void ShowAll(bool show) {
-        for (auto& component : m_components) {
-            component->Show(show);
-        }
-    }
-
-private:
-    std::vector<std::unique_ptr<UIComponent>> m_components;
-};
-```
-
-**Использование `ComponentManager` в `Application`**
-
-```cpp
-// Application.h
-#include "ComponentManager.h"
-// ...
-
-private:
-    ComponentManager m_componentManager;
-// ...
-```
-
-```cpp
-// Application.cpp
-#include "Toolbar.h"
-// ...
-
-bool Application::Initialize(int nCmdShow) {
-    // Создание главного окна
-    m_mainWindow = std::make_unique<Window>(m_hInstance, L"UnrealEditorClass", L"Unreal Engine 5 Editor");
-    if (!m_mainWindow->Create()) {
-        return false;
-    }
-
-    m_mainWindow->Show(nCmdShow);
-
-    // Создание UI-компонентов
-    m_componentManager.AddComponent(std::make_unique<Toolbar>());
-    // Добавьте другие компоненты аналогично
-    // m_componentManager.AddComponent(std::make_unique<ContentBrowser>());
-    // m_componentManager.AddComponent(std::make_unique<PropertiesPanel>());
-    // m_componentManager.AddComponent(std::make_unique<Viewport>());
-
-    m_componentManager.CreateAll(m_mainWindow->GetHWND());
-    m_componentManager.ShowAll(true);
-
-    // Создание рендерера
-    m_renderer = std::make_unique<Renderer>(m_mainWindow->GetHWND());
-    if (!m_renderer->Initialize()) {
-        return false;
-    }
-
-    return true;
-}
-```
-
-### 3. **Улучшение Обработки Сообщений**
-
-Добавьте более продвинутую обработку сообщений и взаимодействие с компонентами:
-
-```cpp
-// Window.cpp (дополнительно в HandleMessage)
-case WM_COMMAND:
-    {
-        int wmId = LOWORD(wParam);
-        // Обработка команд от элементов UI
-        switch (wmId) {
-        case 1001:
-            // Действие для "New"
-            break;
-        case 1002:
-            // Действие для "Open"
-            break;
-        case 1003:
-            // Действие для "Save"
-            break;
-        default:
-            return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
-        }
-    }
-    return 0;
-```
-
-### 4. **Использование DirectX 11 Более Эффективно**
-
-Для улучшения производительности и качества рендеринга можно расширить функциональность класса `Renderer`, добавив шейдеры, буферы и другие графические ресурсы. Это выходит за рамки данного примера, но вы можете начать с внедрения базовых шейдеров и отрисовки простых примитивов.
-
-### 5. **Интеграция Современных UI-библиотек**
-
-Для создания более продвинутого пользовательского интерфейса рекомендуется использовать библиотеки, такие как [Dear ImGui](https://github.com/ocornut/imgui), которые легко интегрируются с DirectX и позволяют создавать гибкие и отзывчивые интерфейсы.
-
-**Пример интеграции Dear ImGui:**
-
-1. **Установка Dear ImGui**: Добавьте Dear ImGui в ваш проект (можно использовать Git Submodule или скачать исходники).
-
-2. **Инициализация Dear ImGui в `Renderer`**:
-
-```cpp
-// Renderer.h (дополнительно)
-#include "imgui.h"
-#include "imgui_impl_win32.h"
-#include "imgui_impl_dx11.h"
-// ...
-
-// Renderer.cpp (дополнительно)
-bool Renderer::Initialize() {
-    try {
-        CreateDeviceAndSwapChain();
-        CreateRenderTargetView();
-
-        // Инициализация Dear ImGui
-        IMGUI_CHECKVERSION();
-        ImGui::CreateContext();
-        ImGuiIO& io = ImGui::GetIO(); (void)io;
-
-        // Настройка стиля
-        ImGui::StyleColorsDark();
-
-        // Инициализация платформы/рендерера
-        ImGui_ImplWin32_Init(m_hwnd);
-        ImGui_ImplDX11_Init(m_device.Get(), m_deviceContext.Get());
-    } catch (const std::runtime_error& e) {
-        // Логирование ошибки
-        return false;
-    }
-    return true;
-}
-
-void Renderer::RenderFrame() {
-    // Начало нового кадра Dear ImGui
-    ImGui_ImplDX11_NewFrame();
-    ImGui_ImplWin32_NewFrame();
-    ImGui::NewFrame();
-
-    // Создание окна ImGui (пример)
-    ImGui::Begin("Hello, Unreal Engine 5!");
-    ImGui::Text("This is a sample UI window.");
-    ImGui::End();
-
-    // Рендеринг ImGui
-    ImGui::Render();
-    m_deviceContext->OMSetRenderTargets(1, m_renderTargetView.GetAddressOf(), nullptr);
-    m_deviceContext->ClearRenderTargetView(m_renderTargetView.Get(), ClearColor);
-    ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-
-    // Презентация изображения
-    m_swapChain->Present(1, 0);
-}
-
-Renderer::~Renderer() {
-    // Завершение работы Dear ImGui
-    ImGui_ImplDX11_Shutdown();
-    ImGui_ImplWin32_Shutdown();
-    ImGui::DestroyContext();
-
-    CleanupRenderTarget();
-}
-```
-
-3. **Обработка Событий**:
-
-Добавьте обработку событий от ImGui в ваше главное окно. Для этого потребуется дополнительная настройка `WindowProc`.
-
-```cpp
-// Window.cpp (дополнительно в WindowProcStatic)
-#include "imgui_impl_win32.h"
-
-if (ImGui_ImplWin32_WndProcHandler(hwnd, uMsg, wParam, lParam))
-    return true;
-```
-
-### 6. **Использование Расширенного Управления Ресурсами**
-
-Рассмотрите возможность использования библиотеки [DirectXTK](https://github.com/microsoft/DirectXTK) для упрощения управления ресурсами и рендерингом.
-
-### 7. **Многопоточность и Асинхронность**
-
-Для улучшения производительности больших приложений, подобных UE5, рассмотрите использование многопоточности и асинхронных операций для загрузки ресурсов и выполнения тяжёлых вычислений.
-
-### 8. **Логирование и Отладка**
-
-Интегрируйте систему логирования (например, [spdlog](https://github.com/gabime/spdlog)) для отслеживания состояния приложения и упрощения отладки.
-
-### 9. **Конфигурация и Настройки**
-
-Добавьте возможность загрузки и сохранения настроек приложения из конфигурационных файлов (например, JSON или XML).
-
-### 10. **Система Плагинов**
-
-Если планируется расширение функциональности, можно внедрить систему плагинов, позволяющую добавлять новые модули без изменения основного кода приложения.
-
-## Полный Переработанный Пример
-
-Ниже приведён полный переработанный пример на основе вышеизложенных рекомендаций. Это базовая структура, которую можно расширять по мере необходимости.
-
-### `Application.h`
-
-```cpp
-#pragma once
-
-#include <windows.h>
-#include <memory>
-#include "Window.h"
-#include "Renderer.h"
-#include "ComponentManager.h"
-
-class Application {
-public:
-    Application(HINSTANCE hInstance);
-    ~Application();
-
-    bool Initialize(int nCmdShow);
-    int Run();
-
-private:
-    HINSTANCE m_hInstance;
-    std::unique_ptr<Window> m_mainWindow;
-    std::unique_ptr<Renderer> m_renderer;
-    ComponentManager m_componentManager;
-
-    // Prevent copying
-    Application(const Application&) = delete;
-    Application& operator=(const Application&) = delete;
-};
-```
-
-### `Application.cpp`
-
-```cpp
-#include "Application.h"
-#include "Toolbar.h"
-#include "ContentBrowser.h"
-#include "PropertiesPanel.h"
-#include "Viewport.h"
-#include <gdiplus.h>
-#include <stdexcept>
-#include <filesystem>
-
-#pragma comment(lib, "gdiplus.lib")
-#pragma comment(lib, "d3d11.lib")
-
-Application::Application(HINSTANCE hInstance)
-    : m_hInstance(hInstance), m_mainWindow(nullptr), m_renderer(nullptr) {
-    // Создание структуры папок проекта
-    std::vector<std::string> folders = {
-        "Assets",
-        "Scripts",
-        "Textures",
-        "Models",
-        "Shaders",
-        "Projects"
-    };
-
-    for (const auto& folder : folders) {
-        std::filesystem::create_directory(folder);
-    }
-
-    // Инициализация GDI+
-    Gdiplus::GdiplusStartupInput gdiplusStartupInput;
-    ULONG_PTR gdiplusToken;
-    if (Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, nullptr) != Gdiplus::Ok) {
-        throw std::runtime_error("Failed to initialize GDI+.");
-    }
-}
-
-Application::~Application() {
-    // Освобождение ресурсов производится автоматически благодаря умным указателям
-    Gdiplus::GdiplusShutdown(0);
-}
-
-bool Application::Initialize(int nCmdShow) {
-    // Регистрация класса окна
-    if (!Window::RegisterWindowClass(m_hInstance, L"UnrealEditorClass")) {
-        return false;
-    }
-
-    // Создание главного окна
-    m_mainWindow = std::make_unique<Window>(m_hInstance, L"UnrealEditorClass", L"Unreal Engine 5 Editor");
-    if (!m_mainWindow->Create()) {
-        return false;
-    }
-
-    m_mainWindow->Show(nCmdShow);
-
-    // Создание UI-компонентов
-    m_componentManager.AddComponent(std::make_unique<Toolbar>());
-    m_componentManager.AddComponent(std::make_unique<ContentBrowser>());
-    m_componentManager.AddComponent(std::make_unique<PropertiesPanel>());
-    m_componentManager.AddComponent(std::make_unique<Viewport>());
-
-    m_componentManager.CreateAll(m_mainWindow->GetHWND());
-    m_componentManager.ShowAll(true);
-
-    // Создание рендерера
-    m_renderer = std::make_unique<Renderer>(m_mainWindow->GetHWND());
-    if (!m_renderer->Initialize()) {
-        return false;
-    }
-
-    return true;
-}
-
-int Application::Run() {
+    // Main message loop
     MSG msg = {};
-    while (msg.message != WM_QUIT) {
-        if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        } else {
-            // Главный цикл рендеринга
-            m_renderer->RenderFrame();
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    // Resource cleanup
+    GdiplusShutdown(gdiplusToken);
+    return 0;
+}
+
+// Window procedure
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    switch (uMsg) {
+        case WM_DESTROY:
+            PostQuitMessage(0);
+            return 0;
+        case WM_COMMAND:
+            OnButtonClick(hwnd, wParam);
+            return 0;
+        case WM_NOTIFY:
+            if (((LPNMHDR)lParam)->hwndFrom == GetDlgItem(hwnd, LIST_VIEW) && ((LPNMHDR)lParam)->code == NM_DBLCLK) {
+                OnDoubleClickListView(hwnd);
+            }
+            break;
+        case WM_PAINT: {
+            PAINTSTRUCT ps;
+            HDC hdc = BeginPaint(hwnd, &ps);
+
+            // Draw gradient background
+            RECT rect;
+            GetClientRect(hwnd, &rect);
+            DrawGradientBackground(hdc, rect);
+
+            EndPaint(hwnd, &ps);
+            return 0;
         }
-    }
-    return static_cast<int>(msg.wParam);
-}
-```
-
-### `Window.h` и `Window.cpp`
-
-Как описано ранее.
-
-### `Renderer.h` и `Renderer.cpp`
-
-Как описано ранее, с добавлением поддержки Dear ImGui при необходимости.
-
-### `UIComponent.h` и Конкретные Компоненты
-
-Создайте конкретные компоненты, например, `Toolbar`, `ContentBrowser`, `PropertiesPanel`, и `Viewport`, наследуясь от `UIComponent`.
-
-**Пример: ContentBrowser**
-
-```cpp
-// ContentBrowser.h
-#pragma once
-#include "UIComponent.h"
-#include <commctrl.h>
-
-class ContentBrowser : public UIComponent {
-public:
-    ContentBrowser();
-    ~ContentBrowser();
-
-    void Create(HWND parent) override;
-    void Show(bool show) override;
-    HWND GetHWND() const override { return m_hListView; }
-
-private:
-    HWND m_hListView;
-
-    void InitializeListView();
-};
-```
-
-```cpp
-// ContentBrowser.cpp
-#include "ContentBrowser.h"
-#include <stdexcept>
-
-ContentBrowser::ContentBrowser()
-    : m_hListView(nullptr) {}
-
-ContentBrowser::~ContentBrowser() {
-    if (m_hListView) {
-        DestroyWindow(m_hListView);
+        default:
+            return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
 }
 
-void ContentBrowser::Create(HWND parent) {
-    m_hListView = CreateWindowEx(0, WC_LISTVIEW, L"Content Browser",
-        WS_CHILD | WS_VISIBLE | LVS_ICON | LVS_EDITLABELS,
-        10, 50, 300, 500, parent, NULL, GetModuleHandle(NULL), NULL);
+// Draw gradient background
+void DrawGradientBackground(HDC hdc, RECT rect) {
+    Graphics graphics(hdc);
+    LinearGradientBrush brush(Point(0, 0), Point(0, rect.bottom), Color(255, 220, 220, 255), Color(255, 255, 200, 255));
+    graphics.FillRectangle(&brush, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
+}
 
-    if (!m_hListView) {
-        throw std::runtime_error("Failed to create Content Browser.");
+// Add items to ListView
+void AddListViewItems(HWND hwndListView) {
+    LVITEM lvItem;
+    lvItem.mask = LVIF_TEXT | LVIF_IMAGE;
+
+    std::vector<std::string> folders = { "Assets", "Scripts", "Scenes", "Prefabs" };
+
+    for (size_t i = 0; i < folders.size(); ++i) {
+        lvItem.iItem = i;
+        lvItem.iSubItem = 0;
+        lvItem.pszText = (LPSTR)folders[i].c_str();
+        lvItem.iImage = 0; // Index of icon
+        SendMessage(hwndListView, LVM_INSERTITEM, 0, (LPARAM)&lvItem);
     }
-
-    InitializeListView();
 }
 
-void ContentBrowser::Show(bool show) {
-    ShowWindow(m_hListView, show ? SW_SHOW : SW_HIDE);
+// Initialize ListView
+void InitializeListView(HWND hwndListView) {
+    LVCOLUMN lvCol;
+    lvCol.mask = LVCF_TEXT | LVCF_WIDTH;
+    lvCol.pszText = "Folders";
+    lvCol.cx = 200;
+    SendMessage(hwndListView, LVM_INSERTCOLUMN, 0, (LPARAM)&lvCol);
 }
 
-void ContentBrowser::InitializeListView() {
-    // Инициализация ListView, добавление колонок, иконок и т.д.
-    // Пример добавления элементов
-    LVITEM lvItem = {};
-    lvItem.mask = LVIF_TEXT;
-    lvItem.iItem = 0;
-    lvItem.pszText = const_cast<LPWSTR>(L"Asset 1");
-    ListView_InsertItem(m_hListView, &lvItem);
-
-    lvItem.iItem = 1;
-    lvItem.pszText = const_cast<LPWSTR>(L"Asset 2");
-    ListView_InsertItem(m_hListView, &lvItem);
+// Load icons into ImageList
+void LoadIcons() {
+    hImageList = ImageList_Create(16, 16, ILC_COLOR32, 4, 0);
+    // Load icons here (for example, using ImageList_AddIcon)
 }
-```
 
-### `ComponentManager.h` и `ComponentManager.cpp`
+// Handle button clicks
+void OnButtonClick(HWND hwnd, WPARAM wParam) {
+    switch (LOWORD(wParam)) {
+        case BUTTON_MY_COMPUTER:
+            MessageBox(hwnd, "Этот компьютер Clicked!", "Notification", MB_OK);
+            break;
+        case BUTTON_1:
+            MessageBox(hwnd, "Button 1 Clicked!", "Notification", MB_OK);
+            break;
+        case BUTTON_2:
+            MessageBox(hwnd, "Button 2 Clicked!", "Notification", MB_OK);
+            break;
+    }
+}
 
-Как описано ранее.
-
-### `main.cpp`
-
-Как описано ранее.
-
-## Заключение
-
-Переработанный код представляет собой более структурированный и расширяемый подход к разработке приложения. Этот пример демонстрирует основы объектно-ориентированного программирования, современного управления ресурсами и модульности, что приближает ваш проект к уровню профессиональных игровых движков, таких как Unreal Engine 5.
-
-Для дальнейшего улучшения рекомендуется:
-
-1. **Интеграция Более Продвинутых Библиотек**: Использование библиотек для UI, логирования, сериализации данных и т.д.
-
-2. **Разработка Системы Рендеринга**: Внедрение шейдеров, материалов, освещения и других графических элементов.
-
-3. **Оптимизация Производительности**: Многопоточность, оптимизация рендеринга и управление ресурсами.
-
-4. **Тестирование и Отладка**: Создание тестов и инструментов для отладки, чтобы обеспечить стабильность и качество приложения.
-
-5. **Документация**: Поддержка хорошо документированного кода и создание пользовательской документации для облегчения сопровождения и расширения проекта.
-
-Если у вас возникнут дополнительные вопросы или потребуется помощь с конкретными аспектами разработки, не стесняйтесь обращаться!
+// Handle double-click events on ListView
+void OnDoubleClickListView(HWND hwnd) {
+    MessageBox(hwnd, "Item double-clicked!", "Notification", MB_OK);
+}

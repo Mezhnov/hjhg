@@ -109,7 +109,16 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         // Получаем и отображаем текущее время
         std::wstring timeString = GetCurrentTimeString();
-        TextOut(hdc, ps.rcPaint.right - 100, ps.rcPaint.bottom - 30, timeString.c_str(), timeString.length());
+
+        // Используем GDI+ для рисования текста
+        Graphics graphics(hdc);
+        FontFamily fontFamily(L"Segoe UI"); // Выбор шрифта
+        Font font(&fontFamily, 20, FontStyleRegular, UnitPixel); // Устанавливаем размер и стиль шрифта
+        SolidBrush brush(Color(255, 0, 0, 0)); // Черный цвет текста
+
+        // Рисуем текст без фона
+        PointF point(static_cast<float>(panelRect.right - 100), static_cast<float>(panelRect.bottom - 30));
+        graphics.DrawString(timeString.c_str(), -1, &font, point, nullptr, &brush);
 
         EndPaint(hwnd, &ps);
         return 0;

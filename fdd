@@ -82,8 +82,15 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         HDC hdc = BeginPaint(hwnd, &ps);
         if (backgroundImage) {
             Graphics graphics(hdc);
-            graphics.DrawImage(backgroundImage, 0, 0, ps.rcPaint.right, ps.rcPaint.bottom);
+            graphics.DrawImage(backgroundImage, 0, 0, ps.rcPaint.right, ps.rcPaint.bottom - 50); // Уменьшаем высоту области рисования на размер панели
         }
+
+        // Рисуем панель внизу
+        RECT panelRect = { 0, ps.rcPaint.bottom - 50, ps.rcPaint.right, ps.rcPaint.bottom }; // Задаем размеры панели
+        HBRUSH brush = CreateSolidBrush(RGB(240, 240, 240)); // Цвет фона панели (светло-серый)
+        FillRect(hdc, &panelRect, brush); // Заполняем панель цветом
+        DeleteObject(brush); // Освобождаем ресурс
+
         EndPaint(hwnd, &ps);
         return 0;
     }

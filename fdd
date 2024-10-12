@@ -1,6 +1,6 @@
 #include <windows.h>
 #include <gdiplus.h>
-#include <wininet.h>
+#include <curl/curl.h>
 #include <string>
 #include <vector>
 #include <chrono>
@@ -10,67 +10,92 @@
 #include <codecvt>
 
 #pragma comment(lib, "gdiplus.lib")
-#pragma comment(lib, "wininet.lib")
+#pragma comment(lib, "libcurl.lib") // Подключаем библиотеку libcurl
 
 using namespace Gdiplus;
 
-// Global Variables
+// Объявляем переменную для изображения на уровне модуля
 Image* backgroundImage = nullptr;
-HINSTANCE g_hInstance;
 
-// Function to Load Image from URL (Remains unchanged if needed)
-bool LoadImageFromURL(const std::wstring& url) {
-    // ... [Your existing implementation]
-    return false; // Placeholder
+// Функция обратного вызова для записи данных в буфер
+size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
+    size_t totalSize = size * nmemb;
+    std::vector<BYTE>* buffer = reinterpret_cast<std::vector<BYTE>*>(userp);
+    buffer->insert(buffer->end(), reinterpret_cast<BYTE*>(contents), reinterpret_cast<BYTE*>(contents) + totalSize);
+    return totalSize;
 }
 
-// Function to Get Current Time as String
+// Функция для загрузки изображения из URL с использованием libcurl
+bool LoadImageFromURL(const std::wstring& url) {
+    CURL* curl;
+    CURLcode res;
+
+    std::vector<BYTE> buffer;
+
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+    curl = curl_easy_init();
+    if (!curl) return false;
+
+    // Устанавливаем URL
+    curl_easy_setopt(curl, CURLOPT_URL, std::string(url.begin(), url.end()).c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buffer);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L); // Следовать за перенаправлениями
+
+    // Выполняем запрос
+    res = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
+    curl_global_cleanup();
+
+    if (res != CURLE_OK) {
+        return false; // Ошибка при загрузке
+    }
+
+    // Загружаем изображение в GDI+
+    IStream* stream = nullptr;
+    if (FAILED(CreateStreamOnHGlobal(NULL, TRUE, &stream))) {
+        return false;
+    }
+
+    ULONG written;
+    if (FAILED(stream->Write(buffer.data(), buffer.size(), &written)) || written != buffer.size()) {
+        stream->Release();
+        return false;
+    }
+    stream->Seek({ 0 }, STREAM_SEEK_SET, NULL);
+
+    backgroundImage = new Image(stream);
+    stream->Release();
+
+    return backgroundImage != nullptr;
+}
+
+// Функция для получения текущего времени в строковом формате
 std::wstring GetCurrentTimeString() {
     using namespace std::chrono;
     auto now = system_clock::now();
     std::time_t now_c = system_clock::to_time_t(now);
     std::tm parts;
 
+    // Используем localtime_s вместо localtime
     localtime_s(&parts, &now_c);
 
     std::wstringstream ss;
-    ss << std::put_time(&parts, L"%H:%M"); // Fixed operator from « to <<
+    ss << std::put_time(&parts, L"%H:%M"); // Формат времени HH:MM
     return ss.str();
 }
 
-// Function to Load an Icon from a System Path
-HICON LoadSystemIcon(int iconID) {
-    return (HICON)LoadImage(NULL, MAKEINTRESOURCE(iconID), IMAGE_ICON, 64, 64, LR_SHARED | LR_DEFAULTSIZE);
-}
-
-// Function to Draw an Icon with Label
-void DrawIconWithLabel(Graphics& graphics, HICON hIcon, const std::wstring& label, float x, float y) {
-    // Draw the icon
-    Bitmap bitmap(hIcon); // Use Bitmap instead of Image
-    graphics.DrawImage(&bitmap, x, y, 64, 64);
-
-    // Draw the label below the icon
-    FontFamily fontFamily(L"Segoe UI");
-    Font font(&fontFamily, 12, FontStyleRegular, UnitPixel);
-    SolidBrush brush(Color(255, 0, 0, 0));
-
-    RectF layoutRect(x, y + 70, 100, 20); // Position label below icon
-    StringFormat format;
-    format.SetAlignment(StringAlignmentCenter);
-    graphics.DrawString(label.c_str(), -1, &font, layoutRect, &format, &brush);
-}
-
-// Window Procedure
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
     case WM_DESTROY:
-        delete backgroundImage; // Free the background image
+        delete backgroundImage; // Удаляем изображение
         PostQuitMessage(0);
         return 0;
 
     case WM_KEYDOWN:
+        // Проверяем нажатие клавиши Esc
         if (wParam == VK_ESCAPE) {
-            DestroyWindow(hwnd); // Close the window on ESC
+            DestroyWindow(hwnd); // Закрыть окно
         }
         return 0;
 
@@ -79,65 +104,41 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         HDC hdc = BeginPaint(hwnd, &ps);
         Graphics graphics(hdc);
 
-        // Draw the background image
+        // Рисуем изображение как фон
         if (backgroundImage) {
             graphics.DrawImage(backgroundImage, 0, 0, ps.rcPaint.right, ps.rcPaint.bottom);
         }
 
-        // Draw the bottom taskbar panel
-        RECT panelRect = { 0, ps.rcPaint.bottom - 80, ps.rcPaint.right, ps.rcPaint.bottom };
-        FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1));
+        // Рисуем нижнюю панель
+        RECT panelRect = { 0, ps.rcPaint.bottom - 40, ps.rcPaint.right, ps.rcPaint.bottom };
+        FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1)); // Цвет панели
 
-        // Draw the current time on the taskbar
+        // Получаем текущее время
         std::wstring timeString = GetCurrentTimeString();
-        std::wstring langString = L"РУС"; // Static language label
+        std::wstring langString = L"РУС"; // Статичное значение языка
 
-        FontFamily fontFamily(L"Segoe UI");
-        Font font(&fontFamily, 16, FontStyleRegular, UnitPixel);
-        SolidBrush brush(Color(255, 0, 0, 0));
+        // Используем GDI+ для рисования текста
+        FontFamily fontFamily(L"Segoe UI"); // Выбор шрифта
+        Font font(&fontFamily, 16, FontStyleRegular, UnitPixel); // Устанавливаем размер шрифта на 16
+        SolidBrush brush(Color(255, 0, 0, 0)); // Черный цвет текста
 
-        // Measure string sizes
+        // Находим размеры текста для центрирования
         RectF timeRect;
         graphics.MeasureString(timeString.c_str(), -1, &font, PointF(0, 0), &timeRect);
-
-        // Calculate position for time and language
-        float xTime = panelRect.right - timeRect.Width - 150; // Adjusted for additional icons
-        float yTime = panelRect.bottom - timeRect.Height - 30;
-
-        // Draw language label
         RectF langRect;
         graphics.MeasureString(langString.c_str(), -1, &font, PointF(0, 0), &langRect);
-        PointF langPoint(xTime - langRect.Width - 10, yTime);
-        graphics.DrawString(langString.c_str(), -1, &font, langPoint, nullptr, &brush);
 
-        // Draw time
-        PointF timePoint(xTime, yTime);
+        // Рассчитываем координаты для расположения текста
+        float xTime = panelRect.right - timeRect.Width - langRect.Width - 30; // Увеличен отступ от правого края
+        float y = panelRect.bottom - timeRect.Height - 10; // Отступ от нижней границы
+
+        // Рисуем текст без фона
+        PointF timePoint(xTime, y);
         graphics.DrawString(timeString.c_str(), -1, &font, timePoint, nullptr, &brush);
 
-        // Load system icons for "This PC" and "Recycle Bin"
-        HICON hThisPC = LoadSystemIcon(IDI_APPLICATION); // Placeholder icon
-        HICON hRecycleBin = LoadSystemIcon(IDI_APPLICATION); // Placeholder icon
-
-        // Draw "This PC" Icon and Label
-        DrawIconWithLabel(graphics, hThisPC, L"This PC", 50, panelRect.bottom - 80);
-
-        // Draw "Recycle Bin" Icon and Label
-        DrawIconWithLabel(graphics, hRecycleBin, L"Recycle Bin", 150, panelRect.bottom - 80);
-
-        // Draw Search Bar Background
-        RectF searchRect(300, panelRect.bottom - 70, 200, 30);
-        SolidBrush searchBrush(Color(255, 255, 255, 255)); // White background
-        graphics.FillRectangle(&searchBrush, searchRect);
-
-        // Draw Search Border
-        Pen borderPen(Color(255, 0, 0, 0));
-        graphics.DrawRectangle(&borderPen, searchRect.X, searchRect.Y, searchRect.Width, searchRect.Height);
-
-        // Draw Search Placeholder Text
-        Font searchFont(&fontFamily, 12, FontStyleRegular, UnitPixel);
-        SolidBrush textBrush(Color(255, 150, 150, 150)); // Gray color for placeholder
-        std::wstring placeholder = L"Search...";
-        graphics.DrawString(placeholder.c_str(), -1, &searchFont, PointF(searchRect.X + 5, searchRect.Y + 5), &textBrush);
+        // Рисуем язык рядом с временем
+        PointF langPoint(xTime - langRect.Width - 10, y); // Отступ слева от времени
+        graphics.DrawString(langString.c_str(), -1, &font, langPoint, nullptr, &brush);
 
         EndPaint(hwnd, &ps);
         return 0;
@@ -148,20 +149,15 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     }
 }
 
-// Entry Point
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
-    g_hInstance = hInstance;
     const wchar_t CLASS_NAME[] = L"FullscreenWindowClass";
 
-    // Initialize GDI+
+    // Инициализация GDI+
     GdiplusStartupInput gdiplusStartupInput;
     ULONG_PTR gdiplusToken;
-    if (GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL) != Ok) {
-        MessageBox(NULL, L"Failed to initialize GDI+", L"Error", MB_ICONERROR);
-        return -1;
-    }
+    GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
 
-    // Define Window Class
+    // Определяем класс окна
     WNDCLASS wc = {};
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
@@ -169,55 +165,45 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 
-    if (!RegisterClass(&wc)) {
-        MessageBox(NULL, L"Window Registration Failed!", L"Error", MB_ICONERROR);
-        GdiplusShutdown(gdiplusToken);
-        return -1;
-    }
+    RegisterClass(&wc);
 
-    // Get Screen Dimensions
+    // Получаем размеры экрана
     int screenWidth = GetSystemMetrics(SM_CXSCREEN);
     int screenHeight = GetSystemMetrics(SM_CYSCREEN);
 
-    // Create Window
+    // Создаем окно
     HWND hwnd = CreateWindowEx(
-        WS_EX_TOPMOST, // Always on top
+        WS_EX_TOPMOST, // Окно всегда поверх остальных
         CLASS_NAME,
         L"My Fullscreen Window",
-        WS_POPUP, // Borderless window
-        0, 0, screenWidth, screenHeight,
+        WS_POPUP, // Убираем рамку окна
+        0, 0, screenWidth, screenHeight, // Положение и размер окна
         NULL,
         NULL,
         hInstance,
         NULL
     );
 
-    if (hwnd == NULL) {
-        MessageBox(NULL, L"Window Creation Failed!", L"Error", MB_ICONERROR);
-        GdiplusShutdown(gdiplusToken);
-        return -1;
-    }
+    if (hwnd == NULL) return 0;
 
-    // Load Background Image from File
-    std::wstring imagePath = L"Resources\\afrikanskii-lev.orig.jpg"; // Corrected path with double backslashes
-    backgroundImage = new Gdiplus::Image(imagePath.c_str());
-    if (backgroundImage->GetLastStatus() != Ok) {
-        MessageBox(NULL, L"Failed to load background image!", L"Error", MB_ICONERROR);
-        delete backgroundImage;
-        backgroundImage = nullptr;
+    // Загружаем изображение из URL
+    std::wstring imageUrl = L"http://example.com/image.jpg"; // Замените на нужный URL
+    if (!LoadImageFromURL(imageUrl)) {
+        // Обработка ошибки загрузки изображения
+        MessageBox(NULL, L"Не удалось загрузить изображение", L"Ошибка", MB_OK | MB_ICONERROR);
     }
 
     ShowWindow(hwnd, nCmdShow);
-    UpdateWindow(hwnd);
 
-    // Main message loop
-    MSG msg;
+    // Главный цикл сообщений
+    MSG msg = {};
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
-    // Cleanup GDI+
+    // Завершаем работу GDI+
     GdiplusShutdown(gdiplusToken);
+
     return 0;
 }

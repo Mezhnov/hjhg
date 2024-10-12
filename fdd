@@ -5,6 +5,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         case WM_DESTROY:
             PostQuitMessage(0);
             return 0;
+
+        case WM_KEYDOWN:
+            // Проверяем нажатие клавиши Esc
+            if (wParam == VK_ESCAPE) {
+                DestroyWindow(hwnd); // Закрыть окно
+            }
+            return 0;
+
         default:
             return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }

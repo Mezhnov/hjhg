@@ -14,11 +14,11 @@
 
 using namespace Gdiplus;
 
-// Global variables
+// Глобальные переменные
 Image* backgroundImage = nullptr;
 HWND hSearchBox = nullptr;
 
-// Function to load image from URL
+// Функция для загрузки изображения по URL
 bool LoadImageFromURL(const std::wstring& url) {
     HINTERNET hInternet = InternetOpen(L"ImageLoader", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (!hInternet) {
@@ -26,7 +26,7 @@ bool LoadImageFromURL(const std::wstring& url) {
         return false;
     }
 
-    // Use INTERNET_FLAG_SECURE for HTTPS
+    // Используем INTERNET_FLAG_SECURE для HTTPS
     HINTERNET hConnect = InternetOpenUrl(hInternet, url.c_str(), NULL, 0,
         INTERNET_FLAG_RELOAD | INTERNET_FLAG_SECURE | INTERNET_FLAG_NO_CACHE_WRITE, 0);
     if (!hConnect) {
@@ -40,7 +40,7 @@ bool LoadImageFromURL(const std::wstring& url) {
     DWORD bytesRead = 0;
     BYTE tempBuffer[4096];
 
-    // Read data in a loop until all data is read
+    // Читаем данные в цикле, пока не будут считаны все данные
     while (InternetQueryDataAvailable(hConnect, &bytesAvailable, 0, 0) && bytesAvailable > 0) {
         DWORD toRead = bytesAvailable;
         if (toRead > sizeof(tempBuffer))
@@ -48,8 +48,7 @@ bool LoadImageFromURL(const std::wstring& url) {
 
         if (InternetReadFile(hConnect, tempBuffer, toRead, &bytesRead) && bytesRead > 0) {
             buffer.insert(buffer.end(), tempBuffer, tempBuffer + bytesRead);
-        }
-        else {
+        } else {
             break;
         }
     }
@@ -62,7 +61,7 @@ bool LoadImageFromURL(const std::wstring& url) {
         return false;
     }
 
-    // Create IStream from buffer
+    // Создаем IStream из буфера
     IStream* stream = nullptr;
     if (FAILED(CreateStreamOnHGlobal(NULL, TRUE, &stream))) {
         MessageBox(NULL, L"Не удалось создать поток данных.", L"Ошибка", MB_OK | MB_ICONERROR);
@@ -79,7 +78,7 @@ bool LoadImageFromURL(const std::wstring& url) {
     LARGE_INTEGER zero = { 0 };
     stream->Seek(zero, STREAM_SEEK_SET, NULL);
 
-    // Create GDI+ Image
+    // Создаем GDI+ Image
     backgroundImage = new Image(stream);
     stream->Release();
 
@@ -93,40 +92,40 @@ bool LoadImageFromURL(const std::wstring& url) {
     return true;
 }
 
-// Function to get current time as string
+// Функция для получения текущего времени в виде строки
 std::wstring GetCurrentTimeString() {
     using namespace std::chrono;
     auto now = system_clock::now();
     std::time_t now_c = system_clock::to_time_t(now);
     std::tm parts;
 
-    // Use localtime_s instead of localtime
+    // Используем localtime_s вместо localtime
     localtime_s(&parts, &now_c);
 
     std::wstringstream ss;
-    ss << std::put_time(&parts, L"%H:%M"); // Time format HH:MM
+    ss << std::put_time(&parts, L"%H:%M"); // Формат времени HH:MM
     return ss.str();
 }
 
-// Function to handle search action (placeholder)
+// Функция для обработки действия поиска (заглушка)
 void PerformSearch(const std::wstring& query) {
-    // Placeholder: Display search query
+    // Заглушка: отображаем поисковый запрос
     std::wstring message = L"Поиск: " + query;
     MessageBox(NULL, message.c_str(), L"Поиск", MB_OK | MB_ICONINFORMATION);
 }
 
-// Window Procedure
+// Процедура обработки оконных сообщений
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
     case WM_CREATE:
-        // Create Search Box on the left side of the bottom panel
+        // Создаем строку поиска
         hSearchBox = CreateWindowEx(
             0, L"EDIT", NULL,
             WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT,
-            10,  // X position
-            10,  // Y position within the panel (to be adjusted in WM_SIZE)
-            200, // Width
-            25,  // Height
+            10,  // Позиция X
+            10,  // Позиция Y
+            200, // Ширина
+            25,  // Высота
             hwnd,
             (HMENU)1, // ID
             NULL,
@@ -138,14 +137,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         break;
 
     case WM_SIZE: {
-        // Adjust the position of the search box within the panel
+        // Корректируем позицию строки поиска в панели
         int width = LOWORD(lParam);
         int height = HIWORD(lParam);
 
-        // Define panel height
+        // Определяем высоту панели
         const int panelHeight = 40;
 
-        // Move the search box to the left side of the panel
+        // Перемещаем строку поиска в панель
         if (hSearchBox) {
             MoveWindow(hSearchBox, 10, height - panelHeight + (panelHeight - 25) / 2, 200, 25, TRUE);
         }
@@ -153,31 +152,23 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     }
 
     case WM_DESTROY:
-        delete backgroundImage; // Delete the image
+        delete backgroundImage; // Удаляем изображение
         PostQuitMessage(0);
         return 0;
 
     case WM_KEYDOWN:
-        // Check if Esc key is pressed
+        // Проверяем, нажата ли клавиша Esc
         if (wParam == VK_ESCAPE) {
-            DestroyWindow(hwnd); // Close window
+            DestroyWindow(hwnd); // Закрываем окно
         }
         return 0;
 
     case WM_COMMAND:
         if (LOWORD(wParam) == 1 && HIWORD(wParam) == EN_UPDATE) {
-            // Handle text update if needed
+            // Обработка изменения текста при необходимости
+        } else if (LOWORD(wParam) == 1 && HIWORD(wParam) == EN_CHANGE) {
+            // Обработка изменения текста при необходимости
         }
-        else if (LOWORD(wParam) == 1 && HIWORD(wParam) == EN_MAXTEXT) {
-            // Handle max text reached if needed
-        }
-        else if (LOWORD(wParam) == 1 && HIWORD(wParam) == EN_CHANGE) {
-            // Handle text change if needed
-        }
-        break;
-
-    case WM_NOTIFY:
-        // Handle notifications if needed
         break;
 
     case WM_PAINT: {
@@ -185,40 +176,40 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         HDC hdc = BeginPaint(hwnd, &ps);
         Graphics graphics(hdc);
 
-        // Draw background image
+        // Рисуем фоновое изображение
         if (backgroundImage) {
             graphics.DrawImage(backgroundImage, 0, 0, ps.rcPaint.right, ps.rcPaint.bottom);
         }
 
-        // Draw bottom panel
+        // Рисуем нижнюю панель
         RECT panelRect = { 0, ps.rcPaint.bottom - 40, ps.rcPaint.right, ps.rcPaint.bottom };
-        FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1)); // Panel color
+        FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1)); // Цвет панели
 
-        // Get current time
+        // Получаем текущее время
         std::wstring timeString = GetCurrentTimeString();
-        std::wstring langString = L"РУС"; // Static language value
+        std::wstring langString = L"РУС"; // Статичное значение языка
 
-        // Use GDI+ to draw text
-        FontFamily fontFamily(L"Segoe UI"); // Font selection
-        Font font(&fontFamily, 16, FontStyleRegular, UnitPixel); // Font size 16
-        SolidBrush brush(Color(255, 0, 0, 0)); // Black text color
+        // Используем GDI+ для рисования текста
+        FontFamily fontFamily(L"Segoe UI"); // Выбор шрифта
+        Font font(&fontFamily, 16, FontStyleRegular, UnitPixel); // Размер шрифта 16
+        SolidBrush brush(Color(255, 0, 0, 0)); // Черный цвет текста
 
-        // Measure text size for centering
+        // Измеряем размер текста для центрирования
         RectF timeRect;
         graphics.MeasureString(timeString.c_str(), -1, &font, PointF(0, 0), &timeRect);
         RectF langRect;
         graphics.MeasureString(langString.c_str(), -1, &font, PointF(0, 0), &langRect);
 
-        // Calculate coordinates for text position
-        float xTime = panelRect.right - timeRect.Width - langRect.Width - 30; // Increased margin from right
-        float y = panelRect.bottom - timeRect.Height - 10; // Margin from bottom
+        // Вычисляем координаты для текста
+        float xTime = panelRect.right - timeRect.Width - langRect.Width - 30; // Увеличенный отступ справа
+        float y = panelRect.bottom - timeRect.Height - 10; // Отступ снизу
 
-        // Draw time text without background
+        // Рисуем текст времени без фона
         PointF timePoint(xTime, y);
         graphics.DrawString(timeString.c_str(), -1, &font, timePoint, nullptr, &brush);
 
-        // Draw language text next to time
-        PointF langPoint(xTime - langRect.Width - 10, y); // Margin left of time
+        // Рисуем текст языка рядом с временем
+        PointF langPoint(xTime - langRect.Width - 10, y); // Отступ слева от времени
         graphics.DrawString(langString.c_str(), -1, &font, langPoint, nullptr, &brush);
 
         EndPaint(hwnd, &ps);
@@ -227,7 +218,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
     case WM_COMMAND:
         if (LOWORD(wParam) == 1 && HIWORD(wParam) == EN_RETURN) {
-            // Handle Enter key in search box
+            // Обработка нажатия клавиши Enter в строке поиска
             wchar_t query[256];
             GetWindowText(hSearchBox, query, 256);
             PerformSearch(query);
@@ -240,43 +231,33 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     return 0;
 }
 
-// Entry point
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
-    const wchar_t CLASS_NAME[] = L"FullscreenWindowClass";
-
-    // Initialize GDI+
+// Точка входа в программу
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     GdiplusStartupInput gdiplusStartupInput;
     ULONG_PTR gdiplusToken;
-    if (GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL) != Ok) {
-        MessageBox(NULL, L"Не удалось инициализировать GDI+.", L"Ошибка", MB_OK | MB_ICONERROR);
-        return 0;
+    GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
+
+    // Загрузка фона
+    if (!LoadImageFromURL(L"https://example.com/yourimage.jpg")) { // Укажите свой URL
+        return 1;
     }
 
-    // Define window class
+    // Регистрация класса окна
+    const wchar_t CLASS_NAME[] = L"Sample Window Class";
     WNDCLASS wc = {};
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
     wc.lpszClassName = CLASS_NAME;
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    RegisterClass(&wc);
 
-    if (!RegisterClass(&wc)) {
-        MessageBox(NULL, L"Не удалось зарегистрировать класс окна.", L"Ошибка", MB_OK | MB_ICONERROR);
-        GdiplusShutdown(gdiplusToken);
-        return 0;
-    }
-
-    // Get screen dimensions
-    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-
-    // Create window
+    // Создание окна
     HWND hwnd = CreateWindowEx(
-        WS_EX_TOPMOST, // Window always on top
+        0,
         CLASS_NAME,
-        L"My Fullscreen Window",
-        WS_POPUP, // Remove window border
-        0, 0, screenWidth, screenHeight, // Window position and size
+        L"Заголовок окна",
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
         NULL,
         NULL,
         hInstance,
@@ -285,32 +266,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     if (hwnd == NULL) {
         MessageBox(NULL, L"Не удалось создать окно.", L"Ошибка", MB_OK | MB_ICONERROR);
-        GdiplusShutdown(gdiplusToken);
-        return 0;
-    }
-
-    // Load background image from URL
-    std::wstring imageUrl = L"https://www.sunhome.ru/i/wallpapers/241/afrikanskii-lev.jpg"; // Image URL
-    if (!LoadImageFromURL(imageUrl)) {
-        MessageBox(NULL, L"Не удалось загрузить изображение.", L"Ошибка", MB_OK | MB_ICONERROR);
-        // Proceed without background image
+        return 1;
     }
 
     ShowWindow(hwnd, nCmdShow);
 
-    // Main message loop
+    // Цикл обработки сообщений
     MSG msg = {};
     while (GetMessage(&msg, NULL, 0, 0)) {
-        // Handle dialog messages
-        if (!IsDialogMessage(hwnd, &msg)) {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
     }
 
-    // Cleanup
-    delete backgroundImage; // Delete image
     GdiplusShutdown(gdiplusToken);
-
     return 0;
 }

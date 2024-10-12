@@ -70,7 +70,7 @@ bool LoadImageFromURL(const std::wstring& url) {
     }
 
     ULONG written;
-    if (FAILED(stream->Write(buffer.data(), buffer.size(), &written)) || written != buffer.size()) {
+    if (FAILED(stream->Write(buffer.data(), static_cast<ULONG>(buffer.size()), &written)) || written != buffer.size()) {
         stream->Release();
         MessageBox(NULL, L"Не удалось записать данные в поток.", L"Ошибка", MB_OK | MB_ICONERROR);
         return false;
@@ -174,6 +174,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         else if (LOWORD(wParam) == 1 && HIWORD(wParam) == EN_CHANGE) {
             // Handle text change if needed
         }
+        else if (LOWORD(wParam) == 1 && HIWORD(wParam) == EN_SETFOCUS) {
+            // Handle focus on the search box if needed
+        }
         break;
 
     case WM_NOTIFY:
@@ -225,15 +228,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         return 0;
     }
 
-    case WM_COMMAND:
-        if (LOWORD(wParam) == 1 && HIWORD(wParam) == EN_RETURN) {
-            // Handle Enter key in search box
-            wchar_t query[256];
-            GetWindowText(hSearchBox, query, 256);
-            PerformSearch(query);
-        }
-        break;
-
     default:
         return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
@@ -249,51 +243,29 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     ULONG_PTR gdiplusToken;
     if (GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL) != Ok) {
         MessageBox(NULL, L"Не удалось инициализировать GDI+.", L"Ошибка", MB_OK | MB_ICONERROR);
-        return 0;
+        return -1;
     }
 
-    // Define window class
     WNDCLASS wc = {};
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
     wc.lpszClassName = CLASS_NAME;
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 
-    if (!RegisterClass(&wc)) {
-        MessageBox(NULL, L"Не удалось зарегистрировать класс окна.", L"Ошибка", MB_OK | MB_ICONERROR);
-        GdiplusShutdown(gdiplusToken);
-        return 0;
-    }
+    RegisterClass(&wc);
 
-    // Get screen dimensions
-    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-
-    // Create window
     HWND hwnd = CreateWindowEx(
-        WS_EX_TOPMOST, // Window always on top
+        WS_EX_TOPMOST,
         CLASS_NAME,
-        L"My Fullscreen Window",
-        WS_POPUP, // Remove window border
-        0, 0, screenWidth, screenHeight, // Window position and size
-        NULL,
-        NULL,
-        hInstance,
-        NULL
+        L"Полноэкранное приложение",
+        WS_POPUP,
+        0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN),
+        NULL, NULL, hInstance, NULL
     );
 
-    if (hwnd == NULL) {
+    if (!hwnd) {
         MessageBox(NULL, L"Не удалось создать окно.", L"Ошибка", MB_OK | MB_ICONERROR);
-        GdiplusShutdown(gdiplusToken);
-        return 0;
-    }
-
-    // Load background image from URL
-    std::wstring imageUrl = L"https://www.sunhome.ru/i/wallpapers/241/afrikanskii-lev.jpg"; // Image URL
-    if (!LoadImageFromURL(imageUrl)) {
-        MessageBox(NULL, L"Не удалось загрузить изображение.", L"Ошибка", MB_OK | MB_ICONERROR);
-        // Proceed without background image
+        return -1;
     }
 
     ShowWindow(hwnd, nCmdShow);
@@ -301,15 +273,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     // Main message loop
     MSG msg = {};
     while (GetMessage(&msg, NULL, 0, 0)) {
-        // Handle dialog messages
-        if (!IsDialogMessage(hwnd, &msg)) {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
     }
 
-    // Cleanup
-    delete backgroundImage; // Delete image
+    // Cleanup GDI+
     GdiplusShutdown(gdiplusToken);
 
     return 0;

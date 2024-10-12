@@ -120,8 +120,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         RectF textRect;
         graphics.MeasureString(timeString.c_str(), -1, &font, PointF(0, 0), &textRect);
 
-        // Рассчитываем координаты для центрирования текста
-        float x = (panelRect.right - textRect.Width) / 2;
+        // Рассчитываем координаты для расположения текста справа
+        float x = panelRect.right - textRect.Width - 10; // Отступ от правого края
         float y = panelRect.bottom - textRect.Height - 10; // Отступ от нижней границы
 
         // Рисуем текст без фона

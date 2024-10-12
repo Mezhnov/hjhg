@@ -6,9 +6,10 @@
 
 using namespace Gdiplus;
 
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    static Gdiplus::Image* backgroundImage = nullptr;
+// Объявляем переменную для изображения на уровне модуля
+Image* backgroundImage = nullptr;
 
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
         case WM_DESTROY:
             delete backgroundImage; // Удаляем изображение

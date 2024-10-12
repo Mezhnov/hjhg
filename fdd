@@ -101,26 +101,30 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             }
 
             // Обработка переключения языка на Alt+Shift или Win+Space
-            if ((GetAsyncKeyState(VK_MENU) & 0x8000) && wParam == VK_SHIFT || 
+            if ((GetAsyncKeyState(VK_MENU) & 0x8000) && wParam == VK_SHIFT ||
                 (GetAsyncKeyState(VK_LWIN) & 0x8000) && wParam == VK_SPACE) {
                 currentLanguageIndex = (currentLanguageIndex + 1) % languages.size(); // Переключаем язык
                 InvalidateRect(hwnd, NULL, TRUE); // Перерисовываем окно
             }
             return 0;
 
+        case WM_SIZE: {
+            InvalidateRect(hwnd, NULL, TRUE); // Перерисовка окна при изменении размера
+            return 0;
+        }
+
         case WM_PAINT: {
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hwnd, &ps);
             Graphics graphics(hdc);
 
-            // Устанавливаем высокое качество интерполяции для улучшения качества изображений
-            graphics.SetInterpolationMode(InterpolationModeHighQualityBicubic);
-            graphics.SetSmoothingMode(SmoothingModeAntiAlias);
+            // Получаем размеры окна
+            RECT windowRect;
+            GetClientRect(hwnd, &windowRect);
 
             // Рисуем изображение как фон
             if (backgroundImage) {
-                RectF imageRect(0, 0, (REAL)ps.rcPaint.right, (REAL)ps.rcPaint.bottom);
-                graphics.DrawImage(backgroundImage, imageRect);
+                graphics.DrawImage(backgroundImage, 0, 0, windowRect.right, windowRect.bottom);
             }
 
             // Рисуем нижнюю панель
@@ -195,35 +199,39 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     RegisterClass(&wc);
 
-    // Получаем размеры экрана, учитывая панель задач
-    RECT workArea;
-    SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0);
-    int screenWidth = workArea.right;
-    int screenHeight = workArea.bottom;
+    // Получаем размеры экрана
+    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
 
     // Создаем окно
     HWND hwnd = CreateWindowEx(
         WS_EX_TOPMOST, // Окно всегда поверх остальных
         CLASS_NAME,
         L"My Fullscreen Window",
-        WS_POPUP, // Без заголовка
-        0, 0, screenWidth, screenHeight, // Позиция и размер
-        NULL, NULL, hInstance, NULL);
+        WS_POPUP, // Убираем рамку окна
+        0, 0, screenWidth, screenHeight, // Положение и размер окна
+        NULL,
+        NULL,
+        hInstance,
+        NULL
+    );
+
+    if (hwnd == NULL) return 0;
+
+    // Загружаем изображение фона из URL
+    LoadImageFromURL(L"https://i.pinimg.com/originals/f0/c7/8c/f0c78cc56f1909dece1c062020e7c8a5.png");
 
     ShowWindow(hwnd, nCmdShow);
     UpdateWindow(hwnd);
 
-    // Загружаем изображение
-    LoadImageFromURL(L"https://example.com/image.jpg"); // Замените на ваш URL
-
-    // Основной цикл обработки сообщений
-    MSG msg = {};
-    while (GetMessage(&msg, NULL, 0)) {
+    // Цикл обработки сообщений
+    MSG msg;
+    while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
-    // Освобождение ресурсов GDI+
+    // Остановка GDI+
     GdiplusShutdown(gdiplusToken);
     return 0;
 }

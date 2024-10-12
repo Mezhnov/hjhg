@@ -6,6 +6,7 @@
 #include <string>
 #include <memory>
 #include <functional>
+#include <filesystem>
 
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "d3d11.lib")
@@ -34,6 +35,7 @@ void CreatePropertiesPanel(HWND hwndParent);
 void CreateViewport(HWND hwndParent);
 void InitializeD3D(HWND hwnd);
 void RenderFrame();
+void CreateProjectFolders();
 
 // Global variables
 HWND g_hwndMain = nullptr;
@@ -44,6 +46,9 @@ ID3D11RenderTargetView* g_pRenderTargetView = nullptr;
 
 // Main function
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
+    // Create project folders
+    CreateProjectFolders();
+
     // Initialize GDI+
     GdiplusStartupInput gdiplusStartupInput;
     ULONG_PTR gdiplusToken;
@@ -211,4 +216,20 @@ void RenderFrame() {
 
     // Present the frame
     g_pSwapChain->Present(0, 0);
+}
+
+void CreateProjectFolders() {
+    // Create project structure
+    std::vector<std::string> folders = {
+        "Assets",
+        "Scripts",
+        "Textures",
+        "Models",
+        "Shaders",
+        "Projects"
+    };
+
+    for (const auto& folder : folders) {
+        std::filesystem::create_directory(folder);
+    }
 }

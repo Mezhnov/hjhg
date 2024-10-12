@@ -200,19 +200,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     // Создаем поле для поиска
     hSearchEdit = CreateWindowEx(
-        WS_EX_TRANSPARENT, // Делает окно прозрачным для взаимодействия
+        WS_EX_TRANSPARENT, // Делаем поле прозрачным
         L"EDIT", NULL,
-        WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | ES_BORDER,
-        200, 830, 200, 30,
+        WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+        10, 10, 200, 30,
         hwnd,
         NULL,
         hInstance,
         NULL
     );
 
-    // Убираем рамку и фоновый цвет поля ввода
+    // Убираем границы и фон
     SetWindowLong(hSearchEdit, GWL_EXSTYLE, GetWindowLong(hSearchEdit, GWL_EXSTYLE) | WS_EX_LAYERED);
-    SetLayeredWindowAttributes(hSearchEdit, RGB(255, 255, 255), 0, LWA_COLORKEY); // Делаем фон поля ввода прозрачным
+    SetLayeredWindowAttributes(hSearchEdit, RGB(255, 255, 255), 255, LWA_COLORKEY);
 
     ShowWindow(hwnd, nCmdShow);
 

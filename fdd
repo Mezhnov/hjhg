@@ -125,7 +125,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 void DrawGradientBackground(HDC hdc, RECT rect) {
     Graphics graphics(hdc);
     LinearGradientBrush brush(Point(0, 0), Point(0, rect.bottom), Color(255, 220, 220, 255), Color(255, 255, 200, 255));
-    graphics.FillRectangle(&brush, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
+    // Using Rect instead of RECT to avoid ambiguity
+    Rect gradientRect(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
+    graphics.FillRectangle(&brush, gradientRect);
 }
 
 // Add items to ListView
@@ -136,9 +138,9 @@ void AddListViewItems(HWND hwndListView) {
     std::vector<std::wstring> folders = { L"Assets", L"Scripts", L"Scenes", L"Prefabs" };
 
     for (size_t i = 0; i < folders.size(); ++i) {
-        lvItem.iItem = i;
+        lvItem.iItem = static_cast<int>(i); // Explicit cast to avoid warnings
         lvItem.iSubItem = 0;
-        lvItem.pszText = (LPWSTR)folders[i].c_str();
+        lvItem.pszText = const_cast<LPWSTR>(folders[i].c_str()); // Use const_cast for safe conversion
         lvItem.iImage = 0; // Index of icon
         SendMessage(hwndListView, LVM_INSERTITEM, 0, (LPARAM)&lvItem);
     }
@@ -148,7 +150,7 @@ void AddListViewItems(HWND hwndListView) {
 void InitializeListView(HWND hwndListView) {
     LVCOLUMN lvCol;
     lvCol.mask = LVCF_TEXT | LVCF_WIDTH;
-    lvCol.pszText = L"Folders"; // Использование широкой строки
+    lvCol.pszText = const_cast<LPWSTR>(L"Folders"); // Use const_cast for safe conversion
     lvCol.cx = 200;
     SendMessage(hwndListView, LVM_INSERTCOLUMN, 0, (LPARAM)&lvCol);
 }

@@ -15,7 +15,7 @@ Image* backgroundImage = nullptr;
 Image* taskbarImage = nullptr;
 
 // Высота панели задач в пикселях
-const int TASKBAR_HEIGHT = 60; // Уменьшили высоту панели задач
+const int TASKBAR_HEIGHT = 80; // Уменьшили высоту панели задач
 
 // Функция для загрузки изображения из URL
 bool LoadImageFromURL(const std::wstring& url, Image** imagePtr) {
@@ -71,8 +71,17 @@ bool LoadImageFromURL(const std::wstring& url, Image** imagePtr) {
 
 // Функция для рисования градиентного фона
 void DrawGradientBackground(Graphics& graphics, const RECT& rect) {
+    // Создаем градиентную кисть
     LinearGradientBrush brush(Point(0, rect.top), Point(0, rect.bottom), Color(255, 220, 220, 220), Color(255, 150, 150, 150));
-    graphics.FillRectangle(&brush, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
+    
+    // Приводим координаты к типу REAL
+    REAL left = static_cast<REAL>(rect.left);
+    REAL top = static_cast<REAL>(rect.top);
+    REAL right = static_cast<REAL>(rect.right);
+    REAL bottom = static_cast<REAL>(rect.bottom);
+
+    // Заполняем прямоугольник градиентным фоном
+    graphics.FillRectangle(&brush, left, top, right - left, bottom - top);
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -106,11 +115,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 graphics.DrawImage(backgroundImage, 0, 0, width, height);
             }
 
-            // Определяем область для панели задач
-            RECT taskbarRect = { 0, height - TASKBAR_HEIGHT, width, height };
-
-            // Нарисовать градиентный фон для панели задач
-            DrawGradientBackground(graphics, taskbarRect);
+            // Нарисовать панель задач
+            SolidBrush taskbarBrush(Color(220, 220, 220)); // Светло-серый цвет
+            graphics.FillRectangle(&taskbarBrush, 0, height - TASKBAR_HEIGHT, width, TASKBAR_HEIGHT);
 
             // Добавить текст на панель задач
             if (taskbarImage) {
@@ -119,7 +126,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             } else {
                 // Если нет изображения, нарисуйте текст
                 FontFamily fontFamily(L"Arial");
-                Font font(&fontFamily, 16, FontStyleRegular, UnitPixel); // Уменьшили размер шрифта
+                Font font(&fontFamily, 20, FontStyleRegular, UnitPixel); // Изменили размер шрифта
                 SolidBrush textBrush(Color(0, 0, 0)); // Черный цвет
 
                 std::wstring taskbarText = L"Панель задач: Нажмите Esc для выхода";
@@ -128,7 +135,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 format.SetAlignment(StringAlignmentCenter);
                 format.SetLineAlignment(StringAlignmentCenter);
 
-                graphics.DrawString(taskbarText.c_str(), -1, &font, RectF(0, height - TASKBAR_HEIGHT, (REAL)width, TASKBAR_HEIGHT), &format, &textBrush);
+                // Приводим координаты к типу REAL
+                REAL left = static_cast<REAL>(0);
+                REAL top = static_cast<REAL>(height - TASKBAR_HEIGHT);
+                REAL right = static_cast<REAL>(width);
+                REAL bottom = static_cast<REAL>(height);
+
+                graphics.DrawString(taskbarText.c_str(), -1, &font, RectF(left, top, right, bottom), &format, &textBrush);
             }
 
             EndPaint(hwnd, &ps);

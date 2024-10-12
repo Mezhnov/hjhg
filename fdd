@@ -1,63 +1,379 @@
+// main.cpp
 #include <windows.h>
+#include <d3d11.h>
+#include <wrl/client.h>
+#include <memory>
+#include <vector>
+#include <string>
+#include <stdexcept>
 
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    switch (uMsg) {
+// Подключение необходимых библиотек
+#pragma comment(lib, "d3d11.lib")
+#pragma comment(lib, "user32.lib")
+#pragma comment(lib, "gdi32.lib")
+
+using Microsoft::WRL::ComPtr;
+
+// Базовый класс для UI-компонентов
+class UIComponent {
+public:
+    virtual ~UIComponent() = default;
+    virtual void Create(HWND parent) = 0;
+    virtual void Show(bool show) = 0;
+    virtual HWND GetHWND() const = 0;
+};
+
+// Пример UI-компонента: Toolbar
+class Toolbar : public UIComponent {
+public:
+    Toolbar() : m_hToolbar(nullptr) {}
+    ~Toolbar() {
+        if (m_hToolbar) {
+            DestroyWindow(m_hToolbar);
+        }
+    }
+
+    void Create(HWND parent) override {
+        m_hToolbar = CreateWindowEx(0, TOOLBARCLASSNAME, NULL,
+            WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | TBSTYLE_TOOLTIPS,
+            0, 0, 0, 0, parent, NULL, GetModuleHandle(NULL), NULL);
+
+        if (!m_hToolbar) {
+            throw std::runtime_error("Failed to create toolbar.");
+        }
+
+        InitializeToolbarButtons();
+
+        // Обновление размеров и размещения
+        SendMessage(m_hToolbar, TB_AUTOSIZE, 0, 0);
+    }
+
+    void Show(bool show) override {
+        ShowWindow(m_hToolbar, show ? SW_SHOW : SW_HIDE);
+    }
+
+    HWND GetHWND() const override { return m_hToolbar; }
+
+private:
+    HWND m_hToolbar;
+
+    void InitializeToolbarButtons() {
+        std::vector<TBBUTTON> tbButtons = {
+            { MAKELONG(STD_FILENEW, 0), 1001, TBSTATE_ENABLED, TBSTYLE_BUTTON, {0}, 0, (INT_PTR)L"New" },
+            { MAKELONG(STD_FILEOPEN, 0), 1002, TBSTATE_ENABLED, TBSTYLE_BUTTON, {0}, 0, (INT_PTR)L"Open" },
+            { MAKELONG(STD_FILESAVE, 0), 1003, TBSTATE_ENABLED, TBSTYLE_BUTTON, {0}, 0, (INT_PTR)L"Save" }
+        };
+
+        SendMessage(m_hToolbar, TB_BUTTONSTRUCTSIZE, (WPARAM)sizeof(TBBUTTON), 0);
+        SendMessage(m_hToolbar, TB_ADDBUTTONS, (WPARAM)tbButtons.size(), (LPARAM)&tbButtons[0]);
+    }
+};
+
+// Менеджер для управления UI-компонентами
+class ComponentManager {
+public:
+    void AddComponent(std::unique_ptr<UIComponent> component) {
+        m_components.emplace_back(std::move(component));
+    }
+
+    void CreateAll(HWND parent) {
+        for (auto& component : m_components) {
+            component->Create(parent);
+        }
+    }
+
+    void ShowAll(bool show) {
+        for (auto& component : m_components) {
+            component->Show(show);
+        }
+    }
+
+private:
+    std::vector<std::unique_ptr<UIComponent>> m_components;
+};
+
+// Класс для управления окном приложения
+class Window {
+public:
+    Window(HINSTANCE hInstance, const std::wstring& className, const std::wstring& windowTitle)
+        : m_hInstance(hInstance), m_className(className), m_windowTitle(windowTitle), m_hwnd(nullptr) {}
+
+    ~Window() {
+        if (m_hwnd) {
+            DestroyWindow(m_hwnd);
+        }
+    }
+
+    bool Create() {
+        if (!RegisterWindowClass(m_hInstance, m_className)) {
+            return false;
+        }
+
+        m_hwnd = CreateWindowEx(
+            0,
+            m_className.c_str(),
+            m_windowTitle.c_str(),
+            WS_OVERLAPPEDWINDOW,
+            CW_USEDEFAULT, CW_USEDEFAULT, 1280, 720,
+            NULL, NULL, m_hInstance, this // Передача указателя на текущий экземпляр
+        );
+
+        if (!m_hwnd) {
+            return false;
+        }
+
+        return true;
+    }
+
+    void Show(int nCmdShow) {
+        ShowWindow(m_hwnd, nCmdShow);
+        UpdateWindow(m_hwnd);
+    }
+
+    HWND GetHWND() const { return m_hwnd; }
+
+    // Обработка сообщений окна
+    LRESULT HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam) {
+        switch (uMsg) {
         case WM_DESTROY:
             PostQuitMessage(0);
             return 0;
 
-        case WM_KEYDOWN:
-            // Проверяем нажатие клавиши Esc
-            if (wParam == VK_ESCAPE) {
-                DestroyWindow(hwnd); // Закрыть окно
+        case WM_COMMAND:
+            {
+                int wmId = LOWORD(wParam);
+                switch (wmId) {
+                case 1001:
+                    // Действие для "New"
+                    MessageBox(m_hwnd, L"New clicked", L"Toolbar", MB_OK);
+                    break;
+                case 1002:
+                    // Действие для "Open"
+                    MessageBox(m_hwnd, L"Open clicked", L"Toolbar", MB_OK);
+                    break;
+                case 1003:
+                    // Действие для "Save"
+                    MessageBox(m_hwnd, L"Save clicked", L"Toolbar", MB_OK);
+                    break;
+                default:
+                    return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
+                }
             }
             return 0;
 
         default:
-            return DefWindowProc(hwnd, uMsg, wParam, lParam);
+            return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
+        }
     }
-}
 
+    // Регистрация класса окна
+    static bool RegisterWindowClass(HINSTANCE hInstance, const std::wstring& className) {
+        WNDCLASS wc = {};
+        wc.style = CS_HREDRAW | CS_VREDRAW;
+        wc.lpfnWndProc = WindowProcStatic;
+        wc.hInstance = hInstance;
+        wc.lpszClassName = className.c_str();
+        wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+        wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW+1);
+
+        return RegisterClass(&wc);
+    }
+
+private:
+    HINSTANCE m_hInstance;
+    std::wstring m_className;
+    std::wstring m_windowTitle;
+    HWND m_hwnd;
+
+    // Статический метод для обработки сообщений окна
+    static LRESULT CALLBACK WindowProcStatic(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+        Window* pWindow = nullptr;
+
+        if (uMsg == WM_NCCREATE) {
+            CREATESTRUCT* pCreate = reinterpret_cast<CREATESTRUCT*>(lParam);
+            pWindow = reinterpret_cast<Window*>(pCreate->lpCreateParams);
+            SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pWindow));
+        }
+        else {
+            pWindow = reinterpret_cast<Window*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+        }
+
+        if (pWindow) {
+            return pWindow->HandleMessage(uMsg, wParam, lParam);
+        }
+
+        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }
+};
+
+// Класс для управления Direct3D рендерингом
+class Renderer {
+public:
+    Renderer(HWND hwnd) : m_hwnd(hwnd) {}
+    ~Renderer() {
+        CleanupRenderTarget();
+    }
+
+    bool Initialize() {
+        try {
+            CreateDeviceAndSwapChain();
+            CreateRenderTargetView();
+        }
+        catch (const std::runtime_error& e) {
+            MessageBoxA(m_hwnd, e.what(), "Renderer Initialization Error", MB_ICONERROR | MB_OK);
+            return false;
+        }
+        return true;
+    }
+
+    void RenderFrame() {
+        // Очистка экрана
+        float ClearColor[4] = { 0.0f, 0.2f, 0.4f, 1.0f }; // Темно-синий цвет
+        m_deviceContext->ClearRenderTargetView(m_renderTargetView.Get(), ClearColor);
+
+        // Здесь можно добавить код рендеринга
+
+        // Презентация изображения
+        m_swapChain->Present(1, 0);
+    }
+
+private:
+    HWND m_hwnd;
+    ComPtr<ID3D11Device> m_device;
+    ComPtr<ID3D11DeviceContext> m_deviceContext;
+    ComPtr<IDXGISwapChain> m_swapChain;
+    ComPtr<ID3D11RenderTargetView> m_renderTargetView;
+
+    void CreateDeviceAndSwapChain() {
+        DXGI_SWAP_CHAIN_DESC sd = {};
+        sd.BufferCount = 1;
+        sd.BufferDesc.Width = 1280;
+        sd.BufferDesc.Height = 720;
+        sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        sd.BufferDesc.RefreshRate.Numerator = 60;
+        sd.BufferDesc.RefreshRate.Denominator = 1;
+        sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+        sd.OutputWindow = m_hwnd;
+        sd.SampleDesc.Count = 1;
+        sd.Windowed = TRUE;
+
+        D3D_FEATURE_LEVEL featureLevels[] = { D3D_FEATURE_LEVEL_11_0 };
+        UINT numFeatureLevels = ARRAYSIZE(featureLevels);
+
+        HRESULT hr = D3D11CreateDeviceAndSwapChain(
+            nullptr,
+            D3D_DRIVER_TYPE_HARDWARE,
+            nullptr,
+            0,
+            featureLevels,
+            numFeatureLevels,
+            D3D11_SDK_VERSION,
+            &sd,
+            &m_swapChain,
+            &m_device,
+            nullptr,
+            &m_deviceContext
+        );
+
+        if (FAILED(hr)) {
+            throw std::runtime_error("Failed to create D3D11 device and swap chain.");
+        }
+    }
+
+    void CreateRenderTargetView() {
+        ComPtr<ID3D11Texture2D> backBuffer;
+        HRESULT hr = m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), &backBuffer);
+        if (FAILED(hr)) {
+            throw std::runtime_error("Failed to get back buffer.");
+        }
+
+        hr = m_device->CreateRenderTargetView(backBuffer.Get(), nullptr, &m_renderTargetView);
+        if (FAILED(hr)) {
+            throw std::runtime_error("Failed to create render target view.");
+        }
+
+        m_deviceContext->OMSetRenderTargets(1, m_renderTargetView.GetAddressOf(), nullptr);
+
+        // Установка вьюпорта
+        D3D11_VIEWPORT vp;
+        vp.Width = 1280.0f;
+        vp.Height = 720.0f;
+        vp.MinDepth = 0.0f;
+        vp.MaxDepth = 1.0f;
+        vp.TopLeftX = 0;
+        vp.TopLeftY = 0;
+        m_deviceContext->RSSetViewports(1, &vp);
+    }
+
+    void CleanupRenderTarget() {
+        if (m_renderTargetView) {
+            m_renderTargetView.Reset();
+        }
+    }
+};
+
+// Класс приложения, объединяющий все компоненты
+class ApplicationApp {
+public:
+    ApplicationApp(HINSTANCE hInstance) : m_hInstance(hInstance), m_window(nullptr), m_renderer(nullptr) {}
+    ~ApplicationApp() = default;
+
+    bool Initialize(int nCmdShow) {
+        try {
+            // Создание и инициализация окна
+            m_window = std::make_unique<Window>(m_hInstance, L"MyWindowClass", L"Professional Application");
+            if (!m_window->Create()) {
+                throw std::runtime_error("Failed to create main window.");
+            }
+            m_window->Show(nCmdShow);
+
+            // Добавление UI-компонентов
+            m_componentManager.AddComponent(std::make_unique<Toolbar>());
+            // Можно добавить другие компоненты аналогичным образом
+            m_componentManager.CreateAll(m_window->GetHWND());
+            m_componentManager.ShowAll(true);
+
+            // Создание и инициализация рендерера
+            m_renderer = std::make_unique<Renderer>(m_window->GetHWND());
+            if (!m_renderer->Initialize()) {
+                throw std::runtime_error("Failed to initialize renderer.");
+            }
+        }
+        catch (const std::exception& e) {
+            MessageBoxA(NULL, e.what(), "Initialization Error", MB_ICONERROR | MB_OK);
+            return false;
+        }
+
+        return true;
+    }
+
+    int Run() {
+        MSG msg = {};
+        while (msg.message != WM_QUIT) {
+            if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+            }
+            else {
+                // Главный цикл рендеринга
+                m_renderer->RenderFrame();
+            }
+        }
+        return static_cast<int>(msg.wParam);
+    }
+
+private:
+    HINSTANCE m_hInstance;
+    std::unique_ptr<Window> m_window;
+    std::unique_ptr<Renderer> m_renderer;
+    ComponentManager m_componentManager;
+};
+
+// Точка входа приложения
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
-    const wchar_t CLASS_NAME[] = L"FullscreenWindowClass";
-
-    // Определяем класс окна
-    WNDCLASS wc = {};
-    wc.lpfnWndProc = WindowProc;
-    wc.hInstance = hInstance;
-    wc.lpszClassName = CLASS_NAME;
-    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-
-    RegisterClass(&wc);
-
-    // Получаем размеры экрана
-    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-
-    // Создаем окно
-    HWND hwnd = CreateWindowEx(
-        WS_EX_TOPMOST, // Окно всегда поверх остальных
-        CLASS_NAME,
-        L"My Fullscreen Window",
-        WS_POPUP, // Убираем рамку окна
-        0, 0, screenWidth, screenHeight, // Положение и размер окна
-        NULL,
-        NULL,
-        hInstance,
-        NULL
-    );
-
-    if (hwnd == NULL) return 0;
-
-    ShowWindow(hwnd, nCmdShow);
-
-    // Главный цикл сообщений
-    MSG msg = {};
-    while (GetMessage(&msg, NULL, 0, 0)) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
+    ApplicationApp app(hInstance);
+    if (!app.Initialize(nCmdShow)) {
+        return -1;
     }
-
-    return 0;
+    return app.Run();
 }

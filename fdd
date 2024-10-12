@@ -24,51 +24,71 @@ int currentLanguageIndex = 0; // Индекс текущего языка
 // Функция для загрузки изображения из URL
 bool LoadImageFromURL(const std::wstring& url) {
     HINTERNET hInternet = InternetOpen(L"ImageLoader", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
-    if (!hInternet) return false;
+    if (!hInternet) {
+        OutputDebugString(L"InternetOpen failed\n");
+        return false;
+    }
 
-    HINTERNET hConnect = InternetOpenUrl(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD, 0);
+    // Флаги для открытия URL: кэш отключен и чтение данных по мере загрузки
+    HINTERNET hConnect = InternetOpenUrl(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD | INTERNET_FLAG_DONT_CACHE, 0);
     if (!hConnect) {
+        OutputDebugString(L"InternetOpenUrl failed\n");
         InternetCloseHandle(hInternet);
         return false;
     }
 
-    // Получаем размер загружаемого изображения
-    DWORD fileSize = 0;
+    // Чтение всех данных
+    std::vector<BYTE> buffer;
+    DWORD bytesAvailable = 0;
     DWORD bytesRead = 0;
-    if (!InternetQueryDataAvailable(hConnect, &fileSize, 0, 0)) {
-        InternetCloseHandle(hConnect);
-        InternetCloseHandle(hInternet);
-        return false;
+    BYTE tempBuffer[4096];
+    while (InternetQueryDataAvailable(hConnect, &bytesAvailable, 0, 0) && bytesAvailable > 0) {
+        DWORD toRead = min(bytesAvailable, (DWORD)sizeof(tempBuffer));
+        if (InternetReadFile(hConnect, tempBuffer, toRead, &bytesRead) && bytesRead > 0) {
+            buffer.insert(buffer.end(), tempBuffer, tempBuffer + bytesRead);
+        } else {
+            break;
+        }
     }
 
-    // Создаем буфер для хранения данных изображения
-    std::vector<BYTE> buffer(fileSize);
-    if (!InternetReadFile(hConnect, buffer.data(), fileSize, &bytesRead) || bytesRead != fileSize) {
-        InternetCloseHandle(hConnect);
-        InternetCloseHandle(hInternet);
-        return false;
-    }
-
-    // Закрываем дескрипторы
     InternetCloseHandle(hConnect);
     InternetCloseHandle(hInternet);
 
-    // Загружаем изображение в GDI+
+    if (buffer.empty()) {
+        OutputDebugString(L"No data downloaded from URL\n");
+        return false;
+    }
+
+    // Создание потока из буфера
     IStream* stream = nullptr;
     if (FAILED(CreateStreamOnHGlobal(NULL, TRUE, &stream))) {
+        OutputDebugString(L"CreateStreamOnHGlobal failed\n");
         return false;
     }
 
     ULONG written;
-    if (FAILED(stream->Write(buffer.data(), fileSize, &written)) || written != fileSize) {
+    if (FAILED(stream->Write(buffer.data(), buffer.size(), &written)) || written != buffer.size()) {
+        OutputDebugString(L"Stream write failed\n");
         stream->Release();
         return false;
     }
-    stream->Seek({ 0 }, STREAM_SEEK_SET, NULL);
 
+    LARGE_INTEGER liZero = {};
+    stream->Seek(liZero, STREAM_SEEK_SET, NULL);
+
+    // Загрузка изображения из потока
     backgroundImage = new Image(stream);
     stream->Release();
 
+    // Проверка статуса загрузки изображения
+    if (backgroundImage->GetLastStatus() != Ok) {
+        OutputDebugString(L"Failed to create Image from stream\n");
+        delete backgroundImage;
+        backgroundImage = nullptr;
+        return false;
+    }
+
+    OutputDebugString(L"Image loaded successfully\n");
     return backgroundImage != nullptr;
 }
 
@@ -79,7 +99,7 @@ std::wstring GetCurrentTimeString() {
     std::time_t now_c = system_clock::to_time_t(now);
     std::tm parts;
 
-    // Используем localtime_s вместо localtime
+    // Используем localtime_s вместо localtime для потокобезопасности
     localtime_s(&parts, &now_c);
 
     std::wstringstream ss;
@@ -101,8 +121,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             }
 
             // Обработка переключения языка на Alt+Shift или Win+Space
-            if ((GetAsyncKeyState(VK_MENU) & 0x8000) && wParam == VK_SHIFT ||
-                (GetAsyncKeyState(VK_LWIN) & 0x8000) && wParam == VK_SPACE) {
+            if (((GetAsyncKeyState(VK_MENU) & 0x8000) && wParam == VK_SHIFT) ||
+                ((GetAsyncKeyState(VK_LWIN) & 0x8000) && wParam == VK_SPACE)) {
                 currentLanguageIndex = (currentLanguageIndex + 1) % languages.size(); // Переключаем язык
                 InvalidateRect(hwnd, NULL, TRUE); // Перерисовываем окно
             }
@@ -118,17 +138,42 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             HDC hdc = BeginPaint(hwnd, &ps);
             Graphics graphics(hdc);
 
+            // Установка высококачественных настроек рендеринга
+            graphics.SetSmoothingMode(SmoothingModeHighQuality);
+            graphics.SetInterpolationMode(InterpolationModeHighQualityBicubic);
+            graphics.SetPixelOffsetMode(PixelOffsetModeHighQuality);
+
             // Получаем размеры окна
             RECT windowRect;
             GetClientRect(hwnd, &windowRect);
 
-            // Рисуем изображение как фон
+            // Рисуем изображение как фон с сохранением пропорций
             if (backgroundImage) {
-                graphics.DrawImage(backgroundImage, 0, 0, windowRect.right, windowRect.bottom);
+                UINT imgWidth = backgroundImage->GetWidth();
+                UINT imgHeight = backgroundImage->GetHeight();
+
+                double windowAspect = static_cast<double>(windowRect.right) / windowRect.bottom;
+                double imageAspect = static_cast<double>(imgWidth) / imgHeight;
+
+                double drawWidth, drawHeight;
+                if (windowAspect > imageAspect) {
+                    // Окно шире изображения
+                    drawHeight = windowRect.bottom;
+                    drawWidth = imageAspect * drawHeight;
+                }
+                else {
+                    // Окно уже или равно изображению
+                    drawWidth = windowRect.right;
+                    drawHeight = drawWidth / imageAspect;
+                }
+
+                float x = static_cast<float>((windowRect.right - drawWidth) / 2.0);
+                float y = static_cast<float>((windowRect.bottom - drawHeight) / 2.0);
+                graphics.DrawImage(backgroundImage, x, y, static_cast<REAL>(drawWidth), static_cast<REAL>(drawHeight));
             }
 
             // Рисуем нижнюю панель
-            RECT panelRect = { 0, ps.rcPaint.bottom - 40, ps.rcPaint.right, ps.rcPaint.bottom };
+            RECT panelRect = { 0, windowRect.bottom - 40, windowRect.right, windowRect.bottom };
             FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1)); // Цвет панели
 
             // Получаем текущее время
@@ -140,23 +185,23 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             Font font(&fontFamily, 16, FontStyleRegular, UnitPixel); // Устанавливаем размер шрифта на 16
             SolidBrush brush(Color(255, 0, 0, 0)); // Черный цвет текста
 
-            // Находим размеры текста для центрирования
+            // Находим размеры текста для правильного размещения
             RectF timeRect;
             graphics.MeasureString(timeString.c_str(), -1, &font, PointF(0, 0), &timeRect);
             RectF langRect;
             graphics.MeasureString(langString.c_str(), -1, &font, PointF(0, 0), &langRect);
 
             // Рассчитываем координаты для расположения текста
-            float xTime = panelRect.right - timeRect.Width - langRect.Width - 30; // Увеличен отступ от правого края
-            float y = panelRect.bottom - timeRect.Height - 10; // Отступ от нижней границы
+            float xTime = static_cast<float>(windowRect.right - timeRect.Width - langRect.Width - 30); // Отступ от правого края
+            float y = static_cast<float>(windowRect.bottom - 40 + (40 - timeRect.Height) / 2.0 - 10); // Отступ от нижней границы
 
-            // Рисуем текст без фона
+            // Рисуем время
             PointF timePoint(xTime, y);
-            graphics.DrawString(timeString.c_str(), -1, &font, timePoint, nullptr, &brush);
+            graphics.DrawString(timeString.c_str(), -1, &font, timePoint, &brush);
 
-            // Рисуем язык рядом с временем
+            // Рисуем текущий язык рядом с временем
             PointF langPoint(xTime - langRect.Width - 10, y); // Отступ слева от времени
-            graphics.DrawString(langString.c_str(), -1, &font, langPoint, nullptr, &brush);
+            graphics.DrawString(langString.c_str(), -1, &font, langPoint, &brush);
 
             // Добавляем анонс операционной системы в центр экрана
             std::wstring announcement = L"Introducing Orega OS: The Future of Performance!";
@@ -165,12 +210,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             graphics.MeasureString(announcement.c_str(), -1, &largeFont, PointF(0, 0), &announcementRect);
 
             // Позиционируем анонс в центре экрана
-            float xAnnouncement = (ps.rcPaint.right - announcementRect.Width) / 2;
-            float yAnnouncement = (ps.rcPaint.bottom - announcementRect.Height) / 2;
+            float xAnnouncement = (static_cast<float>(windowRect.right) - announcementRect.Width) / 2.0f;
+            float yAnnouncement = (static_cast<float>(windowRect.bottom) - announcementRect.Height) / 2.0f;
             PointF announcementPoint(xAnnouncement, yAnnouncement);
 
             SolidBrush announcementBrush(Color(255, 0, 0, 0)); // Чёрный цвет текста для анонса
-            graphics.DrawString(announcement.c_str(), -1, &largeFont, announcementPoint, nullptr, &announcementBrush);
+            graphics.DrawString(announcement.c_str(), -1, &largeFont, announcementPoint, &announcementBrush);
 
             EndPaint(hwnd, &ps);
             return 0;
@@ -216,10 +261,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         NULL
     );
 
-    if (hwnd == NULL) return 0;
+    if (hwnd == NULL) {
+        GdiplusShutdown(gdiplusToken);
+        return 0;
+    }
 
     // Загружаем изображение фона из URL
-    LoadImageFromURL(L"https://i.pinimg.com/originals/f0/c7/8c/f0c78cc56f1909dece1c062020e7c8a5.png");
+    if (!LoadImageFromURL(L"https://i.pinimg.com/originals/f0/c7/8c/f0c78cc56f1909dece1c062020e7c8a5.png")) {
+        MessageBox(hwnd, L"Не удалось загрузить фон. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
+        DestroyWindow(hwnd);
+        GdiplusShutdown(gdiplusToken);
+        return 0;
+    }
 
     ShowWindow(hwnd, nCmdShow);
     UpdateWindow(hwnd);

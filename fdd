@@ -1,94 +1,53 @@
 #include <windows.h>
-#include <gdiplus.h>
-#include <curl/curl.h>
 #include <string>
-#include <vector>
 #include <chrono>
 #include <iomanip>
 #include <sstream>
-#include <locale>
-#include <codecvt>
 
-#pragma comment(lib, "gdiplus.lib")
-#pragma comment(lib, "libcurl.lib") // Подключаем библиотеку libcurl
+using namespace std;
 
-using namespace Gdiplus;
-
-// Объявляем переменную для изображения на уровне модуля
-Image* backgroundImage = nullptr;
-
-// Функция обратного вызова для записи данных в буфер
-size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
-    size_t totalSize = size * nmemb;
-    std::vector<BYTE>* buffer = reinterpret_cast<std::vector<BYTE>*>(userp);
-    buffer->insert(buffer->end(), reinterpret_cast<BYTE*>(contents), reinterpret_cast<BYTE*>(contents) + totalSize);
-    return totalSize;
-}
-
-// Функция для загрузки изображения из URL с использованием libcurl
-bool LoadImageFromURL(const std::wstring& url) {
-    CURL* curl;
-    CURLcode res;
-
-    std::vector<BYTE> buffer;
-
-    curl_global_init(CURL_GLOBAL_DEFAULT);
-    curl = curl_easy_init();
-    if (!curl) return false;
-
-    // Устанавливаем URL
-    curl_easy_setopt(curl, CURLOPT_URL, std::string(url.begin(), url.end()).c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buffer);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L); // Следовать за перенаправлениями
-
-    // Выполняем запрос
-    res = curl_easy_perform(curl);
-    curl_easy_cleanup(curl);
-    curl_global_cleanup();
-
-    if (res != CURLE_OK) {
-        return false; // Ошибка при загрузке
-    }
-
-    // Загружаем изображение в GDI+
-    IStream* stream = nullptr;
-    if (FAILED(CreateStreamOnHGlobal(NULL, TRUE, &stream))) {
-        return false;
-    }
-
-    ULONG written;
-    if (FAILED(stream->Write(buffer.data(), buffer.size(), &written)) || written != buffer.size()) {
-        stream->Release();
-        return false;
-    }
-    stream->Seek({ 0 }, STREAM_SEEK_SET, NULL);
-
-    backgroundImage = new Image(stream);
-    stream->Release();
-
-    return backgroundImage != nullptr;
-}
+// Объявляем переменную для хранения дескриптора изображения
+HBITMAP hBitmap = NULL;
 
 // Функция для получения текущего времени в строковом формате
-std::wstring GetCurrentTimeString() {
+wstring GetCurrentTimeString() {
     using namespace std::chrono;
     auto now = system_clock::now();
     std::time_t now_c = system_clock::to_time_t(now);
     std::tm parts;
-
-    // Используем localtime_s вместо localtime
     localtime_s(&parts, &now_c);
-
     std::wstringstream ss;
     ss << std::put_time(&parts, L"%H:%M"); // Формат времени HH:MM
     return ss.str();
 }
 
+// Функция для загрузки изображения
+bool LoadImageFromFile(const wchar_t* filename) {
+    // Загружаем изображение из файла
+    hBitmap = (HBITMAP)LoadImage(NULL, filename, IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
+    return hBitmap != NULL;
+}
+
+// Функция для рисования изображения
+void DrawBackground(HDC hdc) {
+    if (hBitmap) {
+        HDC hdcMem = CreateCompatibleDC(hdc);
+        HGDIOBJ oldBitmap = SelectObject(hdcMem, hBitmap);
+
+        BITMAP bitmap;
+        GetObject(hBitmap, sizeof(BITMAP), &bitmap);
+        // Рисуем изображение
+        BitBlt(hdc, 0, 0, bitmap.bmWidth, bitmap.bmHeight, hdcMem, 0, 0, SRCCOPY);
+
+        SelectObject(hdcMem, oldBitmap);
+        DeleteDC(hdcMem);
+    }
+}
+
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
     case WM_DESTROY:
-        delete backgroundImage; // Удаляем изображение
+        DeleteObject(hBitmap); // Освобождаем ресурс изображения
         PostQuitMessage(0);
         return 0;
 
@@ -102,44 +61,41 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     case WM_PAINT: {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
-        Graphics graphics(hdc);
 
         // Рисуем изображение как фон
-        if (backgroundImage) {
-            graphics.DrawImage(backgroundImage, 0, 0, ps.rcPaint.right, ps.rcPaint.bottom);
-        }
+        DrawBackground(hdc);
 
         // Рисуем нижнюю панель
         RECT panelRect = { 0, ps.rcPaint.bottom - 40, ps.rcPaint.right, ps.rcPaint.bottom };
         FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1)); // Цвет панели
 
         // Получаем текущее время
-        std::wstring timeString = GetCurrentTimeString();
-        std::wstring langString = L"РУС"; // Статичное значение языка
+        wstring timeString = GetCurrentTimeString();
+        wstring langString = L"РУС"; // Статичное значение языка
 
-        // Используем GDI+ для рисования текста
-        FontFamily fontFamily(L"Segoe UI"); // Выбор шрифта
-        Font font(&fontFamily, 16, FontStyleRegular, UnitPixel); // Устанавливаем размер шрифта на 16
-        SolidBrush brush(Color(255, 0, 0, 0)); // Черный цвет текста
+        // Устанавливаем шрифт
+        HFONT hFont = CreateFont(
+            16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_FD_GROW, L"Segoe UI");
+        SelectObject(hdc, hFont);
 
-        // Находим размеры текста для центрирования
-        RectF timeRect;
-        graphics.MeasureString(timeString.c_str(), -1, &font, PointF(0, 0), &timeRect);
-        RectF langRect;
-        graphics.MeasureString(langString.c_str(), -1, &font, PointF(0, 0), &langRect);
+        // Получаем размеры текста для центрирования
+        SIZE timeSize;
+        GetTextExtentPoint32(hdc, timeString.c_str(), timeString.size(), &timeSize);
+        SIZE langSize;
+        GetTextExtentPoint32(hdc, langString.c_str(), langString.size(), &langSize);
 
         // Рассчитываем координаты для расположения текста
-        float xTime = panelRect.right - timeRect.Width - langRect.Width - 30; // Увеличен отступ от правого края
-        float y = panelRect.bottom - timeRect.Height - 10; // Отступ от нижней границы
+        float xTime = panelRect.right - timeSize.cx - langSize.cx - 30; // Увеличен отступ от правого края
+        float y = panelRect.bottom - timeSize.cy - 10; // Отступ от нижней границы
 
         // Рисуем текст без фона
-        PointF timePoint(xTime, y);
-        graphics.DrawString(timeString.c_str(), -1, &font, timePoint, nullptr, &brush);
+        SetTextColor(hdc, RGB(0, 0, 0)); // Черный цвет текста
+        TextOut(hdc, xTime, y, timeString.c_str(), timeString.size());
+        TextOut(hdc, xTime - langSize.cx - 10, y, langString.c_str(), langString.size());
 
-        // Рисуем язык рядом с временем
-        PointF langPoint(xTime - langRect.Width - 10, y); // Отступ слева от времени
-        graphics.DrawString(langString.c_str(), -1, &font, langPoint, nullptr, &brush);
-
+        // Освобождаем ресурсы
+        DeleteObject(hFont);
         EndPaint(hwnd, &ps);
         return 0;
     }
@@ -151,11 +107,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     const wchar_t CLASS_NAME[] = L"FullscreenWindowClass";
-
-    // Инициализация GDI+
-    GdiplusStartupInput gdiplusStartupInput;
-    ULONG_PTR gdiplusToken;
-    GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
 
     // Определяем класс окна
     WNDCLASS wc = {};
@@ -186,11 +137,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     if (hwnd == NULL) return 0;
 
-    // Загружаем изображение из URL
-    std::wstring imageUrl = L"http://example.com/image.jpg"; // Замените на нужный URL
-    if (!LoadImageFromURL(imageUrl)) {
-        // Обработка ошибки загрузки изображения
-        MessageBox(NULL, L"Не удалось загрузить изображение", L"Ошибка", MB_OK | MB_ICONERROR);
+    // Загружаем изображение из локального файла
+    std::wstring imagePath = L"Resources\\afrikanskii-lev.orig.jpg"; // Убедитесь, что этот файл существует
+    if (!LoadImageFromFile(imagePath.c_str())) {
+        MessageBox(NULL, L"Не удалось загрузить изображение.", L"Ошибка", MB_OK | MB_ICONERROR);
+        return 0;
     }
 
     ShowWindow(hwnd, nCmdShow);
@@ -201,9 +152,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
-
-    // Завершаем работу GDI+
-    GdiplusShutdown(gdiplusToken);
 
     return 0;
 }

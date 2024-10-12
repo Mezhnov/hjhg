@@ -187,9 +187,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     if (hwnd == NULL) return 0;
 
-    // Загружаем изображение из локального файла
-    std::wstring imagePath = L"Resources\\afrikanskii-lev.orig.jpg"; // Путь к изображению в папке проекта
-    backgroundImage = new Gdiplus::Image(imagePath.c_str());
+    // Загружаем изображение из URL
+    std::wstring imageURL = L"https://example.com/your-image.jpg"; // Замените на реальный URL
+    if (!LoadImageFromURL(imageURL)) {
+        // Обработка ошибки загрузки
+        MessageBox(NULL, L"Не удалось загрузить изображение!", L"Ошибка", MB_OK | MB_ICONERROR);
+        return 0; // Прекращаем выполнение, если изображение не загружено
+    }
 
     ShowWindow(hwnd, nCmdShow);
 

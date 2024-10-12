@@ -39,60 +39,85 @@ std::wstring GetCurrentTimeString() {
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
-    case WM_DESTROY:
-        delete backgroundImage; // Удаляем изображение
-        PostQuitMessage(0);
-        return 0;
+        case WM_DESTROY:
+            delete backgroundImage; // Удаляем изображение
+            PostQuitMessage(0);
+            return 0;
 
-    case WM_KEYDOWN:
-        if (wParam == VK_ESCAPE) {
-            DestroyWindow(hwnd); // Закрыть окно
+        case WM_KEYDOWN:
+            if (wParam == VK_ESCAPE) {
+                DestroyWindow(hwnd); // Закрыть окно
+            }
+            return 0;
+
+        case WM_PAINT: {
+            PAINTSTRUCT ps;
+            HDC hdc = BeginPaint(hwnd, &ps);
+            Graphics graphics(hdc);
+
+            // Получаем размеры окна
+            int width = ps.rcPaint.right - ps.rcPaint.left;
+            int height = ps.rcPaint.bottom - ps.rcPaint.top;
+
+            // Рисуем изображение как фон, сохраняя пропорции
+            if (backgroundImage) {
+                float imgWidth = backgroundImage->GetWidth();
+                float imgHeight = backgroundImage->GetHeight();
+                float imgAspectRatio = imgWidth / imgHeight;
+                float windowAspectRatio = static_cast<float>(width) / height;
+
+                int drawWidth, drawHeight;
+                if (imgAspectRatio > windowAspectRatio) {
+                    drawWidth = width;
+                    drawHeight = static_cast<int>(width / imgAspectRatio);
+                } else {
+                    drawHeight = height;
+                    drawWidth = static_cast<int>(height * imgAspectRatio);
+                }
+
+                int x = (width - drawWidth) / 2;
+                int y = (height - drawHeight) / 2;
+
+                graphics.DrawImage(backgroundImage, x, y, drawWidth, drawHeight);
+            }
+
+            // Рисуем нижнюю панель
+            RECT panelRect = { 0, height - 40, width, height };
+            FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1)); // Цвет панели
+
+            // Получаем текущее время
+            std::wstring timeString = GetCurrentTimeString();
+            std::wstring langString = L"РУС"; // Статичное значение языка
+
+            FontFamily fontFamily(L"Segoe UI");
+            Font font(&fontFamily, 16, FontStyleRegular, UnitPixel);
+            SolidBrush brush(Color(255, 0, 0, 0));
+
+            // Находим размеры текста для центрирования
+            RectF timeRect, langRect;
+            graphics.MeasureString(timeString.c_str(), -1, &font, PointF(0, 0), &timeRect);
+            graphics.MeasureString(langString.c_str(), -1, &font, PointF(0, 0), &langRect);
+
+            // Рассчитываем координаты для расположения текста
+            float xTime = panelRect.right - timeRect.Width - langRect.Width - 30;
+            float y = panelRect.bottom - timeRect.Height - 10;
+
+            // Рисуем текст
+            PointF timePoint(xTime, y);
+            graphics.DrawString(timeString.c_str(), -1, &font, timePoint, nullptr, &brush);
+            PointF langPoint(xTime - langRect.Width - 10, y);
+            graphics.DrawString(langString.c_str(), -1, &font, langPoint, nullptr, &brush);
+
+            EndPaint(hwnd, &ps);
+            return 0;
         }
-        return 0;
 
-    case WM_PAINT: {
-        PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(hwnd, &ps);
-        Graphics graphics(hdc);
+        case WM_SIZE:
+            InvalidateRect(hwnd, NULL, TRUE); // Перерисовываем окно при изменении его размера
+            return 0;
 
-        // Рисуем изображение как фон
-        if (backgroundImage) {
-            graphics.DrawImage(backgroundImage, 0, 0, ps.rcPaint.right, ps.rcPaint.bottom);
-        }
-
-        // Рисуем нижнюю панель
-        RECT panelRect = { 0, ps.rcPaint.bottom - 40, ps.rcPaint.right, ps.rcPaint.bottom };
-        FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1)); // Цвет панели
-
-        // Получаем текущее время
-        std::wstring timeString = GetCurrentTimeString();
-        std::wstring langString = L"РУС"; // Статичное значение языка
-
-        FontFamily fontFamily(L"Segoe UI");
-        Font font(&fontFamily, 16, FontStyleRegular, UnitPixel);
-        SolidBrush brush(Color(255, 0, 0, 0));
-
-        // Находим размеры текста для центрирования
-        RectF timeRect, langRect;
-        graphics.MeasureString(timeString.c_str(), -1, &font, PointF(0, 0), &timeRect);
-        graphics.MeasureString(langString.c_str(), -1, &font, PointF(0, 0), &langRect);
-
-        // Рассчитываем координаты для расположения текста
-        float xTime = panelRect.right - timeRect.Width - langRect.Width - 30; 
-        float y = panelRect.bottom - timeRect.Height - 10; 
-
-        // Рисуем текст
-        PointF timePoint(xTime, y);
-        graphics.DrawString(timeString.c_str(), -1, &font, timePoint, nullptr, &brush);
-        PointF langPoint(xTime - langRect.Width - 10, y);
-        graphics.DrawString(langString.c_str(), -1, &font, langPoint, nullptr, &brush);
-
-        EndPaint(hwnd, &ps);
-        return 0;
-    }
-
-    default:
-        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+        default:
+            return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
 }
 
@@ -142,7 +167,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
-
     GdiplusShutdown(gdiplusToken);
     return 0;
 }

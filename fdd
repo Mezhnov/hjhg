@@ -208,15 +208,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     }
 
     ShowWindow(hwnd, nCmdShow);
+    UpdateWindow(hwnd);
 
-    // Message Loop
-    MSG msg = {};
+    // Main message loop
+    MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
-    // Cleanup
+    // Cleanup GDI+
     GdiplusShutdown(gdiplusToken);
     return 0;
 }

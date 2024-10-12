@@ -6,6 +6,8 @@
 #include <chrono>
 #include <iomanip>
 #include <sstream>
+#include <locale>
+#include <codecvt>
 
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "wininet.lib")
@@ -81,6 +83,15 @@ std::wstring GetCurrentTimeString() {
     return ss.str();
 }
 
+// Функция для получения текущего языка
+std::wstring GetCurrentLanguage() {
+    WCHAR lang[LOCALE_NAME_MAX_LENGTH];
+    if (GetUserDefaultLocaleName(lang, LOCALE_NAME_MAX_LENGTH) > 0) {
+        return std::wstring(lang);
+    }
+    return L"RU"; // По умолчанию - русский
+}
+
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
     case WM_DESTROY:
@@ -109,6 +120,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         // Получаем и отображаем текущее время
         std::wstring timeString = GetCurrentTimeString();
+        std::wstring langString = GetCurrentLanguage(); // Получаем язык
 
         // Используем GDI+ для рисования текста
         Graphics graphics(hdc);
@@ -117,16 +129,22 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         SolidBrush brush(Color(255, 0, 0, 0)); // Черный цвет текста
 
         // Находим размеры текста для центрирования
-        RectF textRect;
-        graphics.MeasureString(timeString.c_str(), -1, &font, PointF(0, 0), &textRect);
+        RectF timeRect;
+        graphics.MeasureString(timeString.c_str(), -1, &font, PointF(0, 0), &timeRect);
+        RectF langRect;
+        graphics.MeasureString(langString.c_str(), -1, &font, PointF(0, 0), &langRect);
 
-        // Рассчитываем координаты для расположения текста справа
-        float x = panelRect.right - textRect.Width - 20; // Увеличен отступ от правого края
-        float y = panelRect.bottom - textRect.Height - 10; // Отступ от нижней границы
+        // Рассчитываем координаты для расположения текста
+        float xTime = panelRect.right - timeRect.Width - langRect.Width - 30; // Увеличен отступ от правого края
+        float y = panelRect.bottom - timeRect.Height - 10; // Отступ от нижней границы
 
         // Рисуем текст без фона
-        PointF point(x, y);
-        graphics.DrawString(timeString.c_str(), -1, &font, point, nullptr, &brush);
+        PointF timePoint(xTime, y);
+        graphics.DrawString(timeString.c_str(), -1, &font, timePoint, nullptr, &brush);
+
+        // Рисуем язык рядом с временем
+        PointF langPoint(xTime - langRect.Width - 10, y); // Отступ слева от времени
+        graphics.DrawString(langString.c_str(), -1, &font, langPoint, nullptr, &brush);
 
         EndPaint(hwnd, &ps);
         return 0;

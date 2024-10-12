@@ -121,12 +121,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     case WM_CREATE:
         // Create Search Box on the left side of the bottom panel
         hSearchBox = CreateWindowEx(
-            0, L"EDIT", NULL,
-            WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT,
+            WS_EX_CLIENTEDGE, L"EDIT", NULL,
+            WS_CHILD | WS_VISIBLE | ES_LEFT | WS_BORDER | ES_AUTOHSCROLL,
             10,  // X position
             10,  // Y position within the panel (to be adjusted in WM_SIZE)
-            200, // Width
-            25,  // Height
+            300, // Width (larger for better visibility)
+            30,  // Height (larger for better visibility)
             hwnd,
             (HMENU)1, // ID
             NULL,
@@ -135,6 +135,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         if (!hSearchBox) {
             MessageBox(NULL, L"Не удалось создать окно поиска.", L"Ошибка", MB_OK | MB_ICONERROR);
         }
+        // Set a custom font for the search box (Segoe UI, 16pt)
+        HFONT hFont = CreateFont(16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
+            CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, VARIABLE_PITCH, TEXT("Segoe UI"));
+        SendMessage(hSearchBox, WM_SETFONT, (WPARAM)hFont, TRUE);
         break;
 
     case WM_SIZE: {
@@ -143,11 +147,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         int height = HIWORD(lParam);
 
         // Define panel height
-        const int panelHeight = 40;
+        const int panelHeight = 60; // Increased height for a more pronounced bottom panel
 
         // Move the search box to the left side of the panel
         if (hSearchBox) {
-            MoveWindow(hSearchBox, 10, height - panelHeight + (panelHeight - 25) / 2, 200, 25, TRUE);
+            MoveWindow(hSearchBox, 10, height - panelHeight + (panelHeight - 30) / 2, 300, 30, TRUE);
         }
         break;
     }
@@ -194,7 +198,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         }
 
         // Draw bottom panel
-        RECT panelRect = { 0, ps.rcPaint.bottom - 40, ps.rcPaint.right, ps.rcPaint.bottom };
+        RECT panelRect = { 0, ps.rcPaint.bottom - 60, ps.rcPaint.right, ps.rcPaint.bottom };
         FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1)); // Panel color
 
         // Get current time
@@ -216,16 +220,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         float xTime = panelRect.right - timeRect.Width - langRect.Width - 30; // Increased margin from right
         float y = panelRect.bottom - timeRect.Height - 10; // Margin from bottom
 
-        // Draw time text without background
-        PointF timePoint(xTime, y);
-        graphics.DrawString(timeString.c_str(), -1, &font, timePoint, nullptr, &brush);
-
-        // Draw language text next to time
-        PointF langPoint(xTime - langRect.Width - 10, y); // Margin left of time
-        graphics.DrawString(langString.c_str(), -1, &font, langPoint, nullptr, &brush);
+        // Draw time and language strings
+        graphics.DrawString(timeString.c_str(), -1, &font, PointF(xTime, y), &brush);
+        graphics.DrawString(langString.c_str(), -1, &font, PointF(xTime + timeRect.Width + 10, y), &brush);
 
         EndPaint(hwnd, &ps);
-        return 0;
+        break;
     }
 
     default:
@@ -234,10 +234,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     return 0;
 }
 
-// Entry point
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
-    const wchar_t CLASS_NAME[] = L"FullscreenWindowClass";
-
+// Main entry point
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow) {
     // Initialize GDI+
     GdiplusStartupInput gdiplusStartupInput;
     ULONG_PTR gdiplusToken;
@@ -246,17 +244,23 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         return -1;
     }
 
+    // Load background image from URL
+    if (!LoadImageFromURL(L"https://example.com/image.jpg")) {
+        GdiplusShutdown(gdiplusToken);
+        return -1;
+    }
+
     WNDCLASS wc = {};
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
-    wc.lpszClassName = CLASS_NAME;
+    wc.lpszClassName = L"FullscreenApp";
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 
     RegisterClass(&wc);
 
     HWND hwnd = CreateWindowEx(
         WS_EX_TOPMOST,
-        CLASS_NAME,
+        wc.lpszClassName,
         L"Полноэкранное приложение",
         WS_POPUP,
         0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN),
@@ -265,6 +269,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     if (!hwnd) {
         MessageBox(NULL, L"Не удалось создать окно.", L"Ошибка", MB_OK | MB_ICONERROR);
+        GdiplusShutdown(gdiplusToken);
         return -1;
     }
 

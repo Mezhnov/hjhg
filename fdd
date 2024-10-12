@@ -152,7 +152,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     // Инициализация GDI+
     GdiplusStartupInput gdiplusStartupInput;
     ULONG_PTR gdiplusToken;
-    if (GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL) != GdiplusOk) {
+    if (GdiplusStartup(&gdiplusToken, &gdiplusStartupInput) != Ok) { // Замените GdiplusOk на Ok
         return 0; // Не удалось инициализировать GDI+
     }
 
@@ -188,12 +188,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     // Загружаем изображение из локального файла
     std::wstring imagePath = L"Resources/afrikanskii-lev.orig.jpg"; // Путь к изображению в папке проекта
     backgroundImage = new Gdiplus::Image(imagePath.c_str());
-
-    // Проверяем, удалось ли загрузить изображение
-    if (backgroundImage->GetLastStatus() != Ok) {
-        delete backgroundImage; // Удаляем объект изображения в случае ошибки
-        backgroundImage = nullptr;
-    }
 
     ShowWindow(hwnd, nCmdShow);
 

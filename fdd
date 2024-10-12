@@ -13,7 +13,6 @@ using namespace Gdiplus;
 #define BUTTON_2 102
 #define EDIT_TEXT 103
 #define LIST_VIEW 104
-#define BUTTON_MY_COMPUTER 105
 
 ULONG_PTR gdiplusToken;
 
@@ -39,7 +38,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     icex.dwICC = ICC_LISTVIEW_CLASSES;
     InitCommonControlsEx(&icex);
 
-    const char CLASS_NAME[] = "WindowClass";
+    const wchar_t CLASS_NAME[] = L"WindowClass";
     WNDCLASS wc = {};
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
@@ -50,12 +49,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     RegisterClass(&wc);
 
-    HWND hwnd = CreateWindowEx(0, CLASS_NAME, "My Unreal-Like Window", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+    HWND hwnd = CreateWindowEx(0, CLASS_NAME, L"My Unreal-Like Window", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
                                CW_USEDEFAULT, CW_USEDEFAULT, 800, 600, NULL, NULL, hInstance, NULL);
     if (hwnd == NULL) return 0;
 
     // Create ListView for displaying folders
-    HWND hListView = CreateWindow(WC_LISTVIEW, "", WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SINGLESEL,
+    HWND hListView = CreateWindow(WC_LISTVIEW, L"", WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SINGLESEL,
                                   50, 200, 700, 350, hwnd, (HMENU)LIST_VIEW, hInstance, NULL);
     InitializeListView(hListView);
 
@@ -67,18 +66,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     AddListViewItems(hListView);
 
     // Create buttons
-    CreateWindow("BUTTON", "Этот компьютер", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
-                 50, 50, 150, 30, hwnd, (HMENU)BUTTON_MY_COMPUTER, hInstance, NULL);
+    CreateWindow(L"BUTTON", L"Button 1", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+                 50, 50, 100, 30, hwnd, (HMENU)BUTTON_1, hInstance, NULL);
 
-    CreateWindow("BUTTON", "Button 1", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
-                 220, 50, 100, 30, hwnd, (HMENU)BUTTON_1, hInstance, NULL);
-
-    CreateWindow("BUTTON", "Button 2", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
-                 350, 50, 100, 30, hwnd, (HMENU)BUTTON_2, hInstance, NULL);
+    CreateWindow(L"BUTTON", L"Button 2", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+                 200, 50, 100, 30, hwnd, (HMENU)BUTTON_2, hInstance, NULL);
 
     // Create edit box
-    CreateWindow("EDIT", "", WS_CHILD | WS_VISIBLE | WS_BORDER,
-                 470, 50, 400, 30, hwnd, (HMENU)EDIT_TEXT, hInstance, NULL);
+    CreateWindow(L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_BORDER,
+                 350, 50, 400, 30, hwnd, (HMENU)EDIT_TEXT, hInstance, NULL);
 
     ShowWindow(hwnd, nCmdShow);
 
@@ -137,12 +133,12 @@ void AddListViewItems(HWND hwndListView) {
     LVITEM lvItem;
     lvItem.mask = LVIF_TEXT | LVIF_IMAGE;
 
-    std::vector<std::string> folders = { "Assets", "Scripts", "Scenes", "Prefabs" };
+    std::vector<std::wstring> folders = { L"Assets", L"Scripts", L"Scenes", L"Prefabs" };
 
     for (size_t i = 0; i < folders.size(); ++i) {
         lvItem.iItem = i;
         lvItem.iSubItem = 0;
-        lvItem.pszText = (LPSTR)folders[i].c_str();
+        lvItem.pszText = (LPWSTR)folders[i].c_str();
         lvItem.iImage = 0; // Index of icon
         SendMessage(hwndListView, LVM_INSERTITEM, 0, (LPARAM)&lvItem);
     }
@@ -152,7 +148,7 @@ void AddListViewItems(HWND hwndListView) {
 void InitializeListView(HWND hwndListView) {
     LVCOLUMN lvCol;
     lvCol.mask = LVCF_TEXT | LVCF_WIDTH;
-    lvCol.pszText = "Folders";
+    lvCol.pszText = L"Folders"; // Использование широкой строки
     lvCol.cx = 200;
     SendMessage(hwndListView, LVM_INSERTCOLUMN, 0, (LPARAM)&lvCol);
 }
@@ -166,19 +162,16 @@ void LoadIcons() {
 // Handle button clicks
 void OnButtonClick(HWND hwnd, WPARAM wParam) {
     switch (LOWORD(wParam)) {
-        case BUTTON_MY_COMPUTER:
-            MessageBox(hwnd, "Этот компьютер Clicked!", "Notification", MB_OK);
-            break;
         case BUTTON_1:
-            MessageBox(hwnd, "Button 1 Clicked!", "Notification", MB_OK);
+            MessageBox(hwnd, L"Button 1 Clicked!", L"Notification", MB_OK);
             break;
         case BUTTON_2:
-            MessageBox(hwnd, "Button 2 Clicked!", "Notification", MB_OK);
+            MessageBox(hwnd, L"Button 2 Clicked!", L"Notification", MB_OK);
             break;
     }
 }
 
 // Handle double-click events on ListView
 void OnDoubleClickListView(HWND hwnd) {
-    MessageBox(hwnd, "Item double-clicked!", "Notification", MB_OK);
+    MessageBox(hwnd, L"Item double-clicked!", L"Notification", MB_OK);
 }

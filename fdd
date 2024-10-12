@@ -26,21 +26,35 @@ bool LoadImageFromURL(const std::wstring& url) {
     // Получаем размер загружаемого изображения
     DWORD fileSize = 0;
     DWORD bytesRead = 0;
-    InternetQueryDataAvailable(hConnect, &fileSize, 0, 0);
+    if (!InternetQueryDataAvailable(hConnect, &fileSize, 0, 0)) {
+        InternetCloseHandle(hConnect);
+        InternetCloseHandle(hInternet);
+        return false;
+    }
 
     // Создаем буфер для хранения данных изображения
     std::vector<BYTE> buffer(fileSize);
-    InternetReadFile(hConnect, buffer.data(), fileSize, &bytesRead);
+    if (!InternetReadFile(hConnect, buffer.data(), fileSize, &bytesRead) || bytesRead != fileSize) {
+        InternetCloseHandle(hConnect);
+        InternetCloseHandle(hInternet);
+        return false;
+    }
 
     // Закрываем дескрипторы
     InternetCloseHandle(hConnect);
     InternetCloseHandle(hInternet);
 
     // Загружаем изображение в GDI+
-    IStream* stream = NULL;
-    CreateStreamOnHGlobal(NULL, TRUE, &stream);
+    IStream* stream = nullptr;
+    if (FAILED(CreateStreamOnHGlobal(NULL, TRUE, &stream))) {
+        return false;
+    }
+
     ULONG written;
-    stream->Write(buffer.data(), fileSize, &written);
+    if (FAILED(stream->Write(buffer.data(), fileSize, &written)) || written != fileSize) {
+        stream->Release();
+        return false;
+    }
     stream->Seek({ 0 }, STREAM_SEEK_SET, NULL);
 
     backgroundImage = new Image(stream);

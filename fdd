@@ -69,6 +69,38 @@ bool LoadImageFromURL(const std::wstring& url, Image** imagePtr) {
     return (*imagePtr)->GetLastStatus() == Ok;
 }
 
+// Функция для рисования закругленного прямоугольника
+void DrawRoundedRectangle(Graphics& graphics, const RectF& rect, float radius, SolidBrush& brush) {
+    GraphicsPath path;
+    path.AddArc(rect.X, rect.Y, radius, radius, 180, 90);
+    path.AddArc(rect.X + rect.Width - radius, rect.Y, radius, radius, 270, 90);
+    path.AddArc(rect.X + rect.Width - radius, rect.Y + rect.Height - radius, radius, radius, 0, 90);
+    path.AddArc(rect.X, rect.Y + rect.Height - radius, radius, radius, 90, 90);
+    path.CloseFigure();
+
+    graphics.FillPath(&brush, &path);
+}
+
+// Функция для рисования текста на панели задач
+void DrawTaskbar(Graphics& graphics, int width, int height) {
+    // Фон панели задач
+    SolidBrush taskbarBrush(Color(255, 40, 40, 40)); // Темно-серый цвет
+    DrawRoundedRectangle(graphics, RectF(0, height - TASKBAR_HEIGHT, width, TASKBAR_HEIGHT), 20.0f, taskbarBrush); // Закругленный фон панели задач
+
+    // Текст на панели задач
+    FontFamily fontFamily(L"Arial");
+    Font font(&fontFamily, 24, FontStyleRegular, UnitPixel);
+    SolidBrush textBrush(Color(255, 255, 255)); // Белый цвет текста
+
+    std::wstring taskbarText = L"Панель задач: Нажмите Esc для выхода";
+
+    StringFormat format;
+    format.SetAlignment(StringAlignmentCenter);
+    format.SetLineAlignment(StringAlignmentCenter);
+
+    graphics.DrawString(taskbarText.c_str(), -1, &font, RectF(0, height - TASKBAR_HEIGHT, (REAL)width, TASKBAR_HEIGHT), &format, &textBrush);
+}
+
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
         case WM_DESTROY:
@@ -101,28 +133,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             }
 
             // Нарисовать панель задач
-            // Для начала используем простой цвет
-            SolidBrush taskbarBrush(Color(220, 220, 220)); // Светло-серый цвет
-            graphics.FillRectangle(&taskbarBrush, 0, height - TASKBAR_HEIGHT, width, TASKBAR_HEIGHT);
-
-            // Добавить текст на панель задач
-            if (taskbarImage) {
-                // Если есть изображение панели задач, нарисуйте его
-                graphics.DrawImage(taskbarImage, 0, height - TASKBAR_HEIGHT, width, TASKBAR_HEIGHT);
-            } else {
-                // Если нет изображения, нарисуйте текст
-                FontFamily fontFamily(L"Arial");
-                Font font(&fontFamily, 24, FontStyleRegular, UnitPixel);
-                SolidBrush textBrush(Color(0, 0, 0)); // Черный цвет
-
-                std::wstring taskbarText = L"Панель задач: Нажмите Esc для выхода";
-
-                StringFormat format;
-                format.SetAlignment(StringAlignmentCenter);
-                format.SetLineAlignment(StringAlignmentCenter);
-
-                graphics.DrawString(taskbarText.c_str(), -1, &font, RectF(0, height - TASKBAR_HEIGHT, (REAL)width, TASKBAR_HEIGHT), &format, &textBrush);
-            }
+            DrawTaskbar(graphics, width, height);
 
             EndPaint(hwnd, &ps);
             return 0;

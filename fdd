@@ -46,7 +46,8 @@ HICON LoadSystemIcon(int iconID) {
 // Function to Draw an Icon with Label
 void DrawIconWithLabel(Graphics& graphics, HICON hIcon, const std::wstring& label, float x, float y) {
     // Draw the icon
-    graphics.DrawImage(Image::FromHICON(hIcon), x, y, 64, 64);
+    Bitmap bitmap(hIcon); // Use Bitmap instead of Image
+    graphics.DrawImage(&bitmap, x, y, 64, 64);
 
     // Draw the label below the icon
     FontFamily fontFamily(L"Segoe UI");
@@ -114,9 +115,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         graphics.DrawString(timeString.c_str(), -1, &font, timePoint, nullptr, &brush);
 
         // Load system icons for "This PC" and "Recycle Bin"
-        // You can alternatively load custom icons from files
-        HICON hThisPC = LoadIcon(NULL, IDI_APPLICATION); // Placeholder icon
-        HICON hRecycleBin = LoadIcon(NULL, IDI_APPLICATION); // Placeholder icon
+        HICON hThisPC = LoadSystemIcon(IDI_APPLICATION); // Placeholder icon
+        HICON hRecycleBin = LoadSystemIcon(IDI_APPLICATION); // Placeholder icon
 
         // Draw "This PC" Icon and Label
         DrawIconWithLabel(graphics, hThisPC, L"This PC", 50, panelRect.bottom - 80);

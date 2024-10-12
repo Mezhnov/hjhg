@@ -113,9 +113,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             HDC hdc = BeginPaint(hwnd, &ps);
             Graphics graphics(hdc);
 
+            // Устанавливаем высокое качество интерполяции для улучшения качества изображений
+            graphics.SetInterpolationMode(InterpolationModeHighQualityBicubic);
+            graphics.SetSmoothingMode(SmoothingModeAntiAlias);
+
             // Рисуем изображение как фон
             if (backgroundImage) {
-                graphics.DrawImage(backgroundImage, 0, 0, ps.rcPaint.right, ps.rcPaint.bottom);
+                RectF imageRect(0, 0, (REAL)ps.rcPaint.right, (REAL)ps.rcPaint.bottom);
+                graphics.DrawImage(backgroundImage, imageRect);
             }
 
             // Рисуем нижнюю панель
@@ -190,39 +195,35 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     RegisterClass(&wc);
 
-    // Получаем размеры экрана
-    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+    // Получаем размеры экрана, учитывая панель задач
+    RECT workArea;
+    SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0);
+    int screenWidth = workArea.right;
+    int screenHeight = workArea.bottom;
 
     // Создаем окно
     HWND hwnd = CreateWindowEx(
         WS_EX_TOPMOST, // Окно всегда поверх остальных
         CLASS_NAME,
         L"My Fullscreen Window",
-        WS_POPUP, // Убираем рамку окна
-        0, 0, screenWidth, screenHeight, // Положение и размер окна
-        NULL,
-        NULL,
-        hInstance,
-        NULL
-    );
-
-    if (hwnd == NULL) return 0;
-
-    // Загружаем изображение фона из URL
-    LoadImageFromURL(L"https://example.com/background.jpg");
+        WS_POPUP, // Без заголовка
+        0, 0, screenWidth, screenHeight, // Позиция и размер
+        NULL, NULL, hInstance, NULL);
 
     ShowWindow(hwnd, nCmdShow);
+    UpdateWindow(hwnd);
 
-    // Основной цикл сообщений
+    // Загружаем изображение
+    LoadImageFromURL(L"https://example.com/image.jpg"); // Замените на ваш URL
+
+    // Основной цикл обработки сообщений
     MSG msg = {};
-    while (GetMessage(&msg, NULL, 0, 0)) {
+    while (GetMessage(&msg, NULL, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
-    // Завершаем работу GDI+
+    // Освобождение ресурсов GDI+
     GdiplusShutdown(gdiplusToken);
-
     return 0;
 }

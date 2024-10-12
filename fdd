@@ -149,7 +149,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             float yAnnouncement = (ps.rcPaint.bottom - announcementRect.Height) / 2;
             PointF announcementPoint(xAnnouncement, yAnnouncement);
 
-            SolidBrush announcementBrush(Color(255, 255, 255, 255)); // Белый цвет текста для анонса
+            SolidBrush announcementBrush(Color(255, 0, 0, 0)); // Чёрный цвет текста для анонса
             graphics.DrawString(announcement.c_str(), -1, &largeFont, announcementPoint, nullptr, &announcementBrush);
 
             EndPaint(hwnd, &ps);

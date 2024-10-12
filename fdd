@@ -3,22 +3,17 @@
 #include <wininet.h>
 #include <string>
 #include <vector>
-#include <sstream>
 
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "wininet.lib")
 
 using namespace Gdiplus;
 
-// Объявляем переменные для изображений на уровне модуля
+// Объявляем переменную для изображения на уровне модуля
 Image* backgroundImage = nullptr;
-Image* taskbarImage = nullptr;
-
-// Высота панели задач в пикселях
-const int TASKBAR_HEIGHT = 80; // Уменьшили высоту панели задач
 
 // Функция для загрузки изображения из URL
-bool LoadImageFromURL(const std::wstring& url, Image** imagePtr) {
+bool LoadImageFromURL(const std::wstring& url) {
     HINTERNET hInternet = InternetOpen(L"ImageLoader", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (!hInternet) return false;
 
@@ -31,19 +26,11 @@ bool LoadImageFromURL(const std::wstring& url, Image** imagePtr) {
     // Получаем размер загружаемого изображения
     DWORD fileSize = 0;
     DWORD bytesRead = 0;
-    if (!InternetQueryDataAvailable(hConnect, &fileSize, 0, 0)) {
-        InternetCloseHandle(hConnect);
-        InternetCloseHandle(hInternet);
-        return false;
-    }
+    InternetQueryDataAvailable(hConnect, &fileSize, 0, 0);
 
     // Создаем буфер для хранения данных изображения
     std::vector<BYTE> buffer(fileSize);
-    if (!InternetReadFile(hConnect, buffer.data(), fileSize, &bytesRead)) {
-        InternetCloseHandle(hConnect);
-        InternetCloseHandle(hInternet);
-        return false;
-    }
+    InternetReadFile(hConnect, buffer.data(), fileSize, &bytesRead);
 
     // Закрываем дескрипторы
     InternetCloseHandle(hConnect);
@@ -51,105 +38,44 @@ bool LoadImageFromURL(const std::wstring& url, Image** imagePtr) {
 
     // Загружаем изображение в GDI+
     IStream* stream = NULL;
-    if (FAILED(CreateStreamOnHGlobal(NULL, TRUE, &stream))) {
-        return false;
-    }
-
+    CreateStreamOnHGlobal(NULL, TRUE, &stream);
     ULONG written;
-    if (FAILED(stream->Write(buffer.data(), bytesRead, &written))) {
-        stream->Release();
-        return false;
-    }
+    stream->Write(buffer.data(), fileSize, &written);
+    stream->Seek({ 0 }, STREAM_SEEK_SET, NULL);
 
-    stream->Seek({0}, STREAM_SEEK_SET, NULL);
-
-    *imagePtr = new Image(stream);
+    backgroundImage = new Image(stream);
     stream->Release();
 
-    return (*imagePtr)->GetLastStatus() == Ok;
-}
-
-// Функция для рисования градиентного фона
-void DrawGradientBackground(Graphics& graphics, const RECT& rect) {
-    // Создаем градиентную кисть
-    LinearGradientBrush brush(Point(0, rect.top), Point(0, rect.bottom), Color(255, 220, 220, 220), Color(255, 150, 150, 150));
-    
-    // Приводим координаты к типу REAL
-    REAL left = static_cast<REAL>(rect.left);
-    REAL top = static_cast<REAL>(rect.top);
-    REAL right = static_cast<REAL>(rect.right);
-    REAL bottom = static_cast<REAL>(rect.bottom);
-
-    // Заполняем прямоугольник градиентным фоном
-    graphics.FillRectangle(&brush, left, top, right - left, bottom - top);
+    return backgroundImage != nullptr;
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
-        case WM_DESTROY:
-            delete backgroundImage; // Удаляем фоновое изображение
-            delete taskbarImage;    // Удаляем изображение панели задач
-            PostQuitMessage(0);
-            return 0;
+    case WM_DESTROY:
+        delete backgroundImage; // Удаляем изображение
+        PostQuitMessage(0);
+        return 0;
 
-        case WM_KEYDOWN:
-            // Проверяем нажатие клавиши Esc
-            if (wParam == VK_ESCAPE) {
-                DestroyWindow(hwnd); // Закрыть окно
-            }
-            return 0;
-
-        case WM_PAINT: {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hwnd, &ps);
-            Graphics graphics(hdc);
-
-            // Получаем размеры окна
-            RECT rect;
-            GetClientRect(hwnd, &rect);
-            int width = rect.right - rect.left;
-            int height = rect.bottom - rect.top;
-
-            // Нарисовать фоновое изображение, растянутое на весь экран
-            if (backgroundImage) {
-                graphics.DrawImage(backgroundImage, 0, 0, width, height);
-            }
-
-            // Нарисовать панель задач
-            SolidBrush taskbarBrush(Color(220, 220, 220)); // Светло-серый цвет
-            graphics.FillRectangle(&taskbarBrush, 0, height - TASKBAR_HEIGHT, width, TASKBAR_HEIGHT);
-
-            // Добавить текст на панель задач
-            if (taskbarImage) {
-                // Если есть изображение панели задач, нарисуйте его
-                graphics.DrawImage(taskbarImage, 0, height - TASKBAR_HEIGHT, width, TASKBAR_HEIGHT);
-            } else {
-                // Если нет изображения, нарисуйте текст
-                FontFamily fontFamily(L"Arial");
-                Font font(&fontFamily, 20, FontStyleRegular, UnitPixel); // Изменили размер шрифта
-                SolidBrush textBrush(Color(0, 0, 0)); // Черный цвет
-
-                std::wstring taskbarText = L"Панель задач: Нажмите Esc для выхода";
-
-                StringFormat format;
-                format.SetAlignment(StringAlignmentCenter);
-                format.SetLineAlignment(StringAlignmentCenter);
-
-                // Приводим координаты к типу REAL
-                REAL left = static_cast<REAL>(0);
-                REAL top = static_cast<REAL>(height - TASKBAR_HEIGHT);
-                REAL right = static_cast<REAL>(width);
-                REAL bottom = static_cast<REAL>(height);
-
-                graphics.DrawString(taskbarText.c_str(), -1, &font, RectF(left, top, right, bottom), &format, &textBrush);
-            }
-
-            EndPaint(hwnd, &ps);
-            return 0;
+    case WM_KEYDOWN:
+        // Проверяем нажатие клавиши Esc
+        if (wParam == VK_ESCAPE) {
+            DestroyWindow(hwnd); // Закрыть окно
         }
+        return 0;
 
-        default:
-            return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
+        if (backgroundImage) {
+            Graphics graphics(hdc);
+            graphics.DrawImage(backgroundImage, 0, 0, ps.rcPaint.right, ps.rcPaint.bottom);
+        }
+        EndPaint(hwnd, &ps);
+        return 0;
+    }
+
+    default:
+        return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
 }
 
@@ -179,7 +105,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     HWND hwnd = CreateWindowEx(
         WS_EX_TOPMOST, // Окно всегда поверх остальных
         CLASS_NAME,
-        L"Fullscreen Window",
+        L"My Fullscreen Window",
         WS_POPUP, // Убираем рамку окна
         0, 0, screenWidth, screenHeight, // Положение и размер окна
         NULL,
@@ -188,28 +114,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         NULL
     );
 
-    if (hwnd == NULL) {
-        GdiplusShutdown(gdiplusToken);
+    if (hwnd == NULL) return 0;
+
+    // Загружаем изображение из интернета
+    std::wstring imageUrl = L"https://www.sunhome.ru/i/wallpapers/241/afrikanskii-lev.jpg"; // URL к изображению
+    if (!LoadImageFromURL(imageUrl)) {
+        MessageBox(NULL, L"Не удалось загрузить изображение", L"Ошибка", MB_OK);
         return 0;
     }
-
-    // Загружаем фоновое изображение из интернета
-    std::wstring backgroundUrl = L"https://cdnn21.img.ria.ru/images/07e6/0c/15/1840268869_0:0:3072:1728_1920x0_80_0_0_faef85e8e08135216ec29106ea44c4e7.jpg"; // URL к фоновому изображению
-    if (!LoadImageFromURL(backgroundUrl, &backgroundImage)) {
-        MessageBox(NULL, L"Не удалось загрузить фоновое изображение", L"Ошибка", MB_OK);
-        GdiplusShutdown(gdiplusToken);
-        return 0;
-    }
-
-    // Опционально: Загружаем изображение для панели задач из интернета
-    std::wstring taskbarUrl = L"https://example.com/taskbar_image.png"; // URL к изображению панели задач
-    // Раскомментируйте ниже, чтобы загрузить изображение панели задач
-    /*
-    if (!LoadImageFromURL(taskbarUrl, &taskbarImage)) {
-        MessageBox(NULL, L"Не удалось загрузить изображение панели задач", L"Ошибка", MB_OK);
-        // Продолжаем без изображения панели задач
-    }
-    */
 
     ShowWindow(hwnd, nCmdShow);
 

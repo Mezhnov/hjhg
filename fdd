@@ -17,11 +17,55 @@ using namespace Gdiplus;
 // Объявляем переменную для изображения на уровне модуля
 Image* backgroundImage = nullptr;
 
-// Функция для загрузки изображения из файла
-bool LoadImageFromFile(const std::wstring& filePath) {
-    // Загружаем изображение из файла
-    backgroundImage = new Image(filePath.c_str());
-    return backgroundImage && backgroundImage->GetLastStatus() == Ok;
+// Функция для загрузки изображения из URL
+bool LoadImageFromURL(const std::wstring& url) {
+    HINTERNET hInternet = InternetOpen(L"ImageLoader", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+    if (!hInternet) return false;
+
+    HINTERNET hConnect = InternetOpenUrl(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD, 0);
+    if (!hConnect) {
+        InternetCloseHandle(hInternet);
+        return false;
+    }
+
+    // Получаем размер загружаемого изображения
+    DWORD fileSize = 0;
+    DWORD bytesRead = 0;
+    if (!InternetQueryDataAvailable(hConnect, &fileSize, 0, 0)) {
+        InternetCloseHandle(hConnect);
+        InternetCloseHandle(hInternet);
+        return false;
+    }
+
+    // Создаем буфер для хранения данных изображения
+    std::vector<BYTE> buffer(fileSize);
+    if (!InternetReadFile(hConnect, buffer.data(), fileSize, &bytesRead) || bytesRead != fileSize) {
+        InternetCloseHandle(hConnect);
+        InternetCloseHandle(hInternet);
+        return false;
+    }
+
+    // Закрываем дескрипторы
+    InternetCloseHandle(hConnect);
+    InternetCloseHandle(hInternet);
+
+    // Загружаем изображение в GDI+
+    IStream* stream = nullptr;
+    if (FAILED(CreateStreamOnHGlobal(NULL, TRUE, &stream))) {
+        return false;
+    }
+
+    ULONG written;
+    if (FAILED(stream->Write(buffer.data(), fileSize, &written)) || written != fileSize) {
+        stream->Release();
+        return false;
+    }
+    stream->Seek({ 0 }, STREAM_SEEK_SET, NULL);
+
+    backgroundImage = new Image(stream);
+    stream->Release();
+
+    return backgroundImage != nullptr;
 }
 
 // Функция для получения текущего времени в строковом формате
@@ -30,6 +74,8 @@ std::wstring GetCurrentTimeString() {
     auto now = system_clock::now();
     std::time_t now_c = system_clock::to_time_t(now);
     std::tm parts;
+
+    // Используем localtime_s вместо localtime
     localtime_s(&parts, &now_c);
 
     std::wstringstream ss;
@@ -39,95 +85,80 @@ std::wstring GetCurrentTimeString() {
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
-        case WM_DESTROY:
-            delete backgroundImage; // Удаляем изображение
-            PostQuitMessage(0);
-            return 0;
+    case WM_DESTROY:
+        delete backgroundImage; // Удаляем изображение
+        PostQuitMessage(0);
+        return 0;
 
-        case WM_KEYDOWN:
-            if (wParam == VK_ESCAPE) {
-                DestroyWindow(hwnd); // Закрыть окно
-            }
-            return 0;
+    case WM_KEYDOWN:
+        // Проверяем нажатие клавиши Esc
+        if (wParam == VK_ESCAPE) {
+            DestroyWindow(hwnd); // Закрыть окно
+        }
+        return 0;
 
-        case WM_PAINT: {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hwnd, &ps);
-            Graphics graphics(hdc);
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
+        Graphics graphics(hdc);
 
-            // Получаем размеры окна
-            int width = ps.rcPaint.right - ps.rcPaint.left;
-            int height = ps.rcPaint.bottom - ps.rcPaint.top;
+        // Заполняем фон зеленым цветом
+        graphics.Clear(Color(255, 0, 255, 0)); // Прозрачность, R, G, B
 
-            // Рисуем изображение как фон, сохраняя пропорции
-            if (backgroundImage) {
-                float imgWidth = backgroundImage->GetWidth();
-                float imgHeight = backgroundImage->GetHeight();
-                float imgAspectRatio = imgWidth / imgHeight;
-                float windowAspectRatio = static_cast<float>(width) / height;
-
-                int drawWidth, drawHeight;
-                if (imgAspectRatio > windowAspectRatio) {
-                    drawWidth = width;
-                    drawHeight = static_cast<int>(width / imgAspectRatio);
-                } else {
-                    drawHeight = height;
-                    drawWidth = static_cast<int>(height * imgAspectRatio);
-                }
-
-                int x = (width - drawWidth) / 2;
-                int y = (height - drawHeight) / 2;
-
-                graphics.DrawImage(backgroundImage, x, y, drawWidth, drawHeight);
-            }
-
-            // Рисуем нижнюю панель
-            RECT panelRect = { 0, height - 40, width, height };
-            FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1)); // Цвет панели
-
-            // Получаем текущее время
-            std::wstring timeString = GetCurrentTimeString();
-            std::wstring langString = L"РУС"; // Статичное значение языка
-
-            FontFamily fontFamily(L"Segoe UI");
-            Font font(&fontFamily, 16, FontStyleRegular, UnitPixel);
-            SolidBrush brush(Color(255, 0, 0, 0));
-
-            // Находим размеры текста для центрирования
-            RectF timeRect, langRect;
-            graphics.MeasureString(timeString.c_str(), -1, &font, PointF(0, 0), &timeRect);
-            graphics.MeasureString(langString.c_str(), -1, &font, PointF(0, 0), &langRect);
-
-            // Рассчитываем координаты для расположения текста
-            float xTime = panelRect.right - timeRect.Width - langRect.Width - 30;
-            float y = panelRect.bottom - timeRect.Height - 10;
-
-            // Рисуем текст
-            PointF timePoint(xTime, y);
-            graphics.DrawString(timeString.c_str(), -1, &font, timePoint, nullptr, &brush);
-            PointF langPoint(xTime - langRect.Width - 10, y);
-            graphics.DrawString(langString.c_str(), -1, &font, langPoint, nullptr, &brush);
-
-            EndPaint(hwnd, &ps);
-            return 0;
+        // Рисуем изображение как фон, если оно существует
+        if (backgroundImage) {
+            graphics.DrawImage(backgroundImage, 0, 0, ps.rcPaint.right, ps.rcPaint.bottom);
         }
 
-        case WM_SIZE:
-            InvalidateRect(hwnd, NULL, TRUE); // Перерисовываем окно при изменении его размера
-            return 0;
+        // Рисуем нижнюю панель
+        RECT panelRect = { 0, ps.rcPaint.bottom - 40, ps.rcPaint.right, ps.rcPaint.bottom };
+        FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1)); // Цвет панели
 
-        default:
-            return DefWindowProc(hwnd, uMsg, wParam, lParam);
+        // Получаем текущее время
+        std::wstring timeString = GetCurrentTimeString();
+        std::wstring langString = L"РУС"; // Статичное значение языка
+
+        // Используем GDI+ для рисования текста
+        FontFamily fontFamily(L"Segoe UI"); // Выбор шрифта
+        Font font(&fontFamily, 16, FontStyleRegular, UnitPixel); // Устанавливаем размер шрифта на 16
+        SolidBrush brush(Color(255, 0, 0, 0)); // Черный цвет текста
+
+        // Находим размеры текста для центрирования
+        RectF timeRect;
+        graphics.MeasureString(timeString.c_str(), -1, &font, PointF(0, 0), &timeRect);
+        RectF langRect;
+        graphics.MeasureString(langString.c_str(), -1, &font, PointF(0, 0), &langRect);
+
+        // Рассчитываем координаты для расположения текста
+        float xTime = panelRect.right - timeRect.Width - langRect.Width - 30; // Увеличен отступ от правого края
+        float y = panelRect.bottom - timeRect.Height - 10; // Отступ от нижней границы
+
+        // Рисуем текст без фона
+        PointF timePoint(xTime, y);
+        graphics.DrawString(timeString.c_str(), -1, &font, timePoint, nullptr, &brush);
+
+        // Рисуем язык рядом с временем
+        PointF langPoint(xTime - langRect.Width - 10, y); // Отступ слева от времени
+        graphics.DrawString(langString.c_str(), -1, &font, langPoint, nullptr, &brush);
+
+        EndPaint(hwnd, &ps);
+        return 0;
+    }
+
+    default:
+        return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     const wchar_t CLASS_NAME[] = L"FullscreenWindowClass";
 
+    // Инициализация GDI+
     GdiplusStartupInput gdiplusStartupInput;
     ULONG_PTR gdiplusToken;
     GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
 
+    // Определяем класс окна
     WNDCLASS wc = {};
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
@@ -137,15 +168,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     RegisterClass(&wc);
 
+    // Получаем размеры экрана
     int screenWidth = GetSystemMetrics(SM_CXSCREEN);
     int screenHeight = GetSystemMetrics(SM_CYSCREEN);
 
+    // Создаем окно
     HWND hwnd = CreateWindowEx(
-        WS_EX_TOPMOST,
+        WS_EX_TOPMOST, // Окно всегда поверх остальных
         CLASS_NAME,
         L"My Fullscreen Window",
-        WS_POPUP,
-        0, 0, screenWidth, screenHeight,
+        WS_POPUP, // Убираем рамку окна
+        0, 0, screenWidth, screenHeight, // Положение и размер окна
         NULL,
         NULL,
         hInstance,
@@ -154,19 +187,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     if (hwnd == NULL) return 0;
 
-    // Загружаем изображение из файла
-    std::wstring imagePath = L"Resources/afrikanskii-lev.orig.jpg"; // Путь к изображению
-    if (!LoadImageFromFile(imagePath)) {
-        MessageBox(NULL, L"Не удалось загрузить изображение!", L"Ошибка", MB_OK | MB_ICONERROR);
-    }
+    // Загружаем изображение из локального файла
+    std::wstring imagePath = L"Resources\\afrikanskii-lev.orig.jpg"; // Путь к изображению в папке проекта
+    backgroundImage = new Gdiplus::Image(imagePath.c_str());
 
     ShowWindow(hwnd, nCmdShow);
 
+    // Главный цикл сообщений
     MSG msg = {};
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
+
+    // Завершаем работу GDI+
     GdiplusShutdown(gdiplusToken);
+
     return 0;
 }

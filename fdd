@@ -1,125 +1,199 @@
 #include <windows.h>
-#include <gdiplus.h>
-#include <iostream>
+#include <wininet.h>
+#include <string>
+#include <vector>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
+#include <locale>
+#include <codecvt>
 
-#pragma comment (lib,"Gdiplus.lib")
+#pragma comment(lib, "wininet.lib")
 
-using namespace Gdiplus;
+using namespace std;
 
-// Глобальные переменные
-HINSTANCE hInst;
-const wchar_t* szWindowClass = L"DesktopApp";
-const wchar_t* szTitle = L"Full Screen Image Viewer";
-Image* image = nullptr;
-bool isFullScreen = false;
-HWND hWndMain;
+// Объявляем переменную для изображения на уровне модуля
+HBITMAP backgroundImage = nullptr;
 
-// Идентификаторы
-#define ID_EXIT 1
+// Функция для загрузки изображения из URL
+bool LoadImageFromURL(const std::wstring& url) {
+    HINTERNET hInternet = InternetOpen(L"ImageLoader", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+    if (!hInternet) return false;
 
-// Функция для отрисовки
-void OnPaint(HDC hdc)
-{
-    Graphics graphics(hdc);
-    if (image)
-    {
-        graphics.DrawImage(image, 0, 0, image->GetWidth(), image->GetHeight());
+    HINTERNET hConnect = InternetOpenUrl(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD, 0);
+    if (!hConnect) {
+        InternetCloseHandle(hInternet);
+        return false;
     }
+
+    // Получаем размер загружаемого изображения
+    DWORD fileSize = 0;
+    DWORD bytesRead = 0;
+    if (!InternetQueryDataAvailable(hConnect, &fileSize, 0, 0)) {
+        InternetCloseHandle(hConnect);
+        InternetCloseHandle(hInternet);
+        return false;
+    }
+
+    // Создаем буфер для хранения данных изображения
+    std::vector<BYTE> buffer(fileSize);
+    if (!InternetReadFile(hConnect, buffer.data(), fileSize, &bytesRead) || bytesRead != fileSize) {
+        InternetCloseHandle(hConnect);
+        InternetCloseHandle(hInternet);
+        return false;
+    }
+
+    // Закрываем дескрипторы
+    InternetCloseHandle(hConnect);
+    InternetCloseHandle(hInternet);
+
+    // Загружаем изображение в HBITMAP
+    HGLOBAL hGlobal = GlobalAlloc(GMEM_MOVEABLE, fileSize);
+    memcpy(GlobalLock(hGlobal), buffer.data(), fileSize);
+    GlobalUnlock(hGlobal);
+
+    HBITMAP hBitmap = (HBITMAP)LoadImage(NULL, (LPCWSTR)hGlobal, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION);
+    GlobalFree(hGlobal);
+
+    backgroundImage = hBitmap;
+
+    return backgroundImage != nullptr;
 }
 
-// Обработчик сообщений
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-    switch (message)
-    {
-    case WM_PAINT:
-        {
+// Функция для получения текущего времени в строковом формате
+std::wstring GetCurrentTimeString() {
+    using namespace std::chrono;
+    auto now = system_clock::now();
+    std::time_t now_c = system_clock::to_time_t(now);
+    std::tm parts;
+
+    localtime_s(&parts, &now_c);
+
+    std::wstringstream ss;
+    ss << std::put_time(&parts, L"%H:%M"); // Формат времени HH:MM
+    return ss.str();
+}
+
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    switch (uMsg) {
+        case WM_DESTROY:
+            DeleteObject(backgroundImage); // Удаляем изображение
+            PostQuitMessage(0);
+            return 0;
+
+        case WM_KEYDOWN:
+            // Проверяем нажатие клавиши Esc
+            if (wParam == VK_ESCAPE) {
+                DestroyWindow(hwnd); // Закрыть окно
+            }
+            return 0;
+
+        case WM_PAINT: {
             PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hWnd, &ps);
-            OnPaint(hdc);
-            EndPaint(hWnd, &ps);
-        }
-        break;
-    case WM_KEYDOWN:
-        if (wParam == VK_ESCAPE) // Если нажата клавиша ESC
-        {
-            if (isFullScreen)
-            {
-                SetWindowLong(hWnd, GWL_STYLE, GetWindowLong(hWnd, GWL_STYLE) | WS_OVERLAPPEDWINDOW);
-                SetWindowPos(hWnd, NULL, 100, 100, 800, 600, SWP_NOZORDER | SWP_FRAMECHANGED);
-                isFullScreen = false;
+            HDC hdc = BeginPaint(hwnd, &ps);
+
+            // Рисуем изображение как фон
+            if (backgroundImage) {
+                HDC hMemDC = CreateCompatibleDC(hdc);
+                SelectObject(hMemDC, backgroundImage);
+
+                BITMAP bitmap;
+                GetObject(backgroundImage, sizeof(bitmap), &bitmap);
+                BitBlt(hdc, 0, 0, bitmap.bmWidth, bitmap.bmHeight, hMemDC, 0, 0, SRCCOPY);
+
+                DeleteDC(hMemDC);
             }
+
+            // Рисуем нижнюю панель
+            RECT panelRect = { 0, ps.rcPaint.bottom - 40, ps.rcPaint.right, ps.rcPaint.bottom };
+            FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1)); // Цвет панели
+
+            // Получаем текущее время
+            std::wstring timeString = GetCurrentTimeString();
+            std::wstring langString = L"РУС"; // Статичное значение языка
+
+            // Рисуем текст
+            SetBkMode(hdc, TRANSPARENT);
+            SetTextColor(hdc, RGB(0, 0, 0)); // Черный цвет текста
+            RECT textRect = { 0 };
+            textRect.right = ps.rcPaint.right;
+            textRect.bottom = panelRect.bottom;
+
+            // Устанавливаем шрифт
+            HFONT hFont = CreateFont(16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+                                      DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
+                                      CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+                                      VARIABLE_PITCH, L"Segoe UI");
+            SelectObject(hdc, hFont);
+
+            // Находим размеры текста для центрирования
+            SIZE timeSize;
+            GetTextExtentPoint32(hdc, timeString.c_str(), timeString.length(), &timeSize);
+            SIZE langSize;
+            GetTextExtentPoint32(hdc, langString.c_str(), langString.length(), &langSize);
+
+            // Рассчитываем координаты для расположения текста
+            int xTime = panelRect.right - timeSize.cx - langSize.cx - 30; // Увеличен отступ от правого края
+            int y = panelRect.bottom - timeSize.cy - 10; // Отступ от нижней границы
+
+            // Рисуем текст
+            TextOut(hdc, xTime, y, timeString.c_str(), timeString.length());
+            TextOut(hdc, xTime - langSize.cx - 10, y, langString.c_str(), langString.length());
+
+            DeleteObject(hFont);
+            EndPaint(hwnd, &ps);
+            return 0;
         }
-        break;
-    case WM_COMMAND:
-        if (LOWORD(wParam) == ID_EXIT) // ID_EXIT - идентификатор вашей кнопки
-        {
-            if (isFullScreen)
-            {
-                SetWindowLong(hWnd, GWL_STYLE, GetWindowLong(hWnd, GWL_STYLE) | WS_OVERLAPPEDWINDOW);
-                SetWindowPos(hWnd, NULL, 100, 100, 800, 600, SWP_NOZORDER | SWP_FRAMECHANGED);
-                isFullScreen = false;
-            }
-        }
-        break;
-    case WM_DESTROY:
-        delete image;
-        PostQuitMessage(0);
-        break;
-    default:
-        return DefWindowProc(hWnd, message, wParam, lParam);
+
+        default:
+            return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
-    return 0;
 }
 
-// Функция для создания окна
-void InitInstance(HINSTANCE hInstance, int nCmdShow)
-{
-    hInst = hInstance;
-    hWndMain = CreateWindow(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, 800, 600, NULL, NULL, hInstance, NULL);
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
+    const wchar_t CLASS_NAME[] = L"FullscreenWindowClass";
 
-    if (!hWndMain)
-    {
-        return;
-    }
-
-    ShowWindow(hWndMain, nCmdShow);
-    UpdateWindow(hWndMain);
-}
-
-// Функция WinMain
-int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
-    LPWSTR lpCmdLine, int nCmdShow)
-{
-    // Инициализация GDI+
-    GdiplusStartupInput gdiplusStartupInput;
-    ULONG_PTR gdiplusToken;
-    GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
-
-    // Загрузка изображения
-    image = new Image(L"Resources\\afrikanskii-lev.orig.jpg");
-
-    // Регистрация класса окна
-    WNDCLASS wc = { 0 };
-    wc.lpfnWndProc = WndProc;
+    // Определяем класс окна
+    WNDCLASS wc = {};
+    wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
-    wc.lpszClassName = szWindowClass;
+    wc.lpszClassName = CLASS_NAME;
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 
     RegisterClass(&wc);
 
-    // Создание окна
-    InitInstance(hInstance, nCmdShow);
+    // Получаем размеры экрана
+    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
 
-    // Цикл обработки сообщений
-    MSG msg;
-    while (GetMessage(&msg, NULL, 0, 0))
-    {
+    // Создаем окно
+    HWND hwnd = CreateWindowEx(
+        WS_EX_TOPMOST, // Окно всегда поверх остальных
+        CLASS_NAME,
+        L"My Fullscreen Window",
+        WS_POPUP, // Убираем рамку окна
+        0, 0, screenWidth, screenHeight, // Положение и размер окна
+        NULL,
+        NULL,
+        hInstance,
+        NULL
+    );
+
+    if (hwnd == NULL) return 0;
+
+    // Загружаем изображение из локального файла
+    std::wstring imagePath = L"C:\\Users\\User\\source\\repos\\Проверка проекта\\Resources\\afrikanskii-lev.orig.jpg"; // Путь к изображению в папке проекта
+    LoadImageFromURL(imagePath);
+
+    ShowWindow(hwnd, nCmdShow);
+
+    // Главный цикл сообщений
+    MSG msg = {};
+    while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
-    // Завершение GDI+
-    GdiplusShutdown(gdiplusToken);
-    return (int)msg.wParam;
+    return 0;
 }

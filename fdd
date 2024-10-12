@@ -202,7 +202,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     hSearchEdit = CreateWindowEx(
         WS_EX_TRANSPARENT, // Делаем поле прозрачным
         L"EDIT", NULL,
-        WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+        WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL | ES_LEFT, // Добавляем границу и выравнивание
         10, 10, 200, 30,
         hwnd,
         NULL,
@@ -210,9 +210,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         NULL
     );
 
-    // Убираем границы и фон
-    SetWindowLong(hSearchEdit, GWL_EXSTYLE, GetWindowLong(hSearchEdit, GWL_EXSTYLE) | WS_EX_LAYERED);
-    SetLayeredWindowAttributes(hSearchEdit, RGB(255, 255, 255), 255, LWA_COLORKEY);
+    // Устанавливаем белый фон для поля поиска
+    SetBkColor(GetDC(hSearchEdit), RGB(255, 255, 255)); // Устанавливаем белый фон
+    SendMessage(hSearchEdit, EM_SETSEL, 0, -1); // Выделяем текст
+
+    // Устанавливаем текст "Поиск" в поле поиска
+    SendMessage(hSearchEdit, WM_SETTEXT, 0, (LPARAM)L"Поиск");
 
     ShowWindow(hwnd, nCmdShow);
 

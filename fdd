@@ -3,6 +3,10 @@
 #include <wininet.h>
 #include <string>
 #include <vector>
+#include <chrono>
+#include <ctime>
+#include <iomanip>
+#include <sstream>
 
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "wininet.lib")
@@ -63,6 +67,18 @@ bool LoadImageFromURL(const std::wstring& url) {
     return backgroundImage != nullptr;
 }
 
+// Функция для получения текущего времени в строковом формате
+std::wstring GetCurrentTimeString() {
+    using namespace std::chrono;
+    auto now = system_clock::now();
+    std::time_t now_c = system_clock::to_time_t(now);
+    std::tm* parts = std::localtime(&now_c);
+
+    std::wstringstream ss;
+    ss << std::put_time(parts, L"%H:%M"); // Формат времени HH:MM
+    return ss.str();
+}
+
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
     case WM_DESTROY:
@@ -89,8 +105,24 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         RECT panelRect = { 0, ps.rcPaint.bottom - 50, ps.rcPaint.right, ps.rcPaint.bottom }; // Задаем размеры панели
         HBRUSH brush = CreateSolidBrush(RGB(240, 240, 240)); // Цвет фона панели (светло-серый)
         FillRect(hdc, &panelRect, brush); // Заполняем панель цветом
-        DeleteObject(brush); // Освобождаем ресурс
 
+        // Рисуем текст "РУС" и текущее время
+        Graphics graphics(hdc);
+        graphics.SetSmoothingMode(SmoothingModeAntiAlias);
+        SolidBrush textBrush(Color(0, 0, 0)); // Цвет текста (черный)
+
+        // Получаем текущее время и рисуем его
+        std::wstring currentTime = GetCurrentTimeString();
+        std::wstring timeAndLang = L"РУС " + currentTime;
+
+        // Устанавливаем шрифт
+        FontFamily fontFamily(L"Arial");
+        Font font(&fontFamily, 12, FontStyleRegular, UnitPixel);
+        PointF point(static_cast<float>(ps.rcPaint.right - 100), static_cast<float>(ps.rcPaint.bottom - 30)); // Положение текста
+
+        graphics.DrawString(timeAndLang.c_str(), -1, &font, point, nullptr, &textBrush); // Рисуем текст
+
+        DeleteObject(brush); // Освобождаем ресурс
         EndPaint(hwnd, &ps);
         return 0;
     }

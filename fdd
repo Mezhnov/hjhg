@@ -83,15 +83,6 @@ std::wstring GetCurrentTimeString() {
     return ss.str();
 }
 
-// Функция для получения текущего языка
-std::wstring GetCurrentLanguage() {
-    WCHAR lang[LOCALE_NAME_MAX_LENGTH];
-    if (GetUserDefaultLocaleName(lang, LOCALE_NAME_MAX_LENGTH) > 0) {
-        return std::wstring(lang);
-    }
-    return L"RU"; // По умолчанию - русский
-}
-
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
     case WM_DESTROY:
@@ -118,9 +109,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         RECT panelRect = { 0, ps.rcPaint.bottom - 40, ps.rcPaint.right, ps.rcPaint.bottom };
         FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1)); // Цвет панели
 
-        // Получаем и отображаем текущее время
+        // Получаем текущее время
         std::wstring timeString = GetCurrentTimeString();
-        std::wstring langString = GetCurrentLanguage(); // Получаем язык
+        std::wstring langString = L"РУС"; // Статичное значение языка
 
         // Используем GDI+ для рисования текста
         Graphics graphics(hdc);

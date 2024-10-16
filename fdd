@@ -14,21 +14,31 @@
 
 using namespace Gdiplus;
 
-// Глобальные переменные для изображений
-Image* backgroundImage = nullptr;
-Image* startImage = nullptr;
-Image* myComputerImage = nullptr;
-Image* recycleBinImage = nullptr;
+// Структура для хранения информации об изображении и его названии
+struct ImageItem {
+    Image* image;
+    std::wstring title;
+    float x; // Координата X на экране
+    float y; // Координата Y на экране
+    float width;  // Ширина отображаемого изображения
+    float height; // Высота отображаемого изображения
+};
 
-// Высота панели задач в пикселях
-const int TASKBAR_HEIGHT = 60;
+// Глобальные переменные
+Image* backgroundImage = nullptr;
 
 // Массив языков
-std::vector<std::wstring> languages = { L"РУС", L"ENG" };
+std::vector<std::wstring> languages = { L"РУС", L"ENG" }; // Русский и английский
 int currentLanguageIndex = 0; // Индекс текущего языка
 
+// Массив изображений
+std::vector<ImageItem> images;
+
+// Текущий индекс изображения для отображения
+int currentImageIndex = 0;
+
 // Функция для загрузки изображения из URL
-bool LoadImageFromURL(const std::wstring& url, Image** imagePtr) {
+bool LoadImageFromURL(const std::wstring& url, Image*& outImage) {
     HINTERNET hInternet = InternetOpen(L"ImageLoader", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (!hInternet) {
         OutputDebugString(L"InternetOpen failed\n");
@@ -52,7 +62,8 @@ bool LoadImageFromURL(const std::wstring& url, Image** imagePtr) {
         DWORD toRead = min(bytesAvailable, (DWORD)sizeof(tempBuffer));
         if (InternetReadFile(hConnect, tempBuffer, toRead, &bytesRead) && bytesRead > 0) {
             buffer.insert(buffer.end(), tempBuffer, tempBuffer + bytesRead);
-        } else {
+        }
+        else {
             break;
         }
     }
@@ -83,19 +94,19 @@ bool LoadImageFromURL(const std::wstring& url, Image** imagePtr) {
     stream->Seek(liZero, STREAM_SEEK_SET, NULL);
 
     // Загрузка изображения из потока
-    *imagePtr = new Image(stream);
+    Image* img = new Image(stream);
     stream->Release();
 
     // Проверка статуса загрузки изображения
-    if ((*imagePtr)->GetLastStatus() != Ok) {
+    if (img->GetLastStatus() != Ok) {
         OutputDebugString(L"Failed to create Image from stream\n");
-        delete *imagePtr;
-        *imagePtr = nullptr;
+        delete img;
         return false;
     }
 
+    outImage = img;
     OutputDebugString(L"Image loaded successfully\n");
-    return *imagePtr != nullptr;
+    return true;
 }
 
 // Функция для получения текущего времени в строковом формате
@@ -113,130 +124,198 @@ std::wstring GetCurrentTimeString() {
     return ss.str();
 }
 
+// Функция для инициализации изображений
+bool InitializeImages() {
+    // Список URL-адресов изображений и соответствующих названий
+    std::vector<std::pair<std::wstring, std::wstring>> imageData = {
+        { L"https://via.placeholder.com/150/FF0000/FFFFFF?text=Image1", L"Компьютер" },
+        { L"https://via.placeholder.com/150/00FF00/FFFFFF?text=Image2", L"Папки" },
+        { L"https://via.placeholder.com/150/0000FF/FFFFFF?text=Image3", L"Изображения" },
+        { L"https://via.placeholder.com/150/FFFF00/FFFFFF?text=Image4", L"Музыка" },
+        { L"https://via.placeholder.com/150/FF00FF/FFFFFF?text=Image5", L"Видео" }
+    };
+
+    for (const auto& [url, title] : imageData) {
+        Image* img = nullptr;
+        if (LoadImageFromURL(url, img)) {
+            ImageItem item;
+            item.image = img;
+            item.title = title;
+            item.x = 0.0f;
+            item.y = 0.0f;
+            item.width = 150.0f;  // Стандартная ширина
+            item.height = 150.0f; // Стандартная высота
+            images.push_back(item);
+        }
+        else {
+            OutputDebugString((L"Failed to load image: " + url + L"\n").c_str());
+            return false;
+        }
+    }
+    return true;
+}
+
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
-        case WM_DESTROY:
-            // Удаление всех загруженных изображений
-            delete backgroundImage;
-            delete startImage;
-            delete myComputerImage;
-            delete recycleBinImage;
-            PostQuitMessage(0);
-            return 0;
+    case WM_DESTROY:
+        // Удаляем загруженные изображения
+        delete backgroundImage;
+        for (auto& imgItem : images) {
+            delete imgItem.image;
+        }
+        PostQuitMessage(0);
+        return 0;
 
-        case WM_KEYDOWN:
-            // Проверяем нажатие клавиши Esc
-            if (wParam == VK_ESCAPE) {
-                DestroyWindow(hwnd); // Закрыть окно
-            }
-
-            // Обработка переключения языка на Alt+Shift или Win+Space
-            if (((GetAsyncKeyState(VK_MENU) & 0x8000) && wParam == VK_SHIFT) ||
-                ((GetAsyncKeyState(VK_LWIN) & 0x8000) && wParam == VK_SPACE)) {
-                currentLanguageIndex = (currentLanguageIndex + 1) % languages.size(); // Переключаем язык
-                InvalidateRect(hwnd, NULL, TRUE); // Перерисовываем окно
-            }
-            return 0;
-
-        case WM_SIZE: {
-            InvalidateRect(hwnd, NULL, TRUE); // Перерисовываем окно при изменении размера
-            return 0;
+    case WM_KEYDOWN:
+        // Проверяем нажатие клавиши Esc
+        if (wParam == VK_ESCAPE) {
+            DestroyWindow(hwnd); // Закрыть окно
         }
 
-        case WM_PAINT: {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hwnd, &ps);
-            Graphics graphics(hdc);
-
-            // Установка высококачественных настроек рендеринга
-            graphics.SetSmoothingMode(SmoothingModeHighQuality);
-            graphics.SetInterpolationMode(InterpolationModeHighQualityBicubic);
-            graphics.SetPixelOffsetMode(PixelOffsetModeHighQuality);
-
-            // Получаем размеры окна
-            RECT windowRect;
-            GetClientRect(hwnd, &windowRect);
-            int width = windowRect.right - windowRect.left;
-            int height = windowRect.bottom - windowRect.top;
-
-            // Рисуем фоновое изображение с сохранением пропорций
-            if (backgroundImage) {
-                UINT imgWidth = backgroundImage->GetWidth();
-                UINT imgHeight = backgroundImage->GetHeight();
-
-                double windowAspect = static_cast<double>(width) / height;
-                double imageAspect = static_cast<double>(imgWidth) / imgHeight;
-
-                double drawWidth, drawHeight;
-                if (windowAspect > imageAspect) {
-                    // Окно шире изображения
-                    drawHeight = height;
-                    drawWidth = imageAspect * drawHeight;
-                }
-                else {
-                    // Окно уже или равно изображению
-                    drawWidth = width;
-                    drawHeight = drawWidth / imageAspect;
-                }
-
-                float x = static_cast<float>((width - drawWidth) / 2.0);
-                float y = static_cast<float>((height - drawHeight) / 2.0);
-                graphics.DrawImage(backgroundImage, x, y, static_cast<REAL>(drawWidth), static_cast<REAL>(drawHeight));
-            }
-
-            // Рисуем панель задач
-            RectF taskbarRect(0, static_cast<REAL>(height - TASKBAR_HEIGHT), static_cast<REAL>(width), static_cast<REAL>(TASKBAR_HEIGHT));
-            SolidBrush taskbarBrush(Color(220, 220, 220)); // Светло-серый цвет панели задач
-            graphics.FillRectangle(&taskbarBrush, taskbarRect);
-
-            // Размер иконок панели задач
-            const int ICON_SIZE = 40;
-            const int ICON_PADDING = 10;
-
-            // Рисуем иконку "Пуск"
-            if (startImage) {
-                graphics.DrawImage(startImage, ICON_PADDING, height - TASKBAR_HEIGHT + (TASKBAR_HEIGHT - ICON_SIZE) / 2, ICON_SIZE, ICON_SIZE);
-            }
-
-            // Рисуем иконку "Мой компьютер"
-            if (myComputerImage) {
-                graphics.DrawImage(myComputerImage, ICON_PADDING + ICON_SIZE + ICON_PADDING, height - TASKBAR_HEIGHT + (TASKBAR_HEIGHT - ICON_SIZE) / 2, ICON_SIZE, ICON_SIZE);
-            }
-
-            // Рисуем иконку "Корзина"
-            if (recycleBinImage) {
-                graphics.DrawImage(recycleBinImage, ICON_PADDING + 2 * (ICON_SIZE + ICON_PADDING), height - TASKBAR_HEIGHT + (TASKBAR_HEIGHT - ICON_SIZE) / 2, ICON_SIZE, ICON_SIZE);
-            }
-
-            // Получаем текущее время и язык
-            std::wstring timeString = GetCurrentTimeString();
-            std::wstring langString = languages[currentLanguageIndex];
-
-            // Подготовка текста для панели задач
-            std::wstring taskbarText = L" Язык: " + langString;
-
-            // Настройка шрифта и кисти для текста
-            FontFamily fontFamily(L"Segoe UI");
-            Font font(&fontFamily, 16, FontStyleRegular, UnitPixel);
-            SolidBrush textBrush(Color(255, 0, 0, 0)); // Черный цвет текста
-
-            // Форматирование текста
-            StringFormat format;
-            format.SetAlignment(StringAlignmentFar); // Выровнять по правому краю
-            format.SetLineAlignment(StringAlignmentCenter); // Центрировать по вертикали
-
-            // Создаем общий текст, объединяя время и язык
-            std::wstring combinedText = timeString + L"   " + taskbarText;
-
-            // Рисуем текст на панели задач
-            graphics.DrawString(combinedText.c_str(), -1, &font, RectF(0, height - TASKBAR_HEIGHT, static_cast<REAL>(width), static_cast<REAL>(TASKBAR_HEIGHT)), &format, &textBrush);
-
-            EndPaint(hwnd, &ps);
-            return 0;
+        // Обработка переключения языка на Alt+Shift или Win+Space
+        if (((GetAsyncKeyState(VK_MENU) & 0x8000) && wParam == VK_SHIFT) ||
+            ((GetAsyncKeyState(VK_LWIN) & 0x8000) && wParam == VK_SPACE)) {
+            currentLanguageIndex = (currentLanguageIndex + 1) % languages.size(); // Переключаем язык
+            InvalidateRect(hwnd, NULL, TRUE); // Перерисовываем окно
         }
 
-        default:
-            return DefWindowProc(hwnd, uMsg, wParam, lParam);
+        // Обработка нажатий стрелок для перемещения изображений
+        if (wParam == VK_LEFT) {
+            // Переместить все изображения вправо
+            for (auto& imgItem : images) {
+                imgItem.x += 50.0f; // Например, сдвиг на 50 пикселей
+            }
+            InvalidateRect(hwnd, NULL, TRUE);
+        }
+        if (wParam == VK_RIGHT) {
+            // Переместить все изображения влево
+            for (auto& imgItem : images) {
+                imgItem.x -= 50.0f; // Например, сдвиг на 50 пикселей
+            }
+            InvalidateRect(hwnd, NULL, TRUE);
+        }
+
+        return 0;
+
+    case WM_SIZE: {
+        InvalidateRect(hwnd, NULL, TRUE); // Перерисовка окна при изменении размера
+        return 0;
+    }
+
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
+        Graphics graphics(hdc);
+
+        // Установка высококачественных настроек рендеринга
+        graphics.SetSmoothingMode(SmoothingModeHighQuality);
+        graphics.SetInterpolationMode(InterpolationModeHighQualityBicubic);
+        graphics.SetPixelOffsetMode(PixelOffsetModeHighQuality);
+
+        // Получаем размеры окна
+        RECT windowRect;
+        GetClientRect(hwnd, &windowRect);
+
+        // Рисуем изображение как фон с сохранением пропорций
+        if (backgroundImage) {
+            UINT imgWidth = backgroundImage->GetWidth();
+            UINT imgHeight = backgroundImage->GetHeight();
+
+            double windowAspect = static_cast<double>(windowRect.right) / windowRect.bottom;
+            double imageAspect = static_cast<double>(imgWidth) / imgHeight;
+
+            double drawWidth, drawHeight;
+            if (windowAspect > imageAspect) {
+                // Окно шире изображения
+                drawHeight = windowRect.bottom;
+                drawWidth = imageAspect * drawHeight;
+            }
+            else {
+                // Окно уже или равно изображению
+                drawWidth = windowRect.right;
+                drawHeight = drawWidth / imageAspect;
+            }
+
+            float x = static_cast<float>((windowRect.right - drawWidth) / 2.0);
+            float y = static_cast<float>((windowRect.bottom - drawHeight) / 2.0);
+            graphics.DrawImage(backgroundImage, x, y, static_cast<REAL>(drawWidth), static_cast<REAL>(drawHeight));
+        }
+
+        // Рисуем нижнюю панель
+        RECT panelRect = { 0, windowRect.bottom - 40, windowRect.right, windowRect.bottom };
+        FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1)); // Цвет панели
+
+        // Получаем текущее время
+        std::wstring timeString = GetCurrentTimeString();
+        std::wstring langString = languages[currentLanguageIndex]; // Текущий язык
+
+        // Используем GDI+ для рисования текста
+        FontFamily fontFamily(L"Segoe UI"); // Выбор шрифта
+        Font font(&fontFamily, 14, FontStyleRegular, UnitPixel); // Устанавливаем размер шрифта
+        SolidBrush brush(Color(255, 0, 0, 0)); // Черный цвет текста
+
+        // Находим размеры текста для правильного размещения
+        RectF timeRect;
+        graphics.MeasureString(timeString.c_str(), -1, &font, PointF(0, 0), &timeRect);
+        RectF langRect;
+        graphics.MeasureString(langString.c_str(), -1, &font, PointF(0, 0), &langRect);
+
+        // Рассчитываем координаты для расположения текста
+        float xTime = static_cast<float>(windowRect.right - timeRect.Width - langRect.Width - 30); // Отступ от правого края
+        float yText = static_cast<float>(windowRect.bottom - 40 + (40 - timeRect.Height) / 2.0 - 1); // Отступ от нижней границы
+
+        // Рисуем время
+        PointF timePoint(xTime, yText);
+        graphics.DrawString(timeString.c_str(), -1, &font, timePoint, &brush);
+
+        // Рисуем текущий язык рядом с временем
+        PointF langPoint(xTime - langRect.Width - 10, yText); // Отступ слева от времени
+        graphics.DrawString(langString.c_str(), -1, &font, langPoint, &brush);
+
+        // Добавляем анонс операционной системы в центр экрана
+        std::wstring announcement = L"Introducing Orega OS: The Future of Performance!";
+        RectF announcementRect;
+        Font largeFont(&fontFamily, 40, FontStyleBold, UnitPixel); // Шрифт для анонса
+        graphics.MeasureString(announcement.c_str(), -1, &largeFont, PointF(0, 0), &announcementRect);
+
+        // Позиционируем анонс в центре экрана
+        float xAnnouncement = (static_cast<float>(windowRect.right) - announcementRect.Width) / 2.0f;
+        float yAnnouncement = (static_cast<float>(windowRect.bottom) - announcementRect.Height) / 2.0f;
+        PointF announcementPoint(xAnnouncement, yAnnouncement);
+
+        SolidBrush announcementBrush(Color(255, 0, 0, 0)); // Чёрный цвет текста для анонса
+        graphics.DrawString(announcement.c_str(), -1, &largeFont, announcementPoint, &announcementBrush);
+
+        // Рисуем изображения и их названия
+        float startX = 100.0f; // Начальная позиция X для первого изображения
+        float imageSpacing = 200.0f; // Расстояние между изображениями
+        float imageY = windowRect.bottom / 2.0f - 75.0f; // Позиция Y изображений
+
+        for (size_t i = 0; i < images.size(); ++i) {
+            ImageItem& imgItem = images[i];
+            // Рисуем изображение
+            graphics.DrawImage(imgItem.image, imgItem.x + startX + i * imageSpacing, imgItem.y + imageY, imgItem.width, imgItem.height);
+
+            // Рисуем название под изображением
+            Font titleFont(&fontFamily, 16, FontStyleRegular, UnitPixel);
+            SolidBrush titleBrush(Color(255, 0, 0, 0));
+
+            RectF titleRect;
+            graphics.MeasureString(imgItem.title.c_str(), -1, &titleFont, PointF(0, 0), &titleRect);
+
+            float xTitle = imgItem.x + startX + i * imageSpacing + (imgItem.width - titleRect.Width) / 2.0f;
+            float yTitle = imageY + imgItem.height + 10.0f; // Отступ ниже изображения
+
+            PointF titlePoint(xTitle, yTitle);
+            graphics.DrawString(imgItem.title.c_str(), -1, &titleFont, titlePoint, &titleBrush);
+        }
+
+        EndPaint(hwnd, &ps);
+        return 0;
+    }
+
+    default:
+        return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
 }
 
@@ -246,10 +325,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     // Инициализация GDI+
     GdiplusStartupInput gdiplusStartupInput;
     ULONG_PTR gdiplusToken;
-    if (GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL) != Ok) {
-        MessageBox(NULL, L"Failed to initialize GDI+", L"Error", MB_OK);
-        return 0;
-    }
+    GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
 
     // Определяем класс окна
     WNDCLASS wc = {};
@@ -259,11 +335,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 
-    if (!RegisterClass(&wc)) {
-        MessageBox(NULL, L"Failed to register window class", L"Error", MB_OK);
-        GdiplusShutdown(gdiplusToken);
-        return 0;
-    }
+    RegisterClass(&wc);
 
     // Получаем размеры экрана
     int screenWidth = GetSystemMetrics(SM_CXSCREEN);
@@ -273,7 +345,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     HWND hwnd = CreateWindowEx(
         WS_EX_TOPMOST, // Окно всегда поверх остальных
         CLASS_NAME,
-        L"Fullscreen Window",
+        L"My Fullscreen Window",
         WS_POPUP, // Убираем рамку окна
         0, 0, screenWidth, screenHeight, // Положение и размер окна
         NULL,
@@ -283,42 +355,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     );
 
     if (hwnd == NULL) {
-        MessageBox(NULL, L"Failed to create window", L"Error", MB_OK);
         GdiplusShutdown(gdiplusToken);
         return 0;
     }
 
-    // Загружаем фоновое изображение из URL
-    std::wstring backgroundUrl = L"https://i.pinimg.com/originals/f0/c7/8c/f0c78cc56f1909dece1c062020e7c8a5.png"; // Замените на нужный URL
-    if (!LoadImageFromURL(backgroundUrl, &backgroundImage)) {
-        MessageBox(hwnd, L"Не удалось загрузить фоновое изображение. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
+    // Загружаем изображение фона из URL (можно заменить на локальное изображение при необходимости)
+    if (!LoadImageFromURL(L"https://i.pinimg.com/originals/56/cb/5f/56cb5ff3d83e4159c447b04d5d3a333e.jpg", backgroundImage)) {
+        MessageBox(hwnd, L"Не удалось загрузить фон. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
         DestroyWindow(hwnd);
         GdiplusShutdown(gdiplusToken);
         return 0;
     }
 
-    // Загружаем иконку "Пуск" из URL
-    std::wstring startButtonUrl = L"https://icons.iconarchive.com/icons/icons-land/windows-8/512/Start-icon.png"; // Замените на нужный URL
-    if (!LoadImageFromURL(startButtonUrl, &startImage)) {
-        MessageBox(hwnd, L"Не удалось загрузить иконку 'Пуск'. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
-        DestroyWindow(hwnd);
-        GdiplusShutdown(gdiplusToken);
-        return 0;
-    }
-
-    // Загружаем иконку "Мой компьютер" из URL
-    std::wstring myComputerUrl = L"https://icons.iconarchive.com/icons/custom-icon-design/flatastic-2/256/My-Computer-icon.png"; // Замените на нужный URL
-    if (!LoadImageFromURL(myComputerUrl, &myComputerImage)) {
-        MessageBox(hwnd, L"Не удалось загрузить иконку 'Мой компьютер'. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
-        DestroyWindow(hwnd);
-        GdiplusShutdown(gdiplusToken);
-        return 0;
-    }
-
-    // Загружаем иконку "Корзина" из URL
-    std::wstring recycleBinUrl = L"https://icons.iconarchive.com/icons/custom-icon-design/flatastic-4/256/Recycle-Bin-icon.png"; // Замените на нужный URL
-    if (!LoadImageFromURL(recycleBinUrl, &recycleBinImage)) {
-        MessageBox(hwnd, L"Не удалось загрузить иконку 'Корзина'. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
+    // Инициализируем дополнительные изображения
+    if (!InitializeImages()) {
+        MessageBox(hwnd, L"Не удалось загрузить дополнительные изображения. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
         DestroyWindow(hwnd);
         GdiplusShutdown(gdiplusToken);
         return 0;
@@ -328,13 +379,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     UpdateWindow(hwnd);
 
     // Цикл обработки сообщений
-    MSG msg = {};
+    MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
-    // Очистка GDI+
+    // Остановка GDI+
     GdiplusShutdown(gdiplusToken);
     return 0;
 }

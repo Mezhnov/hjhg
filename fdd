@@ -26,7 +26,6 @@ struct ImageItem {
 
 // Глобальные переменные
 Image* backgroundImage = nullptr;
-ULONG_PTR gdiplusToken;
 
 // Массив языков
 std::vector<std::wstring> languages = { L"РУС", L"ENG" }; // Русский и английский
@@ -152,3 +151,255 @@ bool InitializeImages() {
             return false;
         }
     }
+    return true;
+}
+
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    static WindowData* data = nullptr;
+
+    switch (uMsg) {
+    case WM_DESTROY:
+        // Удаляем загруженные изображения
+        delete backgroundImage;
+        for (auto& imgItem : images) {
+            delete imgItem.image;
+        }
+        PostQuitMessage(0);
+        return 0;
+
+    case WM_KEYDOWN:
+        // Проверяем нажатие клавиши Esc
+        if (wParam == VK_ESCAPE) {
+            DestroyWindow(hwnd); // Закрыть окно
+        }
+
+        // Обработка переключения языка на Alt+Shift или Win+Space
+        if (((GetAsyncKeyState(VK_MENU) & 0x8000) && wParam == VK_SHIFT) ||
+            ((GetAsyncKeyState(VK_LWIN) & 0x8000) && wParam == VK_SPACE)) {
+            currentLanguageIndex = (currentLanguageIndex + 1) % languages.size(); // Переключаем язык
+            InvalidateRect(hwnd, NULL, TRUE); // Перерисовываем окно
+        }
+
+        // Обработка нажатий стрелок для перемещения изображений
+        if (wParam == VK_LEFT) {
+            // Переместить все изображения вправо
+            for (auto& imgItem : images) {
+                imgItem.x += 20.0f; // Сдвиг на 20 пикселей вправо
+                // Ограничение для правого края
+                if (imgItem.x + imgItem.width > GetSystemMetrics(SM_CXSCREEN)) {
+                    imgItem.x = GetSystemMetrics(SM_CXSCREEN) - imgItem.width;
+                }
+            }
+            InvalidateRect(hwnd, NULL, TRUE);
+        }
+        if (wParam == VK_RIGHT) {
+            // Переместить все изображения влево
+            for (auto& imgItem : images) {
+                imgItem.x -= 20.0f; // Сдвиг на 20 пикселей влево
+                // Ограничение для левого края
+                if (imgItem.x < 0) {
+                    imgItem.x = 0;
+                }
+            }
+            InvalidateRect(hwnd, NULL, TRUE);
+        }
+
+        return 0;
+
+    case WM_SIZE: {
+        InvalidateRect(hwnd, NULL, TRUE); // Перерисовка окна при изменении размера
+        return 0;
+    }
+
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
+        Graphics graphics(hdc);
+
+        // Установка высококачественных настроек рендеринга
+        graphics.SetSmoothingMode(SmoothingModeHighQuality);
+        graphics.SetInterpolationMode(InterpolationModeHighQualityBicubic);
+        graphics.SetPixelOffsetMode(PixelOffsetModeHighQuality);
+
+        // Получаем размеры окна
+        RECT windowRect;
+        GetClientRect(hwnd, &windowRect);
+
+        // Рисуем изображение как фон с сохранением пропорций
+        if (backgroundImage) {
+            UINT imgWidth = backgroundImage->GetWidth();
+            UINT imgHeight = backgroundImage->GetHeight();
+
+            double windowAspect = static_cast<double>(windowRect.right) / windowRect.bottom;
+            double imageAspect = static_cast<double>(imgWidth) / imgHeight;
+
+            double drawWidth, drawHeight;
+            if (windowAspect > imageAspect) {
+                // Окно шире изображения
+                drawHeight = windowRect.bottom;
+                drawWidth = imageAspect * drawHeight;
+            }
+            else {
+                // Окно уже или равно изображению
+                drawWidth = windowRect.right;
+                drawHeight = drawWidth / imageAspect;
+            }
+
+            float x = static_cast<float>((windowRect.right - drawWidth) / 2.0);
+            float y = static_cast<float>((windowRect.bottom - drawHeight) / 2.0);
+            graphics.DrawImage(backgroundImage, x, y, static_cast<REAL>(drawWidth), static_cast<REAL>(drawHeight));
+        }
+
+        // Рисуем нижнюю панель
+        RECT panelRect = { 0, windowRect.bottom - 40, windowRect.right, windowRect.bottom };
+        FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1)); // Цвет панели
+
+        // Получаем текущее время
+        std::wstring timeString = GetCurrentTimeString();
+        std::wstring langString = languages[currentLanguageIndex]; // Текущий язык
+
+        // Используем GDI+ для рисования текста
+        FontFamily fontFamily(L"Segoe UI"); // Выбор шрифта
+        Font font(&fontFamily, 14, FontStyleRegular, UnitPixel); // Устанавливаем размер шрифта
+        SolidBrush brush(Color(255, 255, 255, 255)); // Белый цвет текста
+
+        // Находим размеры текста для правильного размещения
+        RectF timeRect;
+        graphics.MeasureString(timeString.c_str(), -1, &font, PointF(0, 0), &timeRect);
+        RectF langRect;
+        graphics.MeasureString(langString.c_str(), -1, &font, PointF(0, 0), &langRect);
+
+        // Рассчитываем координаты для расположения текста
+        float padding = 15.0f;
+        float xTime = static_cast<float>(windowRect.right - timeRect.Width - langRect.Width - 30); // Отступ от правого края
+        float yText = static_cast<float>(windowRect.bottom - 40 + (40 - timeRect.Height) / 2.0 - 1); // Отступ от нижней границы
+
+        // Рисуем текущий язык
+        PointF langPoint(xTime - langRect.Width - 10, yText); // Отступ слева от времени
+        graphics.DrawString(langString.c_str(), -1, &font, langPoint, &brush);
+
+        // Рисуем время
+        PointF timePoint(xTime, yText);
+        graphics.DrawString(timeString.c_str(), -1, &font, timePoint, &brush);
+
+        // Добавляем анонс операционной системы в центр экрана
+        std::wstring announcement = L"Introducing Orega OS: The Future of Performance!";
+        RectF announcementRect;
+        Font largeFont(&fontFamily, 40, FontStyleBold, UnitPixel); // Шрифт для анонса
+        graphics.MeasureString(announcement.c_str(), -1, &largeFont, PointF(0, 0), &announcementRect);
+
+        // Позиционируем анонс в центре экрана
+        float xAnnouncement = (static_cast<float>(windowRect.right) - announcementRect.Width) / 2.0f;
+        float yAnnouncement = (static_cast<float>(windowRect.bottom) - announcementRect.Height) / 2.0f;
+        PointF announcementPoint(xAnnouncement, yAnnouncement);
+
+        SolidBrush announcementBrush(Color(255, 255, 255, 255)); // Белый цвет текста для анонса
+        graphics.DrawString(announcement.c_str(), -1, &largeFont, announcementPoint, &announcementBrush);
+
+        // Рисуем дополнительные изображения и их названия
+        for (const auto& imgItem : images) {
+            // Рисуем изображение
+            graphics.DrawImage(imgItem.image, imgItem.x, imgItem.y, imgItem.width, imgItem.height);
+
+            // Рисуем название под изображением, центрируя его
+            Font titleFont(&fontFamily, 16, FontStyleRegular, UnitPixel);
+            SolidBrush titleBrush(Color(255, 255, 255, 255)); // Белый цвет текста для названия
+
+            RectF titleRect;
+            graphics.MeasureString(imgItem.title.c_str(), -1, &titleFont, PointF(0, 0), &titleRect);
+
+            float xTitle = imgItem.x + (imgItem.width - titleRect.Width) / 2.0f;
+            float yTitle = imgItem.y + imgItem.height + 5.0f; // Отступ ниже изображения
+
+            PointF titlePoint(xTitle, yTitle);
+            graphics.DrawString(imgItem.title.c_str(), -1, &titleFont, titlePoint, &titleBrush);
+        }
+
+        EndPaint(hwnd, &ps);
+        return 0;
+    }
+
+    default:
+        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }
+}
+
+// Основная функция приложения
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
+    const wchar_t CLASS_NAME[] = L"FullscreenWindowClass";
+
+    // Инициализация GDI+
+    GdiplusStartupInput gdiplusStartupInput;
+    ULONG_PTR gdiplusToken;
+    if (GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL) != Ok) {
+        MessageBox(NULL, L"Не удалось инициализировать GDI+", L"Ошибка", MB_ICONERROR);
+        return 0;
+    }
+
+    // Определяем класс окна
+    WNDCLASS wc = {};
+    wc.lpfnWndProc = WindowProc;
+    wc.hInstance = hInstance;
+    wc.lpszClassName = CLASS_NAME;
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+
+    if (!RegisterClass(&wc)) {
+        MessageBox(NULL, L"Не удалось зарегистрировать класс окна.", L"Ошибка", MB_ICONERROR);
+        GdiplusShutdown(gdiplusToken);
+        return 0;
+    }
+
+    // Получаем размеры экрана
+    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+    // Создаем окно
+    HWND hwnd = CreateWindowEx(
+        WS_EX_TOPMOST, // Окно всегда поверх остальных
+        CLASS_NAME,
+        L"My Fullscreen Window",
+        WS_POPUP, // Убираем рамку окна
+        0, 0, screenWidth, screenHeight, // Положение и размер окна
+        NULL,
+        NULL,
+        hInstance,
+        NULL
+    );
+
+    if (hwnd == NULL) {
+        MessageBox(NULL, L"Не удалось создать окно.", L"Ошибка", MB_ICONERROR);
+        GdiplusShutdown(gdiplusToken);
+        return 0;
+    }
+
+    // Загружаем изображение фона из URL
+    if (!LoadImageFromURL(L"https://i.pinimg.com/originals/56/cb/5f/56cb5ff3d83e4159c447b04d5d3a333e.jpg", backgroundImage)) {
+        MessageBox(hwnd, L"Не удалось загрузить фон. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
+        DestroyWindow(hwnd);
+        GdiplusShutdown(gdiplusToken);
+        return 0;
+    }
+
+    // Инициализируем дополнительные изображения
+    if (!InitializeImages()) {
+        MessageBox(hwnd, L"Не удалось загрузить дополнительные изображения. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
+        DestroyWindow(hwnd);
+        GdiplusShutdown(gdiplusToken);
+        return 0;
+    }
+
+    ShowWindow(hwnd, nCmdShow);
+    UpdateWindow(hwnd);
+
+    // Цикл обработки сообщений
+    MSG msg;
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    // Остановка GDI+
+    GdiplusShutdown(gdiplusToken);
+    return 0;
+}

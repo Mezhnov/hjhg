@@ -2,6 +2,7 @@
 // A simplified multi-tabbed browser using C++, Win32 API, GDI+, and WinInet
 
 #include <windows.h>
+#include <windowsx.h> // Для макросов GET_X_LPARAM и GET_Y_LPARAM
 #include <gdiplus.h>
 #include <wininet.h>
 #include <string>
@@ -13,13 +14,14 @@
 #include <codecvt>
 #include <thread>
 #include <mutex>
+#include <iostream>
 
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "wininet.lib")
 
 using namespace Gdiplus;
 
-// Constants
+// Константы
 const wchar_t CLASS_NAME[] = L"SimpleBrowserWindowClass";
 const int WINDOW_WIDTH = 1280;
 const int WINDOW_HEIGHT = 720;
@@ -28,19 +30,20 @@ const int NAVBAR_HEIGHT = 40;
 const int TABBAR_HEIGHT = 30;
 const int TAB_PADDING = 10;
 const int TAB_SPACING = 5;
+const int TAB_WIDTH = 150;
 const int TAB_CLOSE_BUTTON_SIZE = 12;
 const int ADDRESSBAR_PADDING = 5;
 
-// Forward declarations
+// Декларации функций
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-// Utility function to convert std::wstring to std::string
+// Вспомогательная функция для преобразования std::wstring в std::string
 std::string WStringToString(const std::wstring& wstr) {
     std::wstring_convert<std::codecvt_utf8<wchar_t>> conv;
     return conv.to_bytes(wstr);
 }
 
-// Structure to hold tab information
+// Структура для хранения информации о вкладке
 struct Tab {
     std::wstring url;
     std::wstring htmlContent;
@@ -50,59 +53,80 @@ struct Tab {
     Tab(const std::wstring& u = L"https://www.example.com") : url(u), htmlContent(L"Loading..."), loading(true) {}
 };
 
-// Global Variables
+// Глобальные переменные
 std::vector<Tab> tabs;
 int currentTab = 0;
 std::mutex tabsMutex;
 
-// GDI+ Token
+// Токен GDI+
 ULONG_PTR gdiplusToken;
 
-// Function to initialize GDI+
+// Функция инициализации GDI+
 bool InitGDIPlus() {
     GdiplusStartupInput input;
     return GdiplusStartup(&gdiplusToken, &input, NULL) == Ok;
 }
 
-// Function to shutdown GDI+
+// Функция завершения работы GDI+
 void ShutdownGDIPlus() {
     GdiplusShutdown(gdiplusToken);
 }
 
-// Function to fetch HTML content using WinInet
+// Функция для получения HTML-контента с помощью WinInet
 bool FetchHTML(const std::wstring& url, std::wstring& htmlContent) {
     HINTERNET hInternet = InternetOpen(L"SimpleBrowser", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (!hInternet) {
+        std::cerr << "InternetOpen failed" << std::endl;
         return false;
     }
 
-    HINTERNET hConnect = InternetOpenUrl(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD, 0);
+    // Открываем URL с необходимыми флагами
+    HINTERNET hConnect = InternetOpenUrl(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD | INTERNET_FLAG_DONT_CACHE, 0);
     if (!hConnect) {
+        std::cerr << "InternetOpenUrl failed: " << WStringToString(url) << std::endl;
         InternetCloseHandle(hInternet);
         return false;
     }
 
+    // Читаем все данные
+    std::vector<BYTE> buffer;
+    DWORD bytesAvailable = 0;
     DWORD bytesRead = 0;
-    wchar_t buffer[4096];
-    htmlContent.clear();
-
-    while (InternetReadFile(hConnect, buffer, sizeof(buffer) - sizeof(wchar_t), &bytesRead) && bytesRead > 0) {
-        buffer[bytesRead / sizeof(wchar_t)] = L'\0';
-        htmlContent += buffer;
+    BYTE tempBuffer[4096];
+    while (InternetQueryDataAvailable(hConnect, &bytesAvailable, 0, 0) && bytesAvailable > 0) {
+        DWORD toRead = min(bytesAvailable, (DWORD)sizeof(tempBuffer));
+        if (InternetReadFile(hConnect, tempBuffer, toRead, &bytesRead) && bytesRead > 0) {
+            buffer.insert(buffer.end(), tempBuffer, tempBuffer + bytesRead);
+        }
+        else {
+            break;
+        }
     }
 
     InternetCloseHandle(hConnect);
     InternetCloseHandle(hInternet);
-    return !htmlContent.empty();
+
+    if (buffer.empty()) {
+        std::cerr << "No data downloaded from URL: " << WStringToString(url) << std::endl;
+        return false;
+    }
+
+    // Преобразуем буфер из UTF-8 в std::wstring
+    int size_needed = MultiByteToWideChar(CP_UTF8, 0, (const char*)buffer.data(), buffer.size(), NULL, 0);
+    std::wstring wstr(size_needed, 0);
+    MultiByteToWideChar(CP_UTF8, 0, (const char*)buffer.data(), buffer.size(), &wstr[0], size_needed);
+    htmlContent = wstr;
+
+    return true;
 }
 
-// Function to add a new tab
+// Функция для добавления новой вкладки
 void AddNewTab(const std::wstring& url = L"https://www.example.com") {
     std::lock_guard<std::mutex> lock(tabsMutex);
     tabs.emplace_back(url);
     currentTab = tabs.size() - 1;
 
-    // Fetch HTML content in a separate thread to avoid blocking UI
+    // Загружаем HTML-контент в отдельном потоке для избежания блокировки UI
     std::thread([=]() {
         std::wstring content;
         bool success = FetchHTML(url, content);
@@ -115,15 +139,15 @@ void AddNewTab(const std::wstring& url = L"https://www.example.com") {
             }
         }
 
-        // Invalidate window to trigger repaint
-        HWND hwnd = FindWindow(NULL, L"Simple C++ Browser");
-        if (hwnd) {
-            InvalidateRect(hwnd, NULL, TRUE);
+        // Обновляем окно для перерисовки
+        HWND hwndTarget = FindWindow(CLASS_NAME, L"Simple C++ Browser");
+        if (hwndTarget) {
+            InvalidateRect(hwndTarget, NULL, TRUE);
         }
     }).detach();
 }
 
-// Function to close a tab
+// Функция для закрытия вкладки
 void CloseTab(int index) {
     std::lock_guard<std::mutex> lock(tabsMutex);
     if (index >= 0 && index < tabs.size()) {
@@ -133,14 +157,14 @@ void CloseTab(int index) {
         }
     }
 
-    // Invalidate window to trigger repaint
-    HWND hwnd = FindWindow(NULL, L"Simple C++ Browser");
-    if (hwnd) {
-        InvalidateRect(hwnd, NULL, TRUE);
+    // Обновляем окно для перерисовки
+    HWND hwndTarget = FindWindow(CLASS_NAME, L"Simple C++ Browser");
+    if (hwndTarget) {
+        InvalidateRect(hwndTarget, NULL, TRUE);
     }
 }
 
-// Function to fetch and update HTML content for a tab
+// Функция для обновления контента вкладки
 void UpdateTabContent(int index, const std::wstring& url) {
     std::lock_guard<std::mutex> lock(tabsMutex);
     if (index >= 0 && index < tabs.size()) {
@@ -148,7 +172,7 @@ void UpdateTabContent(int index, const std::wstring& url) {
         tabs[index].htmlContent = L"Loading...";
         tabs[index].loading = true;
 
-        // Fetch content in a separate thread
+        // Загружаем контент в отдельном потоке
         std::thread([=]() {
             std::wstring content;
             bool success = FetchHTML(url, content);
@@ -161,23 +185,23 @@ void UpdateTabContent(int index, const std::wstring& url) {
                 }
             }
 
-            // Invalidate window to trigger repaint
-            HWND hwnd = FindWindow(NULL, L"Simple C++ Browser");
-            if (hwnd) {
-                InvalidateRect(hwnd, NULL, TRUE);
+            // Обновляем окно для перерисовки
+            HWND hwndTarget = FindWindow(CLASS_NAME, L"Simple C++ Browser");
+            if (hwndTarget) {
+                InvalidateRect(hwndTarget, NULL, TRUE);
             }
         }).detach();
     }
 }
 
-// Function to get current time as string
+// Функция для получения текущего времени в строковом формате
 std::wstring GetCurrentTimeString() {
     using namespace std::chrono;
     auto now = system_clock::now();
     std::time_t now_c = system_clock::to_time_t(now);
     std::tm parts;
 
-    // Thread-safe alternative to localtime
+    // Потокобезопасная альтернатива localtime
     localtime_s(&parts, &now_c);
 
     std::wstringstream ss;
@@ -185,25 +209,26 @@ std::wstring GetCurrentTimeString() {
     return ss.str();
 }
 
-// Function to draw tabs
+// Функция рисования вкладок
 void DrawTabs(Graphics& graphics, RECT clientRect) {
     FontFamily fontFamily(L"Segoe UI");
     Font font(&fontFamily, 12, FontStyleRegular, UnitPixel);
-    SolidBrush activeBrush(Color(255, 200, 200, 200)); // Light gray for active tab
-    SolidBrush inactiveBrush(Color(255, 160, 160, 160)); // Darker gray for inactive tabs
-    SolidBrush textBrush(Color(255, 0, 0, 0)); // Black text
-    SolidBrush closeBrush(Color(255, 255, 0, 0)); // Red close button
+    SolidBrush activeBrush(Color(255, 200, 200, 200)); // Светло-серый для активной вкладки
+    SolidBrush inactiveBrush(Color(255, 160, 160, 160)); // Темнее серый для неактивных вкладок
+    SolidBrush textBrush(Color(255, 0, 0, 0)); // Чёрный текст
+    Pen closePen(Color(255, 0, 0, 0));
+    closePen.SetWidth(2);
 
-    RECT tabArea = { 0, 0, clientRect.right, TABBAR_HEIGHT };
-    graphics.FillRectangle(&SolidBrush(Color(255, 240, 240, 240)), RectF(tabArea.left, tabArea.top, (REAL)(tabArea.right - tabArea.left), (REAL)(tabArea.bottom - tabArea.top)));
+    // Рисуем фон области вкладок
+    graphics.FillRectangle(&SolidBrush(Color(255, 240, 240, 240)), RectF(0, 0, (REAL)clientRect.right, (REAL)TABBAR_HEIGHT));
 
     int x = TAB_PADDING;
 
     for (size_t i = 0; i < tabs.size(); ++i) {
         Tab& tab = tabs[i];
 
-        // Measure text width
-        RectF layoutRect(x, 5, 200, TABBAR_HEIGHT - 10);
+        // Измеряем ширину текста
+        RectF layoutRect((REAL)x + 5, 5, 140, TABBAR_HEIGHT - 10);
         StringFormat format;
         format.SetTrimming(StringTrimmingEllipsisCharacter);
         RectF measuredRect;
@@ -211,89 +236,84 @@ void DrawTabs(Graphics& graphics, RECT clientRect) {
         font.GetMetrics(&fm);
         int textHeight = fm.height;
 
-        // Set fill color based on active tab
+        // Выбираем цвет заливки вкладки
         SolidBrush* tabBrush = (i == currentTab) ? &activeBrush : &inactiveBrush;
-        graphics.FillRectangle(tabBrush, RectF(x, 0, 150, TABBAR_HEIGHT));
+        graphics.FillRectangle(tabBrush, RectF((REAL)x, 0, (REAL)TAB_WIDTH, (REAL)TABBAR_HEIGHT));
 
-        // Draw tab text
+        // Рисуем текст вкладки
         graphics.DrawString(tab.url.c_str(), -1, &font, layoutRect, &format, &textBrush);
 
-        // Draw close button (a simple 'X')
-        Pen pen(Color(255, 0, 0, 0));
-        pen.SetWidth(2);
-        graphics.DrawLine(&pen, x + 135, 10, x + 145, 20);
-        graphics.DrawLine(&pen, x + 145, 10, x + 135, 20);
+        // Рисуем кнопку закрытия ('X')
+        graphics.DrawLine(&closePen, (REAL)x + TAB_WIDTH - TAB_CLOSE_BUTTON_SIZE - 5, 10, (REAL)x + TAB_WIDTH - 5, 20);
+        graphics.DrawLine(&closePen, (REAL)x + TAB_WIDTH - 5, 10, (REAL)x + TAB_WIDTH - TAB_CLOSE_BUTTON_SIZE - 5, 20);
 
-        // Set tab rectangle for hit-testing
-        tab.tabRect = { x, 0, x + 150, TABBAR_HEIGHT };
+        // Устанавливаем прямоугольник вкладки для обработки кликов
+        tab.tabRect = { x, 0, x + TAB_WIDTH, TABBAR_HEIGHT };
 
-        x += 150 + TAB_SPACING;
+        x += TAB_WIDTH + TAB_SPACING;
     }
 
-    // Draw "+" button for new tab
-    SolidBrush plusBrush(Color(255, 0, 128, 0)); // Green plus
+    // Рисуем кнопку "+" для новой вкладки
     Font plusFont(&fontFamily, 16, FontStyleBold, UnitPixel);
     StringFormat plusFormat;
     plusFormat.SetAlignment(StringAlignmentCenter);
     plusFormat.SetLineAlignment(StringAlignmentCenter);
-    graphics.FillRectangle(&SolidBrush(Color(255, 220, 220, 220)), RectF(x, 0, 30, TABBAR_HEIGHT));
-    graphics.DrawString(L"+", -1, &plusFont, RectF(x, 0, 30, TABBAR_HEIGHT), &plusFormat, &plusBrush);
-    // Set tabRect for "+" button
-    if (!tabs.empty()) {
-        tabs.back().tabRect = { x, 0, x + 30, TABBAR_HEIGHT };
-    }
+    SolidBrush plusBrush(Color(255, 0, 128, 0)); // Зелёный плюс
+    SolidBrush plusBackgroundBrush(Color(255, 220, 220, 220)); // Серый фон для "+"
+    graphics.FillRectangle(&plusBackgroundBrush, RectF((REAL)x, 0, 30, TABBAR_HEIGHT));
+    graphics.DrawString(L"+", -1, &plusFont, RectF((REAL)x, 0, 30, TABBAR_HEIGHT), &plusFormat, &plusBrush);
 }
 
-// Function to draw navigation bar
+// Функция рисования навигационной панели
 void DrawNavBar(Graphics& graphics, RECT clientRect) {
     FontFamily fontFamily(L"Segoe UI");
     Font font(&fontFamily, 12, FontStyleRegular, UnitPixel);
-    SolidBrush brush(Color(255, 220, 220, 220)); // Light gray background
-    SolidBrush textBrush(Color(255, 0, 0, 0)); // Black text
+    SolidBrush brush(Color(255, 220, 220, 220)); // Светло-серый фон
+    SolidBrush textBrush(Color(255, 0, 0, 0)); // Чёрный текст
 
-    // Draw navbar background
-    graphics.FillRectangle(&brush, RectF(0, TABBAR_HEIGHT, (REAL)clientRect.right, (REAL)NAVBAR_HEIGHT));
+    // Рисуем фон навигационной панели
+    graphics.FillRectangle(&brush, RectF(0, (REAL)TABBAR_HEIGHT, (REAL)clientRect.right, (REAL)NAVBAR_HEIGHT));
 
-    // Draw address bar background
-    RectF addressBarRect(ADDRESSBAR_PADDING, TABBAR_HEIGHT + 5, (REAL)(clientRect.right - 2 * ADDRESSBAR_PADDING), 30);
-    SolidBrush addressBrush(Color(255, 255, 255, 255)); // White background
+    // Рисуем фон адресной строки
+    RectF addressBarRect((REAL)ADDRESSBAR_PADDING, (REAL)(TABBAR_HEIGHT + 5), (REAL)(clientRect.right - 2 * ADDRESSBAR_PADDING), 30);
+    SolidBrush addressBrush(Color(255, 255, 255, 255)); // Белый фон
     Pen pen(Color(255, 0, 0, 0));
     pen.SetWidth(1);
     graphics.FillRectangle(&addressBrush, addressBarRect);
     graphics.DrawRectangle(&pen, addressBarRect.X, addressBarRect.Y, addressBarRect.Width, addressBarRect.Height);
 
-    // Draw address text
+    // Рисуем текст адреса
     if (currentTab < tabs.size()) {
         std::wstring address = tabs[currentTab].url;
         graphics.DrawString(address.c_str(), -1, &font, PointF(addressBarRect.X + 5, addressBarRect.Y + 5), &textBrush);
     }
 }
 
-// Function to draw HTML content (as plain text)
+// Функция рисования HTML-контента (в виде простого текста)
 void DrawHTMLContent(Graphics& graphics, RECT clientRect) {
     if (currentTab >= tabs.size()) return;
 
     Tab& tab = tabs[currentTab];
     std::wstring content = tab.htmlContent;
 
-    // Define the area to draw HTML content
+    // Определяем область для рисования HTML-контента
     RectF contentRect(10, TABBAR_HEIGHT + NAVBAR_HEIGHT + 10, (REAL)(clientRect.right - 20), (REAL)(clientRect.bottom - TABBAR_HEIGHT - NAVBAR_HEIGHT - 20));
 
-    // Draw the raw HTML content as text
+    // Рисуем HTML-контент как текст
     FontFamily fontFamily(L"Consolas");
     Font font(&fontFamily, 10, FontStyleRegular, UnitPixel);
-    SolidBrush textBrush(Color(255, 0, 0, 0)); // Black text
+    SolidBrush textBrush(Color(255, 0, 0, 0)); // Чёрный текст
 
     StringFormat format;
-    format.SetTrimming(StringTrimmingCharacterEllipsis);
+    format.SetTrimming(StringTrimmingEllipsisCharacter);
     format.SetFormatFlags(StringFormatFlagsNoClip);
 
     graphics.DrawString(content.c_str(), -1, &font, contentRect, &format, &textBrush);
 }
 
-// Function to handle mouse clicks
+// Функция обработки кликов мыши
 void HandleMouseClick(HWND hwnd, int x, int y) {
-    // Click within tab bar
+    // Обработка кликов в области вкладок
     if (y <= TABBAR_HEIGHT) {
         std::lock_guard<std::mutex> lock(tabsMutex);
         for (size_t i = 0; i < tabs.size(); ++i) {
@@ -301,16 +321,16 @@ void HandleMouseClick(HWND hwnd, int x, int y) {
             if (x >= tab.tabRect.left && x <= tab.tabRect.right &&
                 y >= tab.tabRect.top && y <= tab.tabRect.bottom) {
 
-                // Check if close button area
+                // Проверка области кнопки закрытия ('X')
                 int closeXStart = tab.tabRect.right - TAB_CLOSE_BUTTON_SIZE - 5;
                 if (x >= closeXStart && x <= closeXStart + TAB_CLOSE_BUTTON_SIZE &&
                     y >= 5 && y <= 5 + TAB_CLOSE_BUTTON_SIZE) {
-                    // Close the tab
+                    // Закрываем вкладку
                     CloseTab(i);
                     return;
                 }
-                else if (x >= tab.tabRect.left + 5 && x <= tab.tabRect.left + 145) {
-                    // Switch to the tab
+                else if (x >= tab.tabRect.left + 5 && x <= tab.tabRect.left + TAB_WIDTH - TAB_CLOSE_BUTTON_SIZE - 5) {
+                    // Переключаемся на вкладку
                     currentTab = i;
                     InvalidateRect(hwnd, NULL, TRUE);
                     return;
@@ -318,86 +338,23 @@ void HandleMouseClick(HWND hwnd, int x, int y) {
             }
         }
 
-        // Check if "+" button is clicked
-        if (!tabs.empty()) {
-            Tab& lastTab = tabs.back();
-            if (x >= lastTab.tabRect.left && x <= lastTab.tabRect.right &&
-                y >= lastTab.tabRect.top && y <= lastTab.tabRect.bottom) {
-                // Clicked on "+"
-                AddNewTab();
-                return;
-            }
+        // Проверка клика на кнопку "+" для новой вкладки
+        int plusXStart = TAB_PADDING + ((TAB_WIDTH + TAB_SPACING) * tabs.size());
+        if (x >= plusXStart && x <= plusXStart + 30 && y >= 0 && y <= TABBAR_HEIGHT) {
+            // Добавляем новую вкладку
+            AddNewTab();
+            return;
         }
     }
 
-    // Click within address bar
+    // Обработка кликов в области адресной строки
     if (y > TABBAR_HEIGHT && y < TABBAR_HEIGHT + NAVBAR_HEIGHT) {
-        // For simplicity, we'll prompt the user to enter a new URL
-        wchar_t url[2048] = L"";
-        if (DialogBoxParam(NULL, MAKEINTRESOURCE(101), hwnd, (DLGPROC)[](HWND hwndDlg, UINT msg, WPARAM wParam, LPARAM lParam) -> BOOL {
-            switch (msg) {
-            case WM_INITDIALOG:
-                SetDlgItemText(hwndDlg, 1001, L"https://");
-                return TRUE;
-            case WM_COMMAND:
-                if (LOWORD(wParam) == IDOK) {
-                    GetDlgItemText(hwndDlg, 1001, (LPWSTR)lParam, 2048);
-                    EndDialog(hwndDlg, TRUE);
-                    return TRUE;
-                }
-                else if (LOWORD(wParam) == IDCANCEL) {
-                    EndDialog(hwndDlg, FALSE);
-                    return TRUE;
-                }
-                break;
-            }
-            return FALSE;
-        }, (LPARAM)url)) {
-            // Update the current tab with the new URL
-            if (currentTab < tabs.size()) {
-                UpdateTabContent(currentTab, url);
-            }
-        }
+        // Для простоты при клике на адресную строку выводим информационное сообщение
+        MessageBox(hwnd, L"Ввод URL через адресную строку не реализован.", L"Информация", MB_OK | MB_ICONINFORMATION);
     }
 }
 
-// Dialog Procedure for URL input
-INT_PTR CALLBACK URLInputProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    switch (uMsg) {
-    case WM_INITDIALOG:
-        SetDlgItemText(hwndDlg, 1001, L"https://");
-        return TRUE;
-    case WM_COMMAND:
-        if (LOWORD(wParam) == IDOK) {
-            GetDlgItemText(hwndDlg, 1001, (LPWSTR)lParam, 2048);
-            EndDialog(hwndDlg, TRUE);
-            return TRUE;
-        }
-        else if (LOWORD(wParam) == IDCANCEL) {
-            EndDialog(hwndDlg, FALSE);
-            return TRUE;
-        }
-        break;
-    }
-    return FALSE;
-}
-
-// Function to prompt user for URL input
-bool PromptForURL(HWND hwnd, std::wstring& url) {
-    // Create a simple dialog box for URL input
-    // For simplicity, using MessageBox to enter URL is not feasible
-    // Hence, implementing a basic input dialog is necessary
-    // However, implementing a full dialog is beyond the scope
-    // Instead, use a modal input box functionality
-    // Placeholder implementation:
-
-    // Here, we'll use the InputBox-like function
-    // Since Win32 API doesn't have a native InputBox, you would typically implement one
-    // For simplicity, returning false
-    return false;
-}
-
-// Main Window Procedure
+// Главная оконная процедура
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
     case WM_DESTROY:
@@ -418,17 +375,17 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             HDC hdc = BeginPaint(hwnd, &ps);
             Graphics graphics(hdc);
 
-            // Get client area
+            // Получаем клиентскую область окна
             RECT clientRect;
             GetClientRect(hwnd, &clientRect);
 
-            // Draw tab bar
+            // Рисуем вкладки
             DrawTabs(graphics, clientRect);
 
-            // Draw navigation bar
+            // Рисуем навигационную панель
             DrawNavBar(graphics, clientRect);
 
-            // Draw HTML content
+            // Рисуем HTML-контент
             DrawHTMLContent(graphics, clientRect);
 
             EndPaint(hwnd, &ps);
@@ -437,7 +394,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
     case WM_SIZE:
         {
-            HWND hwndContent = hwnd;
             InvalidateRect(hwnd, NULL, TRUE);
         }
         return 0;
@@ -445,8 +401,24 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     case WM_KEYDOWN:
         {
             if (wParam == VK_CONTROL) {
-                // Example: Ctrl + T to open new tab
+                // Пример: Ctrl + T для открытия новой вкладки
+                AddNewTab();
             }
+            else if (wParam == VK_TAB) {
+                std::lock_guard<std::mutex> lock(tabsMutex);
+                if (!tabs.empty()) {
+                    currentTab = (currentTab + 1) % tabs.size();
+                    InvalidateRect(hwnd, NULL, TRUE);
+                }
+            }
+            else if (wParam == VK_F5) {
+                // Обновление текущей вкладки
+                std::lock_guard<std::mutex> lock(tabsMutex);
+                if (currentTab < tabs.size()) {
+                    UpdateTabContent(currentTab, tabs[currentTab].url);
+                }
+            }
+            // Добавьте обработку других клавиш по необходимости
         }
         return 0;
 
@@ -455,29 +427,30 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     }
 }
 
-// Entry Point
+// Точка входа в приложение
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
-    // Initialize GDI+
+    // Инициализация GDI+
     if (!InitGDIPlus()) {
-        MessageBox(NULL, L"Failed to initialize GDI+", L"Error", MB_OK | MB_ICONERROR);
+        MessageBox(NULL, L"Не удалось инициализировать GDI+", L"Ошибка", MB_OK | MB_ICONERROR);
         return 0;
     }
 
-    // Register Window Class
-    WNDCLASS wc = {};
+    // Регистрация оконного класса
+    WNDCLASSEX wc = {};
+    wc.cbSize = sizeof(WNDCLASSEX);
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
     wc.lpszClassName = CLASS_NAME;
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 
-    if (!RegisterClass(&wc)) {
-        MessageBox(NULL, L"Failed to register window class", L"Error", MB_OK | MB_ICONERROR);
+    if (!RegisterClassEx(&wc)) {
+        MessageBox(NULL, L"Не удалось зарегистрировать оконный класс", L"Ошибка", MB_OK | MB_ICONERROR);
         ShutdownGDIPlus();
         return 0;
     }
 
-    // Create Window
+    // Создание окна
     HWND hwnd = CreateWindowEx(
         0,
         CLASS_NAME,
@@ -491,26 +464,26 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     );
 
     if (hwnd == NULL) {
-        MessageBox(NULL, L"Failed to create window", L"Error", MB_OK | MB_ICONERROR);
+        MessageBox(NULL, L"Не удалось создать окно", L"Ошибка", MB_OK | MB_ICONERROR);
         ShutdownGDIPlus();
         return 0;
     }
 
-    // Show Window
+    // Отображение окна
     ShowWindow(hwnd, nCmdShow);
     UpdateWindow(hwnd);
 
-    // Add initial tab
+    // Добавление начальной вкладки
     AddNewTab();
 
-    // Message Loop
+    // Цикл обработки сообщений
     MSG msg = {};
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
-    // Cleanup GDI+
+    // Завершение работы GDI+
     ShutdownGDIPlus();
     return 0;
 }

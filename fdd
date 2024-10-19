@@ -1,8 +1,4 @@
-// SimpleBrowser.cpp
-// A simplified multi-tabbed browser using C++, Win32 API, GDI+, and WinInet
-
 #include <windows.h>
-#include <windowsx.h> // Для макросов GET_X_LPARAM и GET_Y_LPARAM
 #include <gdiplus.h>
 #include <wininet.h>
 #include <string>
@@ -12,83 +8,49 @@
 #include <sstream>
 #include <locale>
 #include <codecvt>
-#include <thread>
-#include <mutex>
-#include <iostream>
 
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "wininet.lib")
 
 using namespace Gdiplus;
 
-// Константы
-const wchar_t CLASS_NAME[] = L"SimpleBrowserWindowClass";
-const int WINDOW_WIDTH = 1280;
-const int WINDOW_HEIGHT = 720;
-
-const int NAVBAR_HEIGHT = 40;
-const int TABBAR_HEIGHT = 30;
-const int TAB_PADDING = 10;
-const int TAB_SPACING = 5;
-const int TAB_WIDTH = 150;
-const int TAB_CLOSE_BUTTON_SIZE = 12;
-const int ADDRESSBAR_PADDING = 5;
-
-// Декларации функций
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-
-// Вспомогательная функция для преобразования std::wstring в std::string
-std::string WStringToString(const std::wstring& wstr) {
-    std::wstring_convert<std::codecvt_utf8<wchar_t>> conv;
-    return conv.to_bytes(wstr);
-}
-
-// Структура для хранения информации о вкладке
-struct Tab {
-    std::wstring url;
-    std::wstring htmlContent;
-    RECT tabRect;
-    bool loading;
-
-    Tab(const std::wstring& u = L"https://www.example.com") : url(u), htmlContent(L"Loading..."), loading(true) {}
+// Структура для хранения информации об изображении и его названии
+struct ImageItem {
+    Image* image;
+    std::wstring title;
+    float x;      // Координата X на экране
+    float y;      // Координата Y на экране
+    float width;  // Ширина отображаемого изображения
+    float height; // Высота отображаемого изображения
 };
 
 // Глобальные переменные
-std::vector<Tab> tabs;
-int currentTab = 0;
-std::mutex tabsMutex;
+Image* backgroundImage = nullptr;
 
-// Токен GDI+
-ULONG_PTR gdiplusToken;
+// Массив языков
+std::vector<std::wstring> languages = { L"РУС", L"ENG" }; // Русский и английский
+int currentLanguageIndex = 0; // Индекс текущего языка
 
-// Функция инициализации GDI+
-bool InitGDIPlus() {
-    GdiplusStartupInput input;
-    return GdiplusStartup(&gdiplusToken, &input, NULL) == Ok;
-}
+// Массив дополнительных изображений
+std::vector<ImageItem> images;
 
-// Функция завершения работы GDI+
-void ShutdownGDIPlus() {
-    GdiplusShutdown(gdiplusToken);
-}
-
-// Функция для получения HTML-контента с помощью WinInet
-bool FetchHTML(const std::wstring& url, std::wstring& htmlContent) {
-    HINTERNET hInternet = InternetOpen(L"SimpleBrowser", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+// Функция для загрузки изображения из URL
+bool LoadImageFromURL(const std::wstring& url, Image*& outImage) {
+    HINTERNET hInternet = InternetOpen(L"ImageLoader", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (!hInternet) {
-        std::cerr << "InternetOpen failed" << std::endl;
+        OutputDebugString(L"InternetOpen failed\n");
         return false;
     }
 
-    // Открываем URL с необходимыми флагами
+    // Флаги для открытия URL: кэш отключен и чтение данных по мере загрузки
     HINTERNET hConnect = InternetOpenUrl(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD | INTERNET_FLAG_DONT_CACHE, 0);
     if (!hConnect) {
-        std::cerr << "InternetOpenUrl failed: " << WStringToString(url) << std::endl;
+        OutputDebugString(L"InternetOpenUrl failed\n");
         InternetCloseHandle(hInternet);
         return false;
     }
 
-    // Читаем все данные
+    // Чтение всех данных
     std::vector<BYTE> buffer;
     DWORD bytesAvailable = 0;
     DWORD bytesRead = 0;
@@ -107,91 +69,41 @@ bool FetchHTML(const std::wstring& url, std::wstring& htmlContent) {
     InternetCloseHandle(hInternet);
 
     if (buffer.empty()) {
-        std::cerr << "No data downloaded from URL: " << WStringToString(url) << std::endl;
+        OutputDebugString(L"No data downloaded from URL\n");
         return false;
     }
 
-    // Преобразуем буфер из UTF-8 в std::wstring
-    int size_needed = MultiByteToWideChar(CP_UTF8, 0, (const char*)buffer.data(), buffer.size(), NULL, 0);
-    std::wstring wstr(size_needed, 0);
-    MultiByteToWideChar(CP_UTF8, 0, (const char*)buffer.data(), buffer.size(), &wstr[0], size_needed);
-    htmlContent = wstr;
+    // Создание потока из буфера
+    IStream* stream = nullptr;
+    if (FAILED(CreateStreamOnHGlobal(NULL, TRUE, &stream))) {
+        OutputDebugString(L"CreateStreamOnHGlobal failed\n");
+        return false;
+    }
 
+    ULONG written;
+    if (FAILED(stream->Write(buffer.data(), buffer.size(), &written)) || written != buffer.size()) {
+        OutputDebugString(L"Stream write failed\n");
+        stream->Release();
+        return false;
+    }
+
+    LARGE_INTEGER liZero = {};
+    stream->Seek(liZero, STREAM_SEEK_SET, NULL);
+
+    // Загрузка изображения из потока
+    Image* img = new Image(stream);
+    stream->Release();
+
+    // Проверка статуса загрузки изображения
+    if (img->GetLastStatus() != Ok) {
+        OutputDebugString(L"Failed to create Image from stream\n");
+        delete img;
+        return false;
+    }
+
+    outImage = img;
+    OutputDebugString(L"Image loaded successfully\n");
     return true;
-}
-
-// Функция для добавления новой вкладки
-void AddNewTab(const std::wstring& url = L"https://www.example.com") {
-    std::lock_guard<std::mutex> lock(tabsMutex);
-    tabs.emplace_back(url);
-    currentTab = tabs.size() - 1;
-
-    // Загружаем HTML-контент в отдельном потоке для избежания блокировки UI
-    std::thread([=]() {
-        std::wstring content;
-        bool success = FetchHTML(url, content);
-
-        {
-            std::lock_guard<std::mutex> lock(tabsMutex);
-            if (currentTab < tabs.size()) {
-                tabs[currentTab].htmlContent = success ? content : L"Failed to load content.";
-                tabs[currentTab].loading = false;
-            }
-        }
-
-        // Обновляем окно для перерисовки
-        HWND hwndTarget = FindWindow(CLASS_NAME, L"Simple C++ Browser");
-        if (hwndTarget) {
-            InvalidateRect(hwndTarget, NULL, TRUE);
-        }
-    }).detach();
-}
-
-// Функция для закрытия вкладки
-void CloseTab(int index) {
-    std::lock_guard<std::mutex> lock(tabsMutex);
-    if (index >= 0 && index < tabs.size()) {
-        tabs.erase(tabs.begin() + index);
-        if (currentTab >= tabs.size()) {
-            currentTab = tabs.empty() ? 0 : tabs.size() - 1;
-        }
-    }
-
-    // Обновляем окно для перерисовки
-    HWND hwndTarget = FindWindow(CLASS_NAME, L"Simple C++ Browser");
-    if (hwndTarget) {
-        InvalidateRect(hwndTarget, NULL, TRUE);
-    }
-}
-
-// Функция для обновления контента вкладки
-void UpdateTabContent(int index, const std::wstring& url) {
-    std::lock_guard<std::mutex> lock(tabsMutex);
-    if (index >= 0 && index < tabs.size()) {
-        tabs[index].url = url;
-        tabs[index].htmlContent = L"Loading...";
-        tabs[index].loading = true;
-
-        // Загружаем контент в отдельном потоке
-        std::thread([=]() {
-            std::wstring content;
-            bool success = FetchHTML(url, content);
-
-            {
-                std::lock_guard<std::mutex> lock(tabsMutex);
-                if (index < tabs.size()) {
-                    tabs[index].htmlContent = success ? content : L"Failed to load content.";
-                    tabs[index].loading = false;
-                }
-            }
-
-            // Обновляем окно для перерисовки
-            HWND hwndTarget = FindWindow(CLASS_NAME, L"Simple C++ Browser");
-            if (hwndTarget) {
-                InvalidateRect(hwndTarget, NULL, TRUE);
-            }
-        }).detach();
-    }
 }
 
 // Функция для получения текущего времени в строковом формате
@@ -201,262 +113,254 @@ std::wstring GetCurrentTimeString() {
     std::time_t now_c = system_clock::to_time_t(now);
     std::tm parts;
 
-    // Потокобезопасная альтернатива localtime
+    // Используем localtime_s вместо localtime для потокобезопасности
     localtime_s(&parts, &now_c);
 
     std::wstringstream ss;
-    ss << std::put_time(&parts, L"%H:%M");
+    ss << std::put_time(&parts, L"%H:%M"); // Формат времени HH:MM
     return ss.str();
 }
 
-// Функция рисования вкладок
-void DrawTabs(Graphics& graphics, RECT clientRect) {
-    FontFamily fontFamily(L"Segoe UI");
-    Font font(&fontFamily, 12, FontStyleRegular, UnitPixel);
-    SolidBrush activeBrush(Color(255, 200, 200, 200)); // Светло-серый для активной вкладки
-    SolidBrush inactiveBrush(Color(255, 160, 160, 160)); // Темнее серый для неактивных вкладок
-    SolidBrush textBrush(Color(255, 0, 0, 0)); // Чёрный текст
-    Pen closePen(Color(255, 0, 0, 0));
-    closePen.SetWidth(2);
+// Функция для инициализации дополнительных изображений
+bool InitializeImages() {
+    // Список URL-адресов изображений и соответствующих названий
+    std::vector<std::pair<std::wstring, std::wstring>> imageData = {
+        { L"https://via.placeholder.com/150/FF0000/FFFFFF?text=Компьютер", L"Компьютер" },
+        { L"https://via.placeholder.com/150/00FF00/FFFFFF?text=Папки", L"Папки" },
+        { L"https://via.placeholder.com/150/0000FF/FFFFFF?text=Изображения", L"Изображения" },
+        { L"https://via.placeholder.com/150/FFFF00/FFFFFF?text=Музыка", L"Музыка" },
+        { L"https://via.placeholder.com/150/FF00FF/FFFFFF?text=Видео", L"Видео" }
+    };
 
-    // Рисуем фон области вкладок
-    graphics.FillRectangle(&SolidBrush(Color(255, 240, 240, 240)), RectF(0, 0, (REAL)clientRect.right, (REAL)TABBAR_HEIGHT));
+    // Начальные позиции для изображений
+    float startX = 100.0f;
+    float startY = 300.0f;
+    float spacing = 200.0f;
 
-    int x = TAB_PADDING;
-
-    for (size_t i = 0; i < tabs.size(); ++i) {
-        Tab& tab = tabs[i];
-
-        // Измеряем ширину текста
-        RectF layoutRect((REAL)x + 5, 5, 140, TABBAR_HEIGHT - 10);
-        StringFormat format;
-        format.SetTrimming(StringTrimmingEllipsisCharacter);
-        RectF measuredRect;
-        FontMetrics fm;
-        font.GetMetrics(&fm);
-        int textHeight = fm.height;
-
-        // Выбираем цвет заливки вкладки
-        SolidBrush* tabBrush = (i == currentTab) ? &activeBrush : &inactiveBrush;
-        graphics.FillRectangle(tabBrush, RectF((REAL)x, 0, (REAL)TAB_WIDTH, (REAL)TABBAR_HEIGHT));
-
-        // Рисуем текст вкладки
-        graphics.DrawString(tab.url.c_str(), -1, &font, layoutRect, &format, &textBrush);
-
-        // Рисуем кнопку закрытия ('X')
-        graphics.DrawLine(&closePen, (REAL)x + TAB_WIDTH - TAB_CLOSE_BUTTON_SIZE - 5, 10, (REAL)x + TAB_WIDTH - 5, 20);
-        graphics.DrawLine(&closePen, (REAL)x + TAB_WIDTH - 5, 10, (REAL)x + TAB_WIDTH - TAB_CLOSE_BUTTON_SIZE - 5, 20);
-
-        // Устанавливаем прямоугольник вкладки для обработки кликов
-        tab.tabRect = { x, 0, x + TAB_WIDTH, TABBAR_HEIGHT };
-
-        x += TAB_WIDTH + TAB_SPACING;
-    }
-
-    // Рисуем кнопку "+" для новой вкладки
-    Font plusFont(&fontFamily, 16, FontStyleBold, UnitPixel);
-    StringFormat plusFormat;
-    plusFormat.SetAlignment(StringAlignmentCenter);
-    plusFormat.SetLineAlignment(StringAlignmentCenter);
-    SolidBrush plusBrush(Color(255, 0, 128, 0)); // Зелёный плюс
-    SolidBrush plusBackgroundBrush(Color(255, 220, 220, 220)); // Серый фон для "+"
-    graphics.FillRectangle(&plusBackgroundBrush, RectF((REAL)x, 0, 30, TABBAR_HEIGHT));
-    graphics.DrawString(L"+", -1, &plusFont, RectF((REAL)x, 0, 30, TABBAR_HEIGHT), &plusFormat, &plusBrush);
-}
-
-// Функция рисования навигационной панели
-void DrawNavBar(Graphics& graphics, RECT clientRect) {
-    FontFamily fontFamily(L"Segoe UI");
-    Font font(&fontFamily, 12, FontStyleRegular, UnitPixel);
-    SolidBrush brush(Color(255, 220, 220, 220)); // Светло-серый фон
-    SolidBrush textBrush(Color(255, 0, 0, 0)); // Чёрный текст
-
-    // Рисуем фон навигационной панели
-    graphics.FillRectangle(&brush, RectF(0, (REAL)TABBAR_HEIGHT, (REAL)clientRect.right, (REAL)NAVBAR_HEIGHT));
-
-    // Рисуем фон адресной строки
-    RectF addressBarRect((REAL)ADDRESSBAR_PADDING, (REAL)(TABBAR_HEIGHT + 5), (REAL)(clientRect.right - 2 * ADDRESSBAR_PADDING), 30);
-    SolidBrush addressBrush(Color(255, 255, 255, 255)); // Белый фон
-    Pen pen(Color(255, 0, 0, 0));
-    pen.SetWidth(1);
-    graphics.FillRectangle(&addressBrush, addressBarRect);
-    graphics.DrawRectangle(&pen, addressBarRect.X, addressBarRect.Y, addressBarRect.Width, addressBarRect.Height);
-
-    // Рисуем текст адреса
-    if (currentTab < tabs.size()) {
-        std::wstring address = tabs[currentTab].url;
-        graphics.DrawString(address.c_str(), -1, &font, PointF(addressBarRect.X + 5, addressBarRect.Y + 5), &textBrush);
-    }
-}
-
-// Функция рисования HTML-контента (в виде простого текста)
-void DrawHTMLContent(Graphics& graphics, RECT clientRect) {
-    if (currentTab >= tabs.size()) return;
-
-    Tab& tab = tabs[currentTab];
-    std::wstring content = tab.htmlContent;
-
-    // Определяем область для рисования HTML-контента
-    RectF contentRect(10, TABBAR_HEIGHT + NAVBAR_HEIGHT + 10, (REAL)(clientRect.right - 20), (REAL)(clientRect.bottom - TABBAR_HEIGHT - NAVBAR_HEIGHT - 20));
-
-    // Рисуем HTML-контент как текст
-    FontFamily fontFamily(L"Consolas");
-    Font font(&fontFamily, 10, FontStyleRegular, UnitPixel);
-    SolidBrush textBrush(Color(255, 0, 0, 0)); // Чёрный текст
-
-    StringFormat format;
-    format.SetTrimming(StringTrimmingEllipsisCharacter);
-    format.SetFormatFlags(StringFormatFlagsNoClip);
-
-    graphics.DrawString(content.c_str(), -1, &font, contentRect, &format, &textBrush);
-}
-
-// Функция обработки кликов мыши
-void HandleMouseClick(HWND hwnd, int x, int y) {
-    // Обработка кликов в области вкладок
-    if (y <= TABBAR_HEIGHT) {
-        std::lock_guard<std::mutex> lock(tabsMutex);
-        for (size_t i = 0; i < tabs.size(); ++i) {
-            Tab& tab = tabs[i];
-            if (x >= tab.tabRect.left && x <= tab.tabRect.right &&
-                y >= tab.tabRect.top && y <= tab.tabRect.bottom) {
-
-                // Проверка области кнопки закрытия ('X')
-                int closeXStart = tab.tabRect.right - TAB_CLOSE_BUTTON_SIZE - 5;
-                if (x >= closeXStart && x <= closeXStart + TAB_CLOSE_BUTTON_SIZE &&
-                    y >= 5 && y <= 5 + TAB_CLOSE_BUTTON_SIZE) {
-                    // Закрываем вкладку
-                    CloseTab(i);
-                    return;
-                }
-                else if (x >= tab.tabRect.left + 5 && x <= tab.tabRect.left + TAB_WIDTH - TAB_CLOSE_BUTTON_SIZE - 5) {
-                    // Переключаемся на вкладку
-                    currentTab = i;
-                    InvalidateRect(hwnd, NULL, TRUE);
-                    return;
-                }
-            }
+    for (size_t i = 0; i < imageData.size(); ++i) {
+        Image* img = nullptr;
+        if (LoadImageFromURL(imageData[i].first, img)) {
+            ImageItem item;
+            item.image = img;
+            item.title = imageData[i].second;
+            item.x = startX + i * spacing; // Расположение по оси X с отступом
+            item.y = startY;              // Фиксированная позиция по оси Y
+            item.width = 150.0f;          // Ширина изображения
+            item.height = 150.0f;         // Высота изображения
+            images.push_back(item);
         }
-
-        // Проверка клика на кнопку "+" для новой вкладки
-        int plusXStart = TAB_PADDING + ((TAB_WIDTH + TAB_SPACING) * tabs.size());
-        if (x >= plusXStart && x <= plusXStart + 30 && y >= 0 && y <= TABBAR_HEIGHT) {
-            // Добавляем новую вкладку
-            AddNewTab();
-            return;
+        else {
+            OutputDebugString((L"Failed to load image: " + imageData[i].first + L"\n").c_str());
+            return false;
         }
     }
-
-    // Обработка кликов в области адресной строки
-    if (y > TABBAR_HEIGHT && y < TABBAR_HEIGHT + NAVBAR_HEIGHT) {
-        // Для простоты при клике на адресную строку выводим информационное сообщение
-        MessageBox(hwnd, L"Ввод URL через адресную строку не реализован.", L"Информация", MB_OK | MB_ICONINFORMATION);
-    }
+    return true;
 }
 
-// Главная оконная процедура
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
     case WM_DESTROY:
+        // Удаляем загруженные изображения
+        delete backgroundImage;
+        for (auto& imgItem : images) {
+            delete imgItem.image;
+        }
         PostQuitMessage(0);
         return 0;
 
-    case WM_LBUTTONDOWN:
-        {
-            int xPos = GET_X_LPARAM(lParam);
-            int yPos = GET_Y_LPARAM(lParam);
-            HandleMouseClick(hwnd, xPos, yPos);
+    case WM_KEYDOWN:
+        // Проверяем нажатие клавиши Esc
+        if (wParam == VK_ESCAPE) {
+            DestroyWindow(hwnd); // Закрыть окно
         }
-        return 0;
 
-    case WM_PAINT:
-        {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hwnd, &ps);
-            Graphics graphics(hdc);
-
-            // Получаем клиентскую область окна
-            RECT clientRect;
-            GetClientRect(hwnd, &clientRect);
-
-            // Рисуем вкладки
-            DrawTabs(graphics, clientRect);
-
-            // Рисуем навигационную панель
-            DrawNavBar(graphics, clientRect);
-
-            // Рисуем HTML-контент
-            DrawHTMLContent(graphics, clientRect);
-
-            EndPaint(hwnd, &ps);
+        // Обработка переключения языка на Alt+Shift или Win+Space
+        if (((GetAsyncKeyState(VK_MENU) & 0x8000) && wParam == VK_SHIFT) ||
+            ((GetAsyncKeyState(VK_LWIN) & 0x8000) && wParam == VK_SPACE)) {
+            currentLanguageIndex = (currentLanguageIndex + 1) % languages.size(); // Переключаем язык
+            InvalidateRect(hwnd, NULL, TRUE); // Перерисовываем окно
         }
-        return 0;
 
-    case WM_SIZE:
-        {
+        // Обработка нажатий стрелок для перемещения изображений
+        if (wParam == VK_LEFT) {
+            // Переместить все изображения вправо
+            for (auto& imgItem : images) {
+                imgItem.x += 20.0f; // Сдвиг на 20 пикселей вправо
+                // Ограничение для правого края
+                if (imgItem.x + imgItem.width > GetSystemMetrics(SM_CXSCREEN)) {
+                    imgItem.x = GetSystemMetrics(SM_CXSCREEN) - imgItem.width;
+                }
+            }
             InvalidateRect(hwnd, NULL, TRUE);
         }
+        if (wParam == VK_RIGHT) {
+            // Переместить все изображения влево
+            for (auto& imgItem : images) {
+                imgItem.x -= 20.0f; // Сдвиг на 20 пикселей влево
+                // Ограничение для левого края
+                if (imgItem.x < 0) {
+                    imgItem.x = 0;
+                }
+            }
+            InvalidateRect(hwnd, NULL, TRUE);
+        }
+
         return 0;
 
-    case WM_KEYDOWN:
-        {
-            if (wParam == VK_CONTROL) {
-                // Пример: Ctrl + T для открытия новой вкладки
-                AddNewTab();
-            }
-            else if (wParam == VK_TAB) {
-                std::lock_guard<std::mutex> lock(tabsMutex);
-                if (!tabs.empty()) {
-                    currentTab = (currentTab + 1) % tabs.size();
-                    InvalidateRect(hwnd, NULL, TRUE);
-                }
-            }
-            else if (wParam == VK_F5) {
-                // Обновление текущей вкладки
-                std::lock_guard<std::mutex> lock(tabsMutex);
-                if (currentTab < tabs.size()) {
-                    UpdateTabContent(currentTab, tabs[currentTab].url);
-                }
-            }
-            // Добавьте обработку других клавиш по необходимости
-        }
+    case WM_SIZE: {
+        InvalidateRect(hwnd, NULL, TRUE); // Перерисовка окна при изменении размера
         return 0;
+    }
+
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
+        Graphics graphics(hdc);
+
+        // Установка высококачественных настроек рендеринга
+        graphics.SetSmoothingMode(SmoothingModeHighQuality);
+        graphics.SetInterpolationMode(InterpolationModeHighQualityBicubic);
+        graphics.SetPixelOffsetMode(PixelOffsetModeHighQuality);
+
+        // Получаем размеры окна
+        RECT windowRect;
+        GetClientRect(hwnd, &windowRect);
+
+        // Рисуем изображение как фон с сохранением пропорций
+        if (backgroundImage) {
+            UINT imgWidth = backgroundImage->GetWidth();
+            UINT imgHeight = backgroundImage->GetHeight();
+
+            double windowAspect = static_cast<double>(windowRect.right) / windowRect.bottom;
+            double imageAspect = static_cast<double>(imgWidth) / imgHeight;
+
+            double drawWidth, drawHeight;
+            if (windowAspect > imageAspect) {
+                // Окно шире изображения
+                drawHeight = windowRect.bottom;
+                drawWidth = imageAspect * drawHeight;
+            }
+            else {
+                // Окно уже или равно изображению
+                drawWidth = windowRect.right;
+                drawHeight = drawWidth / imageAspect;
+            }
+
+            float x = static_cast<float>((windowRect.right - drawWidth) / 2.0);
+            float y = static_cast<float>((windowRect.bottom - drawHeight) / 2.0);
+            graphics.DrawImage(backgroundImage, x, y, static_cast<REAL>(drawWidth), static_cast<REAL>(drawHeight));
+        }
+
+        // Рисуем нижнюю панель
+        RECT panelRect = { 0, windowRect.bottom - 40, windowRect.right, windowRect.bottom };
+        FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1)); // Цвет панели
+
+        // Получаем текущее время
+        std::wstring timeString = GetCurrentTimeString();
+        std::wstring langString = languages[currentLanguageIndex]; // Текущий язык
+
+        // Используем GDI+ для рисования текста
+        FontFamily fontFamily(L"Segoe UI"); // Выбор шрифта
+        Font font(&fontFamily, 14, FontStyleRegular, UnitPixel); // Устанавливаем размер шрифта
+        SolidBrush brush(Color(255, 0, 0, 0)); // Черный цвет текста
+
+        // Находим размеры текста для правильного размещения
+        RectF timeRect;
+        graphics.MeasureString(timeString.c_str(), -1, &font, PointF(0, 0), &timeRect);
+        RectF langRect;
+        graphics.MeasureString(langString.c_str(), -1, &font, PointF(0, 0), &langRect);
+
+        // Рассчитываем координаты для расположения текста
+        float xTime = static_cast<float>(windowRect.right - timeRect.Width - langRect.Width - 30); // Отступ от правого края
+        float yText = static_cast<float>(windowRect.bottom - 40 + (40 - timeRect.Height) / 2.0 - 1); // Отступ от нижней границы
+
+        // Рисуем время
+        PointF timePoint(xTime, yText);
+        graphics.DrawString(timeString.c_str(), -1, &font, timePoint, &brush);
+
+        // Рисуем текущий язык рядом с временем
+        PointF langPoint(xTime - langRect.Width - 10, yText); // Отступ слева от времени
+        graphics.DrawString(langString.c_str(), -1, &font, langPoint, &brush);
+
+        // Добавляем анонс операционной системы в центр экрана
+        std::wstring announcement = L"Introducing Orega OS: The Future of Performance!";
+        RectF announcementRect;
+        Font largeFont(&fontFamily, 40, FontStyleBold, UnitPixel); // Шрифт для анонса
+        graphics.MeasureString(announcement.c_str(), -1, &largeFont, PointF(0, 0), &announcementRect);
+
+        // Позиционируем анонс в центре экрана
+        float xAnnouncement = (static_cast<float>(windowRect.right) - announcementRect.Width) / 2.0f;
+        float yAnnouncement = (static_cast<float>(windowRect.bottom) - announcementRect.Height) / 2.0f;
+        PointF announcementPoint(xAnnouncement, yAnnouncement);
+
+        SolidBrush announcementBrush(Color(255, 0, 0, 0)); // Чёрный цвет текста для анонса
+        graphics.DrawString(announcement.c_str(), -1, &largeFont, announcementPoint, &announcementBrush);
+
+        // Рисуем дополнительные изображения и их названия
+        for (const auto& imgItem : images) {
+            // Рисуем изображение
+            graphics.DrawImage(imgItem.image, imgItem.x, imgItem.y, imgItem.width, imgItem.height);
+
+            // Рисуем название над изображением, центрируя его
+            Font titleFont(&fontFamily, 16, FontStyleRegular, UnitPixel);
+            SolidBrush titleBrush(Color(255, 0, 0, 0));
+
+            RectF titleRect;
+            graphics.MeasureString(imgItem.title.c_str(), -1, &titleFont, PointF(0, 0), &titleRect);
+
+            float xTitle = imgItem.x + (imgItem.width - titleRect.Width) / 2.0f;
+            float yTitle = imgItem.y - titleRect.Height - 5.0f; // Отступ выше изображения
+
+            PointF titlePoint(xTitle, yTitle);
+            graphics.DrawString(imgItem.title.c_str(), -1, &titleFont, titlePoint, &titleBrush);
+        }
+
+        EndPaint(hwnd, &ps);
+        return 0;
+    }
 
     default:
         return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
 }
 
-// Точка входа в приложение
-int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
+// Основная функция приложения
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
+    const wchar_t CLASS_NAME[] = L"FullscreenWindowClass";
+
     // Инициализация GDI+
-    if (!InitGDIPlus()) {
-        MessageBox(NULL, L"Не удалось инициализировать GDI+", L"Ошибка", MB_OK | MB_ICONERROR);
+    GdiplusStartupInput gdiplusStartupInput;
+    ULONG_PTR gdiplusToken;
+    if (GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL) != Ok) {
+        MessageBox(NULL, L"Не удалось инициализировать GDI+", L"Ошибка", MB_ICONERROR);
         return 0;
     }
 
-    // Регистрация оконного класса
-    WNDCLASSEX wc = {};
-    wc.cbSize = sizeof(WNDCLASSEX);
+    // Определяем класс окна
+    WNDCLASS wc = {};
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
     wc.lpszClassName = CLASS_NAME;
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 
-    if (!RegisterClassEx(&wc)) {
-        MessageBox(NULL, L"Не удалось зарегистрировать оконный класс", L"Ошибка", MB_OK | MB_ICONERROR);
-        ShutdownGDIPlus();
+    if (!RegisterClass(&wc)) {
+        MessageBox(NULL, L"Не удалось зарегистрировать класс окна.", L"Ошибка", MB_ICONERROR);
+        GdiplusShutdown(gdiplusToken);
         return 0;
     }
 
-    // Создание окна
+    // Получаем размеры экрана
+    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+    // Создаем окно
     HWND hwnd = CreateWindowEx(
-        0,
+        WS_EX_TOPMOST, // Окно всегда поверх остальных
         CLASS_NAME,
-        L"Simple C++ Browser",
-        WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, WINDOW_WIDTH, WINDOW_HEIGHT,
+        L"My Fullscreen Window",
+        WS_POPUP, // Убираем рамку окна
+        0, 0, screenWidth, screenHeight, // Положение и размер окна
         NULL,
         NULL,
         hInstance,
@@ -464,26 +368,38 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     );
 
     if (hwnd == NULL) {
-        MessageBox(NULL, L"Не удалось создать окно", L"Ошибка", MB_OK | MB_ICONERROR);
-        ShutdownGDIPlus();
+        MessageBox(NULL, L"Не удалось создать окно.", L"Ошибка", MB_ICONERROR);
+        GdiplusShutdown(gdiplusToken);
         return 0;
     }
 
-    // Отображение окна
+    // Загружаем изображение фона из URL
+    if (!LoadImageFromURL(L"https://i.pinimg.com/originals/56/cb/5f/56cb5ff3d83e4159c447b04d5d3a333e.jpg", backgroundImage)) {
+        MessageBox(hwnd, L"Не удалось загрузить фон. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
+        DestroyWindow(hwnd);
+        GdiplusShutdown(gdiplusToken);
+        return 0;
+    }
+
+    // Инициализируем дополнительные изображения
+    if (!InitializeImages()) {
+        MessageBox(hwnd, L"Не удалось загрузить дополнительные изображения. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
+        DestroyWindow(hwnd);
+        GdiplusShutdown(gdiplusToken);
+        return 0;
+    }
+
     ShowWindow(hwnd, nCmdShow);
     UpdateWindow(hwnd);
 
-    // Добавление начальной вкладки
-    AddNewTab();
-
     // Цикл обработки сообщений
-    MSG msg = {};
+    MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
-    // Завершение работы GDI+
-    ShutdownGDIPlus();
+    // Остановка GDI+
+    GdiplusShutdown(gdiplusToken);
     return 0;
 }

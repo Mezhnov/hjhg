@@ -18,9 +18,9 @@ using namespace Gdiplus;
 struct ImageItem {
     Image* image;
     std::wstring title;
-    float x;      // Координата X на экране
-    float y;      // Координата Y на экране
-    float width;  // Ширина отображаемого изображения
+    float x; // Координата X на экране
+    float y; // Координата Y на экране
+    float width; // Ширина отображаемого изображения
     float height; // Высота отображаемого изображения
 };
 
@@ -125,16 +125,13 @@ std::wstring GetCurrentTimeString() {
 bool InitializeImages() {
     // Список URL-адресов изображений и соответствующих названий
     std::vector<std::pair<std::wstring, std::wstring>> imageData = {
-        { L"https://via.placeholder.com/150/FF0000/FFFFFF?text=Компьютер", L"Компьютер" },
-        { L"https://via.placeholder.com/150/00FF00/FFFFFF?text=Папки", L"Папки" },
-        { L"https://via.placeholder.com/150/0000FF/FFFFFF?text=Изображения", L"Изображения" },
-        { L"https://via.placeholder.com/150/FFFF00/FFFFFF?text=Музыка", L"Музыка" },
-        { L"https://via.placeholder.com/150/FF00FF/FFFFFF?text=Видео", L"Видео" }
+        { L"https://i.postimg.cc/63Y3mC8J/nyc01-temp-zg8pt-R0-FL1-KMi-Z8o-ZL4b.png", L"Компьютер" }
+        // Добавьте другие изображения по необходимости
     };
 
     // Начальные позиции для изображений
-    float startX = 100.0f;
-    float startY = 300.0f;
+    float startX = 50.0f;
+    float startY = 50.0f;
     float spacing = 200.0f;
 
     for (size_t i = 0; i < imageData.size(); ++i) {
@@ -144,9 +141,9 @@ bool InitializeImages() {
             item.image = img;
             item.title = imageData[i].second;
             item.x = startX + i * spacing; // Расположение по оси X с отступом
-            item.y = startY;              // Фиксированная позиция по оси Y
-            item.width = 150.0f;          // Ширина изображения
-            item.height = 150.0f;         // Высота изображения
+            item.y = startY; // Фиксированная позиция по оси Y
+            item.width = 100.0f; // Ширина изображения
+            item.height = 100.0f; // Высота изображения
             images.push_back(item);
         }
         else {
@@ -158,6 +155,8 @@ bool InitializeImages() {
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    static WindowData* data = nullptr;
+
     switch (uMsg) {
     case WM_DESTROY:
         // Удаляем загруженные изображения
@@ -262,7 +261,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         // Используем GDI+ для рисования текста
         FontFamily fontFamily(L"Segoe UI"); // Выбор шрифта
         Font font(&fontFamily, 14, FontStyleRegular, UnitPixel); // Устанавливаем размер шрифта
-        SolidBrush brush(Color(255, 0, 0, 0)); // Черный цвет текста
+        SolidBrush brush(Color(255, 255, 255, 255)); // Белый цвет текста
 
         // Находим размеры текста для правильного размещения
         RectF timeRect;
@@ -271,16 +270,17 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         graphics.MeasureString(langString.c_str(), -1, &font, PointF(0, 0), &langRect);
 
         // Рассчитываем координаты для расположения текста
+        float padding = 15.0f;
         float xTime = static_cast<float>(windowRect.right - timeRect.Width - langRect.Width - 30); // Отступ от правого края
         float yText = static_cast<float>(windowRect.bottom - 40 + (40 - timeRect.Height) / 2.0 - 1); // Отступ от нижней границы
+
+        // Рисуем текущий язык
+        PointF langPoint(xTime - langRect.Width - 10, yText); // Отступ слева от времени
+        graphics.DrawString(langString.c_str(), -1, &font, langPoint, &brush);
 
         // Рисуем время
         PointF timePoint(xTime, yText);
         graphics.DrawString(timeString.c_str(), -1, &font, timePoint, &brush);
-
-        // Рисуем текущий язык рядом с временем
-        PointF langPoint(xTime - langRect.Width - 10, yText); // Отступ слева от времени
-        graphics.DrawString(langString.c_str(), -1, &font, langPoint, &brush);
 
         // Добавляем анонс операционной системы в центр экрана
         std::wstring announcement = L"Introducing Orega OS: The Future of Performance!";
@@ -293,7 +293,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         float yAnnouncement = (static_cast<float>(windowRect.bottom) - announcementRect.Height) / 2.0f;
         PointF announcementPoint(xAnnouncement, yAnnouncement);
 
-        SolidBrush announcementBrush(Color(255, 0, 0, 0)); // Чёрный цвет текста для анонса
+        SolidBrush announcementBrush(Color(255, 255, 255, 255)); // Белый цвет текста для анонса
         graphics.DrawString(announcement.c_str(), -1, &largeFont, announcementPoint, &announcementBrush);
 
         // Рисуем дополнительные изображения и их названия
@@ -301,15 +301,15 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             // Рисуем изображение
             graphics.DrawImage(imgItem.image, imgItem.x, imgItem.y, imgItem.width, imgItem.height);
 
-            // Рисуем название над изображением, центрируя его
+            // Рисуем название под изображением, центрируя его
             Font titleFont(&fontFamily, 16, FontStyleRegular, UnitPixel);
-            SolidBrush titleBrush(Color(255, 0, 0, 0));
+            SolidBrush titleBrush(Color(255, 255, 255, 255)); // Белый цвет текста для названия
 
             RectF titleRect;
             graphics.MeasureString(imgItem.title.c_str(), -1, &titleFont, PointF(0, 0), &titleRect);
 
             float xTitle = imgItem.x + (imgItem.width - titleRect.Width) / 2.0f;
-            float yTitle = imgItem.y - titleRect.Height - 5.0f; // Отступ выше изображения
+            float yTitle = imgItem.y + imgItem.height + 5.0f; // Отступ ниже изображения
 
             PointF titlePoint(xTitle, yTitle);
             graphics.DrawString(imgItem.title.c_str(), -1, &titleFont, titlePoint, &titleBrush);

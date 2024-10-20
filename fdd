@@ -16,12 +16,12 @@ using namespace Gdiplus;
 
 // Структура для хранения информации об изображении и его названии
 struct ImageItem {
-    Image* image;
-    std::wstring title;
-    float x; // Координата X на экране
-    float y; // Координата Y на экране
-    float width; // Ширина отображаемого изображения
-    float height; // Высота отображаемого изображения
+    Image* image;          // Указатель на изображение
+    std::wstring title;    // Название изображения
+    float x;               // Координата X на экране
+    float y;               // Координата Y на экране
+    float width;           // Ширина отображаемого изображения
+    float height;          // Высота отображаемого изображения
 };
 
 // Глобальные переменные
@@ -33,6 +33,11 @@ int currentLanguageIndex = 0; // Индекс текущего языка
 
 // Массив дополнительных изображений
 std::vector<ImageItem> images;
+
+// Переменные для перемещения изображений мышью
+bool isDragging = false;
+int draggedImageIndex = -1;
+POINT lastMousePos = { 0, 0 };
 
 // Функция для загрузки изображения из URL
 bool LoadImageFromURL(const std::wstring& url, Image*& outImage) {
@@ -125,13 +130,14 @@ std::wstring GetCurrentTimeString() {
 bool InitializeImages() {
     // Список URL-адресов изображений и соответствующих названий
     std::vector<std::pair<std::wstring, std::wstring>> imageData = {
-        { L"https://i.postimg.cc/63Y3mC8J/nyc01-temp-zg8pt-R0-FL1-KMi-Z8o-ZL4b.png", L"Компьютер" }
+        { L"https://i.postimg.cc/63Y3mC8J/nyc01-temp-zg8pt-R0-FL1-KMi-Z8o-ZL4b.png", L"Новая папка" },
+        { L"https://i.postimg.cc/0Q12Jw0R/fra01-temp-r-MINe9-WDa-DPi-KQl-Rb3p-F-processed.png", L"Этот компьютер" }
         // Добавьте другие изображения по необходимости
     };
 
     // Начальные позиции для изображений
-    float startX = 50.0f;
-    float startY = 50.0f;
+    float startX = 150.0f;
+    float startY = 200.0f;
     float spacing = 200.0f;
 
     for (size_t i = 0; i < imageData.size(); ++i) {
@@ -141,9 +147,9 @@ bool InitializeImages() {
             item.image = img;
             item.title = imageData[i].second;
             item.x = startX + i * spacing; // Расположение по оси X с отступом
-            item.y = startY; // Фиксированная позиция по оси Y
-            item.width = 100.0f; // Ширина изображения
-            item.height = 100.0f; // Высота изображения
+            item.y = startY;              // Фиксированная позиция по оси Y
+            item.width = 100.0f;          // Ширина изображения
+            item.height = 100.0f;         // Высота изображения
             images.push_back(item);
         }
         else {
@@ -152,6 +158,18 @@ bool InitializeImages() {
         }
     }
     return true;
+}
+
+// Функция для проверки, находится ли точка внутри изображения
+int HitTestImages(int mouseX, int mouseY) {
+    for (size_t i = 0; i < images.size(); ++i) {
+        const ImageItem& img = images[i];
+        if (mouseX >= img.x && mouseX <= (img.x + img.width) &&
+            mouseY >= img.y && mouseY <= (img.y + img.height)) {
+            return static_cast<int>(i);
+        }
+    }
+    return -1;
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -180,31 +198,67 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             InvalidateRect(hwnd, NULL, TRUE); // Перерисовываем окно
         }
 
-        // Обработка нажатий стрелок для перемещения изображений
-        if (wParam == VK_LEFT) {
-            // Переместить все изображения вправо
-            for (auto& imgItem : images) {
-                imgItem.x += 20.0f; // Сдвиг на 20 пикселей вправо
-                // Ограничение для правого края
-                if (imgItem.x + imgItem.width > GetSystemMetrics(SM_CXSCREEN)) {
-                    imgItem.x = GetSystemMetrics(SM_CXSCREEN) - imgItem.width;
-                }
-            }
-            InvalidateRect(hwnd, NULL, TRUE);
-        }
-        if (wParam == VK_RIGHT) {
-            // Переместить все изображения влево
-            for (auto& imgItem : images) {
-                imgItem.x -= 20.0f; // Сдвиг на 20 пикселей влево
-                // Ограничение для левого края
-                if (imgItem.x < 0) {
-                    imgItem.x = 0;
-                }
-            }
-            InvalidateRect(hwnd, NULL, TRUE);
-        }
-
         return 0;
+
+    case WM_LBUTTONDOWN: {
+        // Получаем позицию курсора
+        int xPos = GET_X_LPARAM(lParam);
+        int yPos = GET_Y_LPARAM(lParam);
+
+        // Проверяем, на каком изображении был клик
+        int hitIndex = HitTestImages(xPos, yPos);
+        if (hitIndex != -1) {
+            isDragging = true;
+            draggedImageIndex = hitIndex;
+            lastMousePos.x = xPos;
+            lastMousePos.y = yPos;
+        }
+        break;
+    }
+
+    case WM_MOUSEMOVE: {
+        if (isDragging && draggedImageIndex != -1) {
+            int xPos = GET_X_LPARAM(lParam);
+            int yPos = GET_Y_LPARAM(lParam);
+
+            // Вычисляем смещение
+            int deltaX = xPos - lastMousePos.x;
+            int deltaY = yPos - lastMousePos.y;
+
+            // Обновляем позицию изображения
+            images[draggedImageIndex].x += deltaX;
+            images[draggedImageIndex].y += deltaY;
+
+            // Ограничиваем движение изображений внутри окна
+            RECT windowRect;
+            GetClientRect(hwnd, &windowRect);
+
+            // Ограничение по оси X
+            if (images[draggedImageIndex].x < 0)
+                images[draggedImageIndex].x = 0;
+            if (images[draggedImageIndex].x + images[draggedImageIndex].width > windowRect.right)
+                images[draggedImageIndex].x = windowRect.right - images[draggedImageIndex].width;
+
+            // Ограничение по оси Y
+            if (images[draggedImageIndex].y < 0)
+                images[draggedImageIndex].y = 0;
+            if (images[draggedImageIndex].y + images[draggedImageIndex].height > windowRect.bottom - 40) // Учёт нижней панели
+                images[draggedImageIndex].y = windowRect.bottom - 40 - images[draggedImageIndex].height;
+
+            // Обновляем позицию для следующего шага
+            lastMousePos.x = xPos;
+            lastMousePos.y = yPos;
+
+            InvalidateRect(hwnd, NULL, TRUE);
+        }
+        break;
+    }
+
+    case WM_LBUTTONUP:
+        // Завершаем перетаскивание
+        isDragging = false;
+        draggedImageIndex = -1;
+        break;
 
     case WM_SIZE: {
         InvalidateRect(hwnd, NULL, TRUE); // Перерисовка окна при изменении размера
@@ -258,10 +312,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         std::wstring timeString = GetCurrentTimeString();
         std::wstring langString = languages[currentLanguageIndex]; // Текущий язык
 
+        // Выбор цвета текста в зависимости от языка
+        Color textColor = (currentLanguageIndex == 0) ? Color(255, 0, 0, 0) : Color(255, 255, 255, 255); // Черный для РУС, Белый для ENG
+
         // Используем GDI+ для рисования текста
         FontFamily fontFamily(L"Segoe UI"); // Выбор шрифта
         Font font(&fontFamily, 14, FontStyleRegular, UnitPixel); // Устанавливаем размер шрифта
-        SolidBrush brush(Color(255, 255, 255, 255)); // Белый цвет текста
+        SolidBrush brush(textColor); // Цвет текста
 
         // Находим размеры текста для правильного размещения
         RectF timeRect;
@@ -271,16 +328,17 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         // Рассчитываем координаты для расположения текста
         float padding = 15.0f;
-        float xTime = static_cast<float>(windowRect.right - timeRect.Width - langRect.Width - 30); // Отступ от правого края
+        float totalWidth = timeRect.Width + langRect.Width + 10.0f; // Общая ширина времени и языка с отступом
+        float xTime = static_cast<float>(windowRect.right - totalWidth - padding); // Отступ от правого края
         float yText = static_cast<float>(windowRect.bottom - 40 + (40 - timeRect.Height) / 2.0 - 1); // Отступ от нижней границы
 
-        // Рисуем текущий язык
-        PointF langPoint(xTime - langRect.Width - 10, yText); // Отступ слева от времени
-        graphics.DrawString(langString.c_str(), -1, &font, langPoint, &brush);
-
         // Рисуем время
-        PointF timePoint(xTime, yText);
+        PointF timePoint(xTime + langRect.Width + 10.0f, yText);
         graphics.DrawString(timeString.c_str(), -1, &font, timePoint, &brush);
+
+        // Рисуем текущий язык рядом с временем
+        PointF langPoint(xTime, yText);
+        graphics.DrawString(langString.c_str(), -1, &font, langPoint, &brush);
 
         // Добавляем анонс операционной системы в центр экрана
         std::wstring announcement = L"Introducing Orega OS: The Future of Performance!";
@@ -301,15 +359,18 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             // Рисуем изображение
             graphics.DrawImage(imgItem.image, imgItem.x, imgItem.y, imgItem.width, imgItem.height);
 
-            // Рисуем название под изображением, центрируя его
+            // Рисуем название над изображением, центрируя его
             Font titleFont(&fontFamily, 16, FontStyleRegular, UnitPixel);
-            SolidBrush titleBrush(Color(255, 255, 255, 255)); // Белый цвет текста для названия
+            SolidBrush titleBrush(Color(255, 0, 0, 0)); // Черный цвет текста для названия
 
             RectF titleRect;
             graphics.MeasureString(imgItem.title.c_str(), -1, &titleFont, PointF(0, 0), &titleRect);
 
             float xTitle = imgItem.x + (imgItem.width - titleRect.Width) / 2.0f;
-            float yTitle = imgItem.y + imgItem.height + 5.0f; // Отступ ниже изображения
+            float yTitle = imgItem.y - titleRect.Height - 5.0f; // Отступ выше изображения
+
+            // Убедитесь, что текст не выходит за границы окна
+            if (yTitle < 0) yTitle = 0;
 
             PointF titlePoint(xTitle, yTitle);
             graphics.DrawString(imgItem.title.c_str(), -1, &titleFont, titlePoint, &titleBrush);

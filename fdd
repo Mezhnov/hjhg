@@ -8,6 +8,7 @@
 #include <sstream>
 #include <locale>
 #include <codecvt>
+#include <memory> // For smart pointers
 
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "wininet.lib")
@@ -16,7 +17,7 @@ using namespace Gdiplus;
 
 // Structure to store image information
 struct ImageItem {
-    Image* image;
+    std::unique_ptr<Image> image; // Use smart pointer for automatic memory management
     std::wstring title;
     float x;      // X-coordinate on the screen
     float y;      // Y-coordinate on the screen
@@ -24,18 +25,21 @@ struct ImageItem {
     float height; // Height of the displayed image
 };
 
-// Global Variables
-Image* backgroundImage = nullptr;
+// Structure to store window-specific data
+struct WindowData {
+    bool isDragging = false;
+    size_t draggingImageIndex = SIZE_MAX; // Invalid index initially
+    POINT lastMousePos = { 0, 0 };
+    std::unique_ptr<Image> backgroundImage = nullptr;
+    std::vector<ImageItem> images;
+};
 
 // List of languages
 std::vector<std::wstring> languages = { L"РУС", L"ENG" }; // Russian and English
 int currentLanguageIndex = 0; // Current language index
 
-// List of additional images
-std::vector<ImageItem> images;
-
 // Function to load image from URL
-bool LoadImageFromURL(const std::wstring& url, Image*& outImage) {
+bool LoadImageFromURL(const std::wstring& url, std::unique_ptr<Image>& outImage) {
     HINTERNET hInternet = InternetOpen(L"ImageLoader", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (!hInternet) {
         OutputDebugString(L"InternetOpen failed\n");
@@ -43,7 +47,7 @@ bool LoadImageFromURL(const std::wstring& url, Image*& outImage) {
     }
 
     // Flags for opening URL: no cache and reading data as it downloads
-    HINTERNET hConnect = InternetOpenUrl(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD | INTERNET_FLAG_DONT_CACHE, 0);
+    HINTERNET hConnect = InternetOpenUrl(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD | INTERNET_FLAG_DONT_CACHE | INTERNET_FLAG_NO_CACHE_WRITE, 0);
     if (!hConnect) {
         OutputDebugString(L"InternetOpenUrl failed\n");
         InternetCloseHandle(hInternet);
@@ -91,17 +95,16 @@ bool LoadImageFromURL(const std::wstring& url, Image*& outImage) {
     stream->Seek(liZero, STREAM_SEEK_SET, NULL);
 
     // Load image from stream
-    Image* img = new Image(stream);
+    std::unique_ptr<Image> img(new Image(stream));
     stream->Release();
 
     // Check image load status
     if (img->GetLastStatus() != Ok) {
         OutputDebugString(L"Failed to create Image from stream\n");
-        delete img;
         return false;
     }
 
-    outImage = img;
+    outImage = std::move(img);
     OutputDebugString(L"Image loaded successfully\n");
     return true;
 }
@@ -122,7 +125,7 @@ std::wstring GetCurrentTimeString() {
 }
 
 // Function to initialize additional images
-bool InitializeImages() {
+bool InitializeImages(WindowData& winData) {
     // List of image URLs and corresponding titles
     std::vector<std::pair<std::wstring, std::wstring>> imageData = {
         { L"https://i.postimg.cc/63Y3mC8J/nyc01-temp-zg8pt-R0-FL1-KMi-Z8o-ZL4b.png", L"Новая папка" }, // New Folder
@@ -136,16 +139,16 @@ bool InitializeImages() {
     float spacing = 150.0f; // Reduced spacing for better layout
 
     for (size_t i = 0; i < imageData.size(); ++i) {
-        Image* img = nullptr;
+        std::unique_ptr<Image> img = nullptr;
         if (LoadImageFromURL(imageData[i].first, img)) {
             ImageItem item;
-            item.image = img;
+            item.image = std::move(img);
             item.title = imageData[i].second;
             item.x = startX + i * spacing; // Position along X-axis with spacing
             item.y = startY;                // Fixed Y position
             item.width = 100.0f;            // Image width
             item.height = 100.0f;           // Image height
-            images.push_back(item);
+            winData.images.push_back(std::move(item));
         }
         else {
             OutputDebugString((L"Failed to load image: " + imageData[i].first + L"\n").c_str());
@@ -155,13 +158,6 @@ bool InitializeImages() {
     return true;
 }
 
-// Structure to store window-specific data
-struct WindowData {
-    bool isDragging = false;
-    size_t draggingImageIndex = SIZE_MAX; // Invalid index initially
-    POINT lastMousePos = { 0, 0 };
-};
-
 // Window Procedure
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     // Retrieve WindowData
@@ -170,21 +166,33 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     switch (uMsg) {
     case WM_CREATE: {
         // Allocate and store WindowData
+        CREATESTRUCT* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
         WindowData* wndData = new WindowData();
+
+        // Assign to GWLP_USERDATA
         SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(wndData));
+
+        // Initialize images
+        if (!InitializeImages(*wndData)) {
+            MessageBox(hwnd, L"Не удалось загрузить дополнительные изображения. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
+            PostQuitMessage(0);
+        }
+
+        // Load background image
+        if (!LoadImageFromURL(L"https://i.pinimg.com/originals/56/cb/5f/56cb5ff3d83e4159c447b04d5d3a333e.jpg", wndData->backgroundImage)) {
+            MessageBox(hwnd, L"Не удалось загрузить фон. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
+            PostQuitMessage(0);
+        }
+
         return 0;
     }
 
     case WM_DESTROY:
         // Clean up WindowData
         if (data) {
+            // Unique pointers automatically clean up
             delete data;
-        }
-
-        // Delete loaded images
-        delete backgroundImage;
-        for (auto& imgItem : images) {
-            delete imgItem.image;
+            SetWindowLongPtr(hwnd, GWLP_USERDATA, 0);
         }
         PostQuitMessage(0);
         return 0;
@@ -210,6 +218,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     }
 
     case WM_PAINT: {
+        if (!data) {
+            return DefWindowProc(hwnd, uMsg, wParam, lParam);
+        }
+
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
         Graphics graphics(hdc);
@@ -224,9 +236,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         GetClientRect(hwnd, &windowRect);
 
         // Draw background image while maintaining aspect ratio
-        if (backgroundImage) {
-            UINT imgWidth = backgroundImage->GetWidth();
-            UINT imgHeight = backgroundImage->GetHeight();
+        if (data->backgroundImage) {
+            UINT imgWidth = data->backgroundImage->GetWidth();
+            UINT imgHeight = data->backgroundImage->GetHeight();
 
             double windowAspect = static_cast<double>(windowRect.right) / windowRect.bottom;
             double imageAspect = static_cast<double>(imgWidth) / imgHeight;
@@ -245,7 +257,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
             float x = static_cast<float>((windowRect.right - drawWidth) / 2.0);
             float y = static_cast<float>((windowRect.bottom - drawHeight) / 2.0);
-            graphics.DrawImage(backgroundImage, x, y, static_cast<REAL>(drawWidth), static_cast<REAL>(drawHeight));
+            graphics.DrawImage(data->backgroundImage.get(), x, y, static_cast<REAL>(drawWidth), static_cast<REAL>(drawHeight));
         }
 
         // Draw bottom panel
@@ -295,22 +307,24 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         graphics.DrawString(announcement.c_str(), -1, &largeFont, announcementPoint, &announcementBrush);
 
         // Draw additional images and their titles
-        for (const auto& imgItem : images) {
-            // Draw image
-            graphics.DrawImage(imgItem.image, imgItem.x, imgItem.y, imgItem.width, imgItem.height);
+        for (const auto& imgItem : data->images) {
+            if (imgItem.image) {
+                // Draw image
+                graphics.DrawImage(imgItem.image.get(), imgItem.x, imgItem.y, imgItem.width, imgItem.height);
 
-            // Draw title below the image, centered
-            Font titleFont(&fontFamily, 16, FontStyleRegular, UnitPixel);
-            SolidBrush titleBrush(Color(255, 255, 255, 255)); // White text color for titles
+                // Draw title below the image, centered
+                Font titleFont(&fontFamily, 16, FontStyleRegular, UnitPixel);
+                SolidBrush titleBrush(Color(255, 255, 255, 255)); // White text color for titles
 
-            RectF titleRect;
-            graphics.MeasureString(imgItem.title.c_str(), -1, &titleFont, PointF(0, 0), &titleRect);
+                RectF titleRect;
+                graphics.MeasureString(imgItem.title.c_str(), -1, &titleFont, PointF(0, 0), &titleRect);
 
-            float xTitle = imgItem.x + (imgItem.width - titleRect.Width) / 2.0f;
-            float yTitle = imgItem.y + imgItem.height + 5.0f; // Offset below image
+                float xTitle = imgItem.x + (imgItem.width - titleRect.Width) / 2.0f;
+                float yTitle = imgItem.y + imgItem.height + 5.0f; // Offset below image
 
-            PointF titlePoint(xTitle, yTitle);
-            graphics.DrawString(imgItem.title.c_str(), -1, &titleFont, titlePoint, &titleBrush);
+                PointF titlePoint(xTitle, yTitle);
+                graphics.DrawString(imgItem.title.c_str(), -1, &titleFont, titlePoint, &titleBrush);
+            }
         }
 
         EndPaint(hwnd, &ps);
@@ -324,9 +338,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             int mouseY = GET_Y_LPARAM(lParam);
             POINT mousePt = { mouseX, mouseY };
 
-            // Check if the click is on any image (from top to bottom)
-            for (size_t i = images.size(); i-- > 0; ) {
-                const auto& imgItem = images[i];
+            // Iterate from topmost to bottom to find the topmost image under the cursor
+            for (size_t i = data->images.size(); i-- > 0; ) {
+                const auto& imgItem = data->images[i];
                 RECT imgRect = {
                     static_cast<LONG>(imgItem.x),
                     static_cast<LONG>(imgItem.y),
@@ -343,10 +357,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                     SetCapture(hwnd);
 
                     // Bring the dragged image to the front
-                    ImageItem draggedItem = images[i];
-                    images.erase(images.begin() + i);
-                    images.push_back(draggedItem);
-                    data->draggingImageIndex = images.size() - 1;
+                    if (i != data->images.size() - 1) { // Check if not already the topmost
+                        ImageItem draggedItem = std::move(data->images[i]);
+                        data->images.erase(data->images.begin() + i);
+                        data->images.push_back(std::move(draggedItem));
+                        data->draggingImageIndex = data->images.size() - 1;
+                    }
 
                     InvalidateRect(hwnd, NULL, TRUE);
                     break;
@@ -357,7 +373,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     }
 
     case WM_MOUSEMOVE: {
-        if (data && data->isDragging && data->draggingImageIndex < images.size()) {
+        if (data && data->isDragging && data->draggingImageIndex < data->images.size()) {
             // Get current mouse position
             int mouseX = GET_X_LPARAM(lParam);
             int mouseY = GET_Y_LPARAM(lParam);
@@ -369,22 +385,22 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
             if (deltaX != 0 || deltaY != 0) {
                 // Update image position
-                images[data->draggingImageIndex].x += static_cast<float>(deltaX);
-                images[data->draggingImageIndex].y += static_cast<float>(deltaY);
+                data->images[data->draggingImageIndex].x += static_cast<float>(deltaX);
+                data->images[data->draggingImageIndex].y += static_cast<float>(deltaY);
 
                 // Get window dimensions
                 RECT windowRect;
                 GetClientRect(hwnd, &windowRect);
 
                 // Ensure the image stays within window bounds
-                if (images[data->draggingImageIndex].x < 0)
-                    images[data->draggingImageIndex].x = 0;
-                if (images[data->draggingImageIndex].y < 0)
-                    images[data->draggingImageIndex].y = 0;
-                if (images[data->draggingImageIndex].x + images[data->draggingImageIndex].width > windowRect.right)
-                    images[data->draggingImageIndex].x = windowRect.right - images[data->draggingImageIndex].width;
-                if (images[data->draggingImageIndex].y + images[data->draggingImageIndex].height > windowRect.bottom - 40) // 40 for panel
-                    images[data->draggingImageIndex].y = windowRect.bottom - 40 - images[data->draggingImageIndex].height;
+                if (data->images[data->draggingImageIndex].x < 0)
+                    data->images[data->draggingImageIndex].x = 0;
+                if (data->images[data->draggingImageIndex].y < 0)
+                    data->images[data->draggingImageIndex].y = 0;
+                if (data->images[data->draggingImageIndex].x + data->images[data->draggingImageIndex].width > windowRect.right)
+                    data->images[data->draggingImageIndex].x = windowRect.right - data->images[data->draggingImageIndex].width;
+                if (data->images[data->draggingImageIndex].y + data->images[data->draggingImageIndex].height > windowRect.bottom - 40) // 40 for panel
+                    data->images[data->draggingImageIndex].y = windowRect.bottom - 40 - data->images[data->draggingImageIndex].height;
 
                 // Update last mouse position
                 data->lastMousePos = currentPt;
@@ -458,22 +474,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     if (hwnd == NULL) {
         MessageBox(NULL, L"Не удалось создать окно.", L"Ошибка", MB_ICONERROR);
-        GdiplusShutdown(gdiplusToken);
-        return 0;
-    }
-
-    // Load background image from URL
-    if (!LoadImageFromURL(L"https://i.pinimg.com/originals/56/cb/5f/56cb5ff3d83e4159c447b04d5d3a333e.jpg", backgroundImage)) {
-        MessageBox(hwnd, L"Не удалось загрузить фон. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
-        DestroyWindow(hwnd);
-        GdiplusShutdown(gdiplusToken);
-        return 0;
-    }
-
-    // Initialize additional images
-    if (!InitializeImages()) {
-        MessageBox(hwnd, L"Не удалось загрузить дополнительные изображения. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
-        DestroyWindow(hwnd);
         GdiplusShutdown(gdiplusToken);
         return 0;
     }

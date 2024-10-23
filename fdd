@@ -154,17 +154,20 @@ void PlaySoundByLanguage(const std::wstring& soundName) {
 
 // Function to initialize additional images
 bool InitializeImages() {
-    // List of image URLs and corresponding titles
+    // Список URL изображений и соответствующих названий
     std::vector<std::pair<std::wstring, std::wstring>> imageData = {
         { L"https://i.postimg.cc/63Y3mC8J/nyc01-temp-zg8pt-R0-FL1-KMi-Z8o-ZL4b.png", L"Новая папка" }, // New Folder
         { L"https://i.postimg.cc/0Q12Jw0R/fra01-temp-r-MINe9-WDa-DPi-KQl-Rb3p-F-processed.png", L"Этот компьютер" }, // This Computer
-        // Add more images as needed
+        // Добавляем иконки Wi-Fi, Звук и Батарея
+        { L"https://example.com/icons/wifi.png", L"Wi-Fi" },
+        { L"https://example.com/icons/sound.png", L"Звук" },
+        { L"https://example.com/icons/battery.png", L"Батарея" },
     };
 
-    // Initial positions for images
+    // Начальные позиции для изображений
     float startX = 50.0f;
-    float startY = 150.0f; // Positioned below the announcement
-    float spacing = 150.0f; // Reduced spacing for better layout
+    float startY = 150.0f; // Расположены ниже объявления
+    float spacing = 100.0f; // Изменено для лучшего размещения
 
     for (size_t i = 0; i < imageData.size(); ++i) {
         Image* img = nullptr;
@@ -172,20 +175,19 @@ bool InitializeImages() {
             ImageItem item;
             item.image = img;
             item.title = imageData[i].second;
-            item.x = startX + i * spacing; // Position along X-axis with spacing
-            item.y = startY; // Fixed Y position
-            item.width = 100.0f; // Image width
-            item.height = 100.0f; // Image height
+            item.x = startX + i * spacing; // Позиция по оси X с отступом
+            item.y = startY; // Фиксированная позиция по Y
+            item.width = 50.0f; // Ширина иконки
+            item.height = 50.0f; // Высота иконки
             images.push_back(item);
         }
         else {
-            OutputDebugString((L"Failed to load image: " + imageData[i].first + L"\n").c_str());
+            OutputDebugString((L"Не удалось загрузить изображение: " + imageData[i].first + L"\n").c_str());
             return false;
         }
     }
     return true;
 }
-
 // Structure to store window-specific data
 struct WindowData {
     bool isDragging = false;

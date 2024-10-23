@@ -9,38 +9,35 @@
 #include <locale>
 #include <codecvt>
 #include <windowsx.h>
+#include <mmsystem.h> // For PlaySound
 
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "wininet.lib")
+#pragma comment(lib, "winmm.lib") // Link with winmm.lib for PlaySound
 
 using namespace Gdiplus;
 
-// Структура для хранения информации об изображении
+// Structure to store image information
 struct ImageItem {
     Image* image;
     std::wstring title;
-    float x; // Координата X на экране
-    float y; // Координата Y на экране
-    float width; // Ширина отображаемого изображения
-    float height; // Высота отображаемого изображения
+    float x; // X-coordinate on the screen
+    float y; // Y-coordinate on the screen
+    float width; // Width of the displayed image
+    float height; // Height of the displayed image
 };
 
-// Глобальные переменные
+// Global Variables
 Image* backgroundImage = nullptr;
 
-// Дополнительные значки
-Image* wifiIcon = nullptr;
-Image* soundIcon = nullptr;
-Image* batteryIcon = nullptr;
+// List of languages
+std::vector<std::wstring> languages = { L"РУС", L"ENG" }; // Russian and English
+int currentLanguageIndex = 0; // Current language index
 
-// Список языков
-std::vector<std::wstring> languages = { L"РУС", L"ENG" }; // Русский и Английский
-int currentLanguageIndex = 0; // Текущий индекс языка
-
-// Список дополнительных изображений
+// List of additional images
 std::vector<ImageItem> images;
 
-// Функция загрузки изображения из URL
+// Function to load image from URL
 bool LoadImageFromURL(const std::wstring& url, Image*& outImage) {
     HINTERNET hInternet = InternetOpen(L"ImageLoader", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (!hInternet) {
@@ -48,7 +45,7 @@ bool LoadImageFromURL(const std::wstring& url, Image*& outImage) {
         return false;
     }
 
-    // Флаги для открытия URL: без кеша и чтение данных по мере загрузки
+    // Flags for opening URL: no cache and reading data as it downloads
     HINTERNET hConnect = InternetOpenUrl(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD | INTERNET_FLAG_DONT_CACHE, 0);
     if (!hConnect) {
         OutputDebugString(L"InternetOpenUrl failed\n");
@@ -56,7 +53,7 @@ bool LoadImageFromURL(const std::wstring& url, Image*& outImage) {
         return false;
     }
 
-    // Чтение всех данных
+    // Read all data
     std::vector<BYTE> buffer;
     DWORD bytesAvailable = 0;
     DWORD bytesRead = 0;
@@ -79,7 +76,7 @@ bool LoadImageFromURL(const std::wstring& url, Image*& outImage) {
         return false;
     }
 
-    // Создание потока из буфера
+    // Create a stream from the buffer
     IStream* stream = nullptr;
     if (FAILED(CreateStreamOnHGlobal(NULL, TRUE, &stream))) {
         OutputDebugString(L"CreateStreamOnHGlobal failed\n");
@@ -96,11 +93,11 @@ bool LoadImageFromURL(const std::wstring& url, Image*& outImage) {
     LARGE_INTEGER liZero = {};
     stream->Seek(liZero, STREAM_SEEK_SET, NULL);
 
-    // Загрузка изображения из потока
+    // Load image from stream
     Image* img = new Image(stream);
     stream->Release();
 
-    // Проверка статуса загрузки изображения
+    // Check image load status
     if (img->GetLastStatus() != Ok) {
         OutputDebugString(L"Failed to create Image from stream\n");
         delete img;
@@ -112,34 +109,62 @@ bool LoadImageFromURL(const std::wstring& url, Image*& outImage) {
     return true;
 }
 
-// Функция получения текущего времени в виде строки
+// Function to get current time as string
 std::wstring GetCurrentTimeString() {
     using namespace std::chrono;
     auto now = system_clock::now();
     std::time_t now_c = system_clock::to_time_t(now);
     std::tm parts;
 
-    // Используем localtime_s для потокобезопасности
+    // Use localtime_s for thread safety
     localtime_s(&parts, &now_c);
 
     std::wstringstream ss;
-    ss << std::put_time(&parts, L"%H:%M"); // Формат времени ЧЧ:ММ
+    ss << std::put_time(&parts, L"%H:%M"); // Time format HH:MM
     return ss.str();
 }
 
-// Функция инициализации дополнительных изображений
+// Function to play a sound
+void PlaySoundByLanguage(const std::wstring& soundName) {
+    // Define sound file paths or use system sounds
+    // For demonstration, we'll use system sounds based on soundName
+    // You can replace this with actual file paths or URLs
+
+    std::wstring soundPath;
+    if (currentLanguageIndex == 0) { // Russian
+        if (soundName == L"WindowsLogo") {
+            // Play a system sound or specify a custom path
+            // Example: PlaySound(L"C:\\Sounds\\windows_logo.wav", NULL, SND_FILENAME | SND_ASYNC);
+            PlaySound(MAKEINTRESOURCE(IDR_WAVE1), NULL, SND_RESOURCE | SND_ASYNC);
+        }
+        else if (soundName == L"WiFi") {
+            PlaySound(MAKEINTRESOURCE(IDR_WAVE2), NULL, SND_RESOURCE | SND_ASYNC);
+        }
+        else if (soundName == L"BatteryCharging") {
+            PlaySound(MAKEINTRESOURCE(IDR_WAVE3), NULL, SND_RESOURCE | SND_ASYNC);
+        }
+        else if (soundName == L"Triangle") {
+            PlaySound(MAKEINTRESOURCE(IDR_WAVE4), NULL, SND_RESOURCE | SND_ASYNC);
+        }
+    }
+    else { // English or other languages
+        // Optionally, play different sounds or no sounds
+    }
+}
+
+// Function to initialize additional images
 bool InitializeImages() {
-    // Список URL-адресов изображений и соответствующих заголовков
+    // List of image URLs and corresponding titles
     std::vector<std::pair<std::wstring, std::wstring>> imageData = {
         { L"https://i.postimg.cc/63Y3mC8J/nyc01-temp-zg8pt-R0-FL1-KMi-Z8o-ZL4b.png", L"Новая папка" }, // New Folder
-        { L"https://i.postimg.cc/0Q12Jw0R/fra01-temp-r-MINe9-WDa-DPi-KQl-Rb3p-F-processed.png", L"Этот компьютер" } // This Computer
-        // Добавьте больше изображений по мере необходимости
+        { L"https://i.postimg.cc/0Q12Jw0R/fra01-temp-r-MINe9-WDa-DPi-KQl-Rb3p-F-processed.png", L"Этот компьютер" }, // This Computer
+        // Add more images as needed
     };
 
-    // Начальные позиции для изображений
+    // Initial positions for images
     float startX = 50.0f;
-    float startY = 150.0f; // Размещены ниже объявления
-    float spacing = 150.0f; // Уменьшенное расстояние для лучшей компоновки
+    float startY = 150.0f; // Positioned below the announcement
+    float spacing = 150.0f; // Reduced spacing for better layout
 
     for (size_t i = 0; i < imageData.size(); ++i) {
         Image* img = nullptr;
@@ -147,10 +172,10 @@ bool InitializeImages() {
             ImageItem item;
             item.image = img;
             item.title = imageData[i].second;
-            item.x = startX + i * spacing; // Позиция по оси X с учетом расстояния
-            item.y = startY; // Фиксированная позиция Y
-            item.width = 100.0f; // Ширина изображения
-            item.height = 100.0f; // Высота изображения
+            item.x = startX + i * spacing; // Position along X-axis with spacing
+            item.y = startY; // Fixed Y position
+            item.width = 100.0f; // Image width
+            item.height = 100.0f; // Image height
             images.push_back(item);
         }
         else {
@@ -161,81 +186,105 @@ bool InitializeImages() {
     return true;
 }
 
-// Функция инициализации значков
-bool InitializeIcons() {
-    // URL-адреса значков (замените на свои или используйте локальные пути)
-    std::vector<std::pair<std::wstring, Image**>> iconData = {
-        { L"https://example.com/path/to/wifi_icon.png", &wifiIcon },
-        { L"https://example.com/path/to/sound_icon.png", &soundIcon },
-        { L"https://example.com/path/to/battery_icon.png", &batteryIcon }
-    };
-
-    for (const auto& [url, imagePtr] : iconData) {
-        if (!LoadImageFromURL(url, *imagePtr)) {
-            OutputDebugString((L"Не удалось загрузить значок: " + url + L"\n").c_str());
-            return false;
-        }
-    }
-    return true;
-}
-
-// Структура для хранения данных окна
+// Structure to store window-specific data
 struct WindowData {
     bool isDragging = false;
-    size_t draggingImageIndex = SIZE_MAX; // Недопустимый индекс изначально
+    size_t draggingImageIndex = SIZE_MAX; // Invalid index initially
     POINT lastMousePos = { 0, 0 };
 };
 
-// Процедура окна
+// Function to create a context menu
+void CreateContextMenu(HWND hwnd, int x, int y, const std::wstring& title) {
+    HMENU hMenu = CreatePopupMenu();
+    if (hMenu) {
+        if (title == L"Новая папка") { // New Folder
+            AppendMenu(hMenu, MF_STRING, 1, L"Открыть");  // Open
+            AppendMenu(hMenu, MF_STRING, 2, L"Переименовать"); // Rename
+            AppendMenu(hMenu, MF_STRING, 3, L"Удалить"); // Delete
+
+            // Set foreground to ensure the menu disappears correctly
+            SetForegroundWindow(hwnd);
+
+            // Track the popup menu
+            int cmd = TrackPopupMenu(
+                hMenu,
+                TPM_RETURNCMD | TPM_TOPALIGN | TPM_LEFTALIGN,
+                x,
+                y,
+                0,
+                hwnd,
+                NULL
+            );
+
+            // Handle menu selections
+            if (cmd == 1) { // Open
+                MessageBox(hwnd, L"Открыть выбранной папку.", L"Открыть", MB_OK);
+            }
+            else if (cmd == 2) { // Rename
+                MessageBox(hwnd, L"Функция переименования не реализована.", L"Переименовать", MB_OK);
+            }
+            else if (cmd == 3) { // Delete
+                MessageBox(hwnd, L"Функция удаления не реализована.", L"Удалить", MB_OK);
+            }
+
+            DestroyMenu(hMenu);
+        }
+        // Add more context menus for other titles if needed
+    }
+}
+
+// Window Procedure
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    // Получение данных окна
+    // Retrieve WindowData
     WindowData* data = reinterpret_cast<WindowData*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
 
     switch (uMsg) {
     case WM_CREATE: {
-        // Выделение и сохранение данных окна
+        // Allocate and store WindowData
         WindowData* wndData = new WindowData();
         SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(wndData));
         return 0;
     }
 
     case WM_DESTROY:
-        // Очистка данных окна
+        // Clean up WindowData
         if (data) {
             delete data;
         }
 
-        // Удаление загруженных изображений
+        // Delete loaded images
         delete backgroundImage;
         for (auto& imgItem : images) {
             delete imgItem.image;
         }
-
-        // Удаление загруженных значков
-        delete wifiIcon;
-        delete soundIcon;
-        delete batteryIcon;
-
         PostQuitMessage(0);
         return 0;
 
     case WM_KEYDOWN:
-        // Проверка нажатия клавиши Esc для закрытия окна
+        // Check for Esc key to close the window
         if (wParam == VK_ESCAPE) {
-            DestroyWindow(hwnd); // Закрыть окно
+            DestroyWindow(hwnd); // Close window
         }
 
-        // Обработка переключения языка через Alt+Shift или Win+Space
+        // Handle language switching via Alt+Shift or Win+Space
         if (((GetAsyncKeyState(VK_MENU) & 0x8000) && wParam == VK_SHIFT) ||
             ((GetAsyncKeyState(VK_LWIN) & 0x8000) && wParam == VK_SPACE)) {
-            currentLanguageIndex = (currentLanguageIndex + 1) % languages.size(); // Переключение языка
-            InvalidateRect(hwnd, NULL, TRUE); // Перерисовка окна
+            currentLanguageIndex = (currentLanguageIndex + 1) % languages.size(); // Switch language
+            InvalidateRect(hwnd, NULL, TRUE); // Redraw window
+
+            // Play sounds if language is Russian
+            if (languages[currentLanguageIndex] == L"РУС") {
+                PlaySoundByLanguage(L"WindowsLogo");
+                PlaySoundByLanguage(L"WiFi");
+                PlaySoundByLanguage(L"BatteryCharging");
+                PlaySoundByLanguage(L"Triangle");
+            }
         }
 
         return 0;
 
     case WM_SIZE: {
-        InvalidateRect(hwnd, NULL, TRUE); // Перерисовка окна при изменении размера
+        InvalidateRect(hwnd, NULL, TRUE); // Redraw window on resize
         return 0;
     }
 
@@ -244,16 +293,16 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         HDC hdc = BeginPaint(hwnd, &ps);
         Graphics graphics(hdc);
 
-        // Настройки высокого качества рендеринга
+        // Set high-quality rendering settings
         graphics.SetSmoothingMode(SmoothingModeHighQuality);
         graphics.SetInterpolationMode(InterpolationModeHighQualityBicubic);
         graphics.SetPixelOffsetMode(PixelOffsetModeHighQuality);
 
-        // Получение размеров окна
+        // Get window dimensions
         RECT windowRect;
         GetClientRect(hwnd, &windowRect);
 
-        // Отрисовка фонового изображения с сохранением пропорций
+        // Draw background image while maintaining aspect ratio
         if (backgroundImage) {
             UINT imgWidth = backgroundImage->GetWidth();
             UINT imgHeight = backgroundImage->GetHeight();
@@ -263,12 +312,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
             double drawWidth, drawHeight;
             if (windowAspect > imageAspect) {
-                // Окно шире изображения
+                // Window is wider than image
                 drawHeight = windowRect.bottom;
                 drawWidth = imageAspect * drawHeight;
             }
             else {
-                // Окно уже или равно по пропорции
+                // Window is narrower or equal to image
                 drawWidth = windowRect.right;
                 drawHeight = drawWidth / imageAspect;
             }
@@ -278,88 +327,73 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             graphics.DrawImage(backgroundImage, x, y, static_cast<REAL>(drawWidth), static_cast<REAL>(drawHeight));
         }
 
-        // Отрисовка нижней панели
+        // Draw bottom panel
         RECT panelRect = { 0, windowRect.bottom - 40, windowRect.right, windowRect.bottom };
-        FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1)); // Цвет панели
+        FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1)); // Panel color
 
-        // Отрисовка значков Wi-Fi, звука и батареи на панели
-        if (wifiIcon && soundIcon && batteryIcon) {
-            float iconSize = 24.0f; // Размер значка
-            float padding = 10.0f; // Отступ от правого края панели
-            float spacing = 10.0f; // Расстояние между значками
-
-            // Позиция Y значков (по вертикали центр панели)
-            float yIcon = static_cast<float>(windowRect.bottom - 40) + (40 - iconSize) / 2.0f;
-
-            // Позиция X для батареи (самый правый):
-            float xBattery = static_cast<float>(windowRect.right - padding - iconSize);
-            graphics.DrawImage(batteryIcon, xBattery, yIcon, iconSize, iconSize);
-
-            // Позиция X для звука:
-            float xSound = xBattery - spacing - iconSize;
-            graphics.DrawImage(soundIcon, xSound, yIcon, iconSize, iconSize);
-
-            // Позиция X для Wi-Fi:
-            float xWifi = xSound - spacing - iconSize;
-            graphics.DrawImage(wifiIcon, xWifi, yIcon, iconSize, iconSize);
-        }
-
-        // Отрисовка времени и текущего языка
+        // Get current time
         std::wstring timeString = GetCurrentTimeString();
-        std::wstring langString = languages[currentLanguageIndex]; // Текущий язык
+        std::wstring langString = languages[currentLanguageIndex]; // Current language
 
-        // Используем GDI+ для отрисовки текста
-        FontFamily fontFamily(L"Segoe UI");
-        Font font(&fontFamily, 14, FontStyleRegular, UnitPixel);
-        SolidBrush brush(Color(255, 0, 0, 0)); // Черный цвет текста
+        // Use GDI+ to draw text
+        FontFamily fontFamily(L"Segoe UI"); // Font selection
+        Font font(&fontFamily, 14, FontStyleRegular, UnitPixel); // Font size
+        SolidBrush brush(Color(255, 0, 0, 0)); // Black text color
 
-        // Измерение размеров текста
+        // Measure text sizes
         RectF timeRect;
         graphics.MeasureString(timeString.c_str(), -1, &font, PointF(0, 0), &timeRect);
         RectF langRect;
         graphics.MeasureString(langString.c_str(), -1, &font, PointF(0, 0), &langRect);
 
-        // Вычисление позиций для текста
-        float paddingText = 15.0f;
-        float xTime = static_cast<float>(windowRect.right - timeRect.Width - langRect.Width - 30); // Отступ справа
-        float yText = static_cast<float>(windowRect.bottom - 40 + (40 - timeRect.Height) / 2.0 - 1); // Вертикальное выравнивание
+        // Calculate positions for text
+        float padding = 15.0f;
+        float xTime
+            = static_cast<float>(windowRect.right - timeRect.Width - langRect.Width - 30); // Right margin
+        float yText = static_cast<float>(windowRect.bottom - 40 + (40 - timeRect.Height) / 2.0 - 1); // Vertical alignment
 
-        // Отрисовка текущего языка
-        PointF langPoint(xTime - langRect.Width - 10, yText); // Позиция слева от времени
+        // Draw current language
+        PointF langPoint(xTime - langRect.Width - 10, yText); // Position to the left of time
         graphics.DrawString(langString.c_str(), -1, &font, langPoint, &brush);
 
-        // Отрисовка текущего времени
+        // Draw current time
         PointF timePoint(xTime, yText);
         graphics.DrawString(timeString.c_str(), -1, &font, timePoint, &brush);
 
-        // Добавление объявления ОС по центру экрана
-        std::wstring announcement = L"Introducing Orega OS: The Future of Performance!";
+        // Add OS announcement at the center of the screen
+        std::wstring announcement;
+        if (languages[currentLanguageIndex] == L"РУС") {
+            announcement = L"Представляем Orega OS: Будущее Производительности!";
+        }
+        else {
+            announcement = L"Introducing Orega OS: The Future of Performance!";
+        }
         RectF announcementRect;
-        Font largeFont(&fontFamily, 40, FontStyleBold, UnitPixel);
+        Font largeFont(&fontFamily, 40, FontStyleBold, UnitPixel); // Font for announcement
         graphics.MeasureString(announcement.c_str(), -1, &largeFont, PointF(0, 0), &announcementRect);
 
-        // Позиция объявления по центру
+        // Position announcement at the center
         float xAnnouncement = (static_cast<float>(windowRect.right) - announcementRect.Width) / 2.0f;
         float yAnnouncement = (static_cast<float>(windowRect.bottom) - announcementRect.Height) / 2.0f;
         PointF announcementPoint(xAnnouncement, yAnnouncement);
 
-        SolidBrush announcementBrush(Color(255, 255, 255, 255)); // Белый цвет текста для объявления
+        SolidBrush announcementBrush(Color(255, 255, 255, 255)); // White text color for announcement
         graphics.DrawString(announcement.c_str(), -1, &largeFont, announcementPoint, &announcementBrush);
 
-        // Отрисовка дополнительных изображений и их заголовков
+        // Draw additional images and their titles
         for (const auto& imgItem : images) {
-            // Отрисовка изображения
+            // Draw image
             graphics.DrawImage(imgItem.image, imgItem.x, imgItem.y, imgItem.width, imgItem.height);
 
-            // Отрисовка заголовка под изображением, центрировано
+            // Draw title below the image, centered
             Font titleFont(&fontFamily, 16, FontStyleRegular, UnitPixel);
-            SolidBrush titleBrush(Color(255, 255, 255, 255)); // Белый цвет текста для заголовков
+            SolidBrush titleBrush(Color(255, 255, 255, 255)); // White text color for titles
 
             RectF titleRect;
             graphics.MeasureString(imgItem.title.c_str(), -1, &titleFont, PointF(0, 0), &titleRect);
 
             float xTitle = imgItem.x + (imgItem.width - titleRect.Width) / 2.0f;
-            float yTitle = imgItem.y + imgItem.height + 5.0f; // Смещение ниже изображения
+            float yTitle = imgItem.y + imgItem.height + 5.0f; // Offset below image
 
             PointF titlePoint(xTitle, yTitle);
             graphics.DrawString(imgItem.title.c_str(), -1, &titleFont, titlePoint, &titleBrush);
@@ -371,13 +405,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
     case WM_LBUTTONDOWN: {
         if (data) {
-            // Получение позиции мыши
+            // Get mouse position
             int mouseX = GET_X_LPARAM(lParam);
             int mouseY = GET_Y_LPARAM(lParam);
             POINT mousePt = { mouseX, mouseY };
 
-            // Проверка, находится ли клик на каком-либо изображении (сверху вниз)
-            for (size_t i = images.size(); i-- > 0; ) {
+            // Check if the click is on any image (from top to bottom)
+            for (size_t i = images.size(); i-- > 0;) {
                 const auto& imgItem = images[i];
                 RECT imgRect = {
                     static_cast<LONG>(imgItem.x),
@@ -386,15 +420,16 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                     static_cast<LONG>(imgItem.y + imgItem.height)
                 };
                 if (PtInRect(&imgRect, mousePt)) {
-                    // Начало перетаскивания
+                    // Determine if it's a click or drag
+                    // For simplicity, assume it's a click if no movement occurs
                     data->isDragging = true;
                     data->draggingImageIndex = i;
                     data->lastMousePos = mousePt;
 
-                    // Захват мыши
+                    // Capture the mouse
                     SetCapture(hwnd);
 
-                    // Перемещение перетаскиваемого изображения наверх
+                    // Bring the dragged image to the front
                     ImageItem draggedItem = images[i];
                     images.erase(images.begin() + i);
                     images.push_back(draggedItem);
@@ -408,27 +443,33 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         return 0;
     }
 
+    case WM_RBUTTONDOWN: {
+        // Optional: Handle right-clicks for context menus
+        // Not implemented in this example
+        return 0;
+    }
+
     case WM_MOUSEMOVE: {
         if (data && data->isDragging && data->draggingImageIndex < images.size()) {
-            // Получение текущей позиции мыши
+            // Get current mouse position
             int mouseX = GET_X_LPARAM(lParam);
             int mouseY = GET_Y_LPARAM(lParam);
             POINT currentPt = { mouseX, mouseY };
 
-            // Вычисление изменения позиции
+            // Calculate movement delta
             int deltaX = currentPt.x - data->lastMousePos.x;
             int deltaY = currentPt.y - data->lastMousePos.y;
 
             if (deltaX != 0 || deltaY != 0) {
-                // Обновление позиции изображения
+                // Update image position
                 images[data->draggingImageIndex].x += static_cast<float>(deltaX);
                 images[data->draggingImageIndex].y += static_cast<float>(deltaY);
 
-                // Получение размеров окна
+                // Get window dimensions
                 RECT windowRect;
                 GetClientRect(hwnd, &windowRect);
 
-                // Обеспечение, чтобы изображение оставалось в пределах окна
+                // Ensure the image stays within window bounds
                 if (images[data->draggingImageIndex].x < 0)
                     images[data->draggingImageIndex].x = 0;
                 if (images[data->draggingImageIndex].y < 0)
@@ -436,13 +477,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 if (images[data->draggingImageIndex].x +
                     images[data->draggingImageIndex].width > windowRect.right)
                     images[data->draggingImageIndex].x = windowRect.right - images[data->draggingImageIndex].width;
-                if (images[data->draggingImageIndex].y + images[data->draggingImageIndex].height > windowRect.bottom - 40) // 40 для панели
+                if (images[data->draggingImageIndex].y + images[data->draggingImageIndex].height > windowRect.bottom - 40) // 40 for panel
                     images[data->draggingImageIndex].y = windowRect.bottom - 40 - images[data->draggingImageIndex].height;
 
-                // Обновление последней позиции мыши
+                // Update last mouse position
                 data->lastMousePos = currentPt;
 
-                // Перерисовка окна
+                // Redraw window
                 InvalidateRect(hwnd, NULL, TRUE);
             }
         }
@@ -450,13 +491,31 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     }
 
     case WM_LBUTTONUP: {
-        if (data && data->isDragging) {
-            // Окончание перетаскивания
-            data->isDragging = false;
-            data->draggingImageIndex = SIZE_MAX;
-
-            // Освобождение захвата мыши
+        if (data) {
+            // Release the mouse capture
             ReleaseCapture();
+
+            if (data->isDragging && data->draggingImageIndex < images.size()) {
+                // Determine if it was a click or a drag based on movement
+                // For simplicity, treat it as a click if the position hasn't changed much
+                // Implement more robust click vs. drag detection if needed
+
+                // Find if the mouse was released near the last position
+                int mouseX = GET_X_LPARAM(lParam);
+                int mouseY = GET_Y_LPARAM(lParam);
+                POINT currentPt = { mouseX, mouseY };
+                int distance = abs(currentPt.x - data->lastMousePos.x) + abs(currentPt.y - data->lastMousePos.y);
+
+                if (distance < 5) { // Threshold for click
+                    // It's a click, not a drag
+                    std::wstring clickedTitle = images[data->draggingImageIndex].title;
+                    CreateContextMenu(hwnd, mouseX, mouseY, clickedTitle);
+                }
+
+                // Stop dragging
+                data->isDragging = false;
+                data->draggingImageIndex = SIZE_MAX;
+            }
         }
         return 0;
     }
@@ -466,11 +525,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     }
 }
 
-// Главная функция приложения
+// Main Application Function
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     const wchar_t CLASS_NAME[] = L"FullscreenWindowClass";
 
-    // Инициализация GDI+
+    // Initialize GDI+
     GdiplusStartupInput gdiplusStartupInput;
     ULONG_PTR gdiplusToken;
     if (GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL) != Ok) {
@@ -478,7 +537,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         return 0;
     }
 
-    // Определение класса окна
+    // Define window class
     WNDCLASS wc = {};
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
@@ -492,17 +551,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         return 0;
     }
 
-    // Получение размеров экрана
+    // Get screen dimensions
     int screenWidth = GetSystemMetrics(SM_CXSCREEN);
     int screenHeight = GetSystemMetrics(SM_CYSCREEN);
 
-    // Создание окна
+    // Create window
     HWND hwnd = CreateWindowEx(
-        WS_EX_TOPMOST, // Всегда поверх
+        WS_EX_TOPMOST, // Window always on top
         CLASS_NAME,
         L"Orega OS Presentation",
-        WS_POPUP, // Без рамок
-        0, 0, screenWidth, screenHeight, // Позиция и размер
+        WS_POPUP, // Remove window borders
+        0, 0, screenWidth, screenHeight, // Window position and size
         NULL,
         NULL,
         hInstance,
@@ -515,7 +574,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         return 0;
     }
 
-    // Загрузка фонового изображения из URL
+    // Load background image from URL
     if (!LoadImageFromURL(L"https://i.pinimg.com/originals/56/cb/5f/56cb5ff3d83e4159c447b04d5d3a333e.jpg", backgroundImage)) {
         MessageBox(hwnd, L"Не удалось загрузить фон. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
         DestroyWindow(hwnd);
@@ -523,17 +582,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         return 0;
     }
 
-    // Инициализация дополнительных изображений
+    // Initialize additional images
     if (!InitializeImages()) {
         MessageBox(hwnd, L"Не удалось загрузить дополнительные изображения. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
-        DestroyWindow(hwnd);
-        GdiplusShutdown(gdiplusToken);
-        return 0;
-    }
-
-    // Инициализация значков
-    if (!InitializeIcons()) {
-        MessageBox(hwnd, L"Не удалось загрузить значки. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
         DestroyWindow(hwnd);
         GdiplusShutdown(gdiplusToken);
         return 0;
@@ -542,14 +593,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     ShowWindow(hwnd, nCmdShow);
     UpdateWindow(hwnd);
 
-    // Цикл сообщений
+    // Message loop
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
-    // Освобождение ресурсов GDI+
+    // Shutdown GDI+
     GdiplusShutdown(gdiplusToken);
     return 0;
 }

@@ -383,23 +383,26 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         graphics.DrawString(announcement.c_str(), -1, &largeFont, announcementPoint, &announcementBrush);
 
         // Draw additional images and their titles
-        for (const auto& imgItem : images) {
-            // Draw image
-            graphics.DrawImage(imgItem.image, imgItem.x, imgItem.y, imgItem.width, imgItem.height);
+for (const auto& imgItem : images) {
+    // Определяем, находится ли иконка в нижней панели
+    if (imgItem.y > (windowRect.bottom - 100)) { // Предполагаем, что нижняя панель имеет высоту 100
+        // Отрисовка иконки
+        graphics.DrawImage(imgItem.image, imgItem.x, imgItem.y, imgItem.width, imgItem.height);
 
-            // Draw title below the image, centered
-            Font titleFont(&fontFamily, 16, FontStyleRegular, UnitPixel);
-            SolidBrush titleBrush(Color(255, 255, 255, 255)); // White text color for titles
+        // Отрисовка заголовка под иконкой
+        Font titleFont(&fontFamily, 12, FontStyleRegular, UnitPixel);
+        SolidBrush titleBrush(Color(255, 255, 255, 255)); // Белый цвет текста
 
-            RectF titleRect;
-            graphics.MeasureString(imgItem.title.c_str(), -1, &titleFont, PointF(0, 0), &titleRect);
+        RectF titleRect;
+        graphics.MeasureString(imgItem.title.c_str(), -1, &titleFont, PointF(0, 0), &titleRect);
 
-            float xTitle = imgItem.x + (imgItem.width - titleRect.Width) / 2.0f;
-            float yTitle = imgItem.y + imgItem.height + 5.0f; // Offset below image
+        float xTitle = imgItem.x + (imgItem.width - titleRect.Width) / 2.0f;
+        float yTitle = imgItem.y + imgItem.height + 5.0f; // Смещение под иконкой
 
-            PointF titlePoint(xTitle, yTitle);
-            graphics.DrawString(imgItem.title.c_str(), -1, &titleFont, titlePoint, &titleBrush);
-        }
+        PointF titlePoint(xTitle, yTitle);
+        graphics.DrawString(imgItem.title.c_str(), -1, &titleFont, titlePoint, &titleBrush);
+    }
+}
 
         EndPaint(hwnd, &ps);
         return 0;

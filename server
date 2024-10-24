@@ -1,1 +1,177 @@
+# server.py
+import socket
+import threading
+import logging
+import os
 
+# Настройки сервера
+HOST = '0.0.0.0'  # Привязка к всем интерфейсам
+PORT = 8080
+BUFFER_SIZE = 4096  # Размер буфера для передачи данных
+
+# Логирование
+logging.basicConfig(
+    filename='smp_server.log',
+    level=logging.INFO,
+    format='%(asctime)s:%(levelname)s:%(message)s'
+)
+
+# Карта ресурсов
+domain_mapping = {
+    'example.com': {
+        'html_file': 'index.html',
+        'css_file': 'styles.css',
+        'image_file': 'img.png'
+    },
+    'test.com': {
+        'html_file': 'test.html',
+        'css_file': 'style_test.css',
+        'image_file': 'image_test.jpg'
+    }
+}
+
+def send_large_file(conn, filepath):
+    """Отправка больших файлов по частям."""
+    if not os.path.exists(filepath):
+        logging.error(f"File not found: {filepath}")
+        response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: File not found\n\n"
+        conn.send(response.encode())
+        return
+
+    try:
+        file_size = os.path.getsize(filepath)
+        # Определение типа контента на основе расширения файла
+        _, ext = os.path.splitext(filepath)
+        ext = ext.lower()
+        if ext == '.html' or ext == '.htm':
+            content_type = 'text/html'
+        elif ext == '.css':
+            content_type = 'text/css'
+        elif ext in ['.png']:
+            content_type = 'image/png'
+        elif ext in ['.jpg', '.jpeg']:
+            content_type = 'image/jpeg'
+        else:
+            content_type = 'application/octet-stream'
+
+        # Отправка заголовков
+        response_headers = (
+            "SMP 1.0\n"
+            "STATUS: OK\n"
+            f"CONTENT-TYPE: {content_type}\n"
+            f"CONTENT-LENGTH: {file_size}\n\n"
+        )
+        conn.send(response_headers.encode())
+        logging.info(f"Начинаем отправку файла {filepath}")
+
+        with open(filepath, 'rb') as f:
+            while True:
+                chunk = f.read(BUFFER_SIZE)
+                if not chunk:
+                    break
+                conn.sendall(chunk)
+        logging.info(f"Файл {filepath} успешно отправлен.")
+    except Exception as e:
+        logging.error(f"Ошибка при отправке файла {filepath}: {e}")
+        response = f"SMP 1.0\nSTATUS: ERROR\nMESSAGE: Error while sending file: {e}\n\n"
+        conn.send(response.encode())
+
+def handle_client(conn, addr):
+    logging.info(f"Подключен: {addr}")
+    initial_message = "SMP 1.0\nSTATUS: OK\nMESSAGE: Connected successfully\n\n"
+    conn.send(initial_message.encode())
+    logging.info(f"Отправлено {addr}:\n{initial_message}")
+
+    while True:
+        try:
+            data = b""
+            while b"\n\n" not in data:
+                part = conn.recv(BUFFER_SIZE)
+                if not part:
+                    raise ConnectionResetError("Соединение закрыто клиентом")
+                data += part
+
+            header_data, _, body = data.partition(b"\n\n")
+            headers = {}
+            for line in header_data.decode().split('\n'):
+                if ': ' in line:
+                    key, value = line.split(': ', 1)
+                    headers[key.strip()] = value.strip()
+
+            action = headers.get('ACTION')
+            resource = headers.get('RESOURCE')
+
+            if action == 'GET' and resource:
+                if resource.startswith('css/') or resource.startswith('img/'):
+                    # Запрос на получение ресурса (CSS или изображение)
+                    domain, _, path = resource.partition('/')
+                    domain_info = domain_mapping.get(domain)
+                    if not domain_info:
+                        response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Domain not found\n\n"
+                        conn.send(response.encode())
+                        logging.error(f"Домен не найден: {domain}")
+                        continue
+
+                    if resource.startswith('css/'):
+                        css_filename = path
+                        css_file = domain_info.get('css_file')
+                        if css_file and os.path.exists(css_file):
+                            send_large_file(conn, css_file)
+                        else:
+                            response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: CSS file not found\n\n"
+                            conn.send(response.encode())
+                            logging.error(f"CSS файл не найден: {css_file}")
+                    elif resource.startswith('img/'):
+                        image_filename = path
+                        image_file = domain_info.get('image_file')
+                        if image_file and os.path.exists(image_file):
+                            send_large_file(conn, image_file)
+                        else:
+                            response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Image file not found\n\n"
+                            conn.send(response.encode())
+                            logging.error(f"Изображение файл не найден: {image_file}")
+                else:
+                    # Запрос на получение HTML страницы
+                    domain_info = domain_mapping.get(resource)
+                    if not domain_info:
+                        response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Domain not found\n\n"
+                        conn.send(response.encode())
+                        logging.error(f"Домен не найден: {resource}")
+                        continue
+
+                    html_file = domain_info.get('html_file')
+                    if html_file and os.path.exists(html_file):
+                        send_large_file(conn, html_file)
+                    else:
+                        response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: HTML file not found\n\n"
+                        conn.send(response.encode())
+                        logging.error(f"HTML файл не найден: {html_file}")
+            else:
+                response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Invalid action or resource\n\n"
+                conn.send(response.encode())
+                logging.error(f"Неверное действие или ресурс: ACTION={action}, RESOURCE={resource}")
+
+        except ConnectionResetError as e:
+            logging.info(f"Отключен клиент {addr}: {e}")
+            break
+        except Exception as e:
+            logging.error(f"Ошибка с клиентом {addr}: {e}")
+            break
+
+    conn.close()
+    logging.info(f"Соединение с {addr} закрыто.")
+
+def start_server():
+    """Запуск сервера."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+        server_socket.bind((HOST, PORT))
+        server_socket.listen()
+        logging.info(f"Сервер запущен на {HOST}:{PORT}")
+
+        while True:
+            conn, addr = server_socket.accept()
+            client_thread = threading.Thread(target=handle_client, args=(conn, addr), daemon=True)
+            client_thread.start()
+
+if __name__ == "__main__":
+    start_server()

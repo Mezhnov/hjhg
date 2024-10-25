@@ -43,11 +43,11 @@ def send_large_file(conn, filepath):
         # Определение типа контента на основе расширения файла
         _, ext = os.path.splitext(filepath)
         ext = ext.lower()
-        if ext == '.html' or ext == '.htm':
+        if ext in ['.html', '.htm']:
             content_type = 'text/html'
         elif ext == '.css':
             content_type = 'text/css'
-        elif ext in ['.png']:
+        elif ext == '.png':
             content_type = 'image/png'
         elif ext in ['.jpg', '.jpeg']:
             content_type = 'image/jpeg'
@@ -102,50 +102,48 @@ def handle_client(conn, addr):
             resource = headers.get('RESOURCE')
 
             if action == 'GET' and resource:
-                if resource.startswith('css/') or resource.startswith('img/'):
-                    # Запрос на получение ресурса (CSS или изображение)
-                    domain, _, path = resource.partition('/')
-                    domain_info = domain_mapping.get(domain)
-                    if not domain_info:
-                        response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Domain not found\n\n"
-                        conn.send(response.encode())
-                        logging.error(f"Домен не найден: {domain}")
-                        continue
+                # Обработка запросов вида <domain>/<path>
+                parts = resource.split('/', 1)
+                domain = parts[0]
+                path = parts[1] if len(parts) > 1 else ''
 
-                    if resource.startswith('css/'):
-                        css_filename = path
-                        css_file = domain_info.get('css_file')
-                        if css_file and os.path.exists(css_file):
-                            send_large_file(conn, css_file)
-                        else:
-                            response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: CSS file not found\n\n"
-                            conn.send(response.encode())
-                            logging.error(f"CSS файл не найден: {css_file}")
-                    elif resource.startswith('img/'):
-                        image_filename = path
-                        image_file = domain_info.get('image_file')
-                        if image_file and os.path.exists(image_file):
-                            send_large_file(conn, image_file)
-                        else:
-                            response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Image file not found\n\n"
-                            conn.send(response.encode())
-                            logging.error(f"Изображение файл не найден: {image_file}")
+                domain_info = domain_mapping.get(domain)
+                if not domain_info:
+                    response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Domain not found\n\n"
+                    conn.send(response.encode())
+                    logging.error(f"Домен не найден: {domain}")
+                    continue
+
+                if path.startswith('css/'):
+                    css_filename = path[len('css/'):]
+                    css_file = domain_info.get('css_file')
+                    css_file_path = os.path.join('css', css_filename)
+                    if css_file and os.path.exists(css_file_path):
+                        send_large_file(conn, css_file_path)
+                    else:
+                        response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: CSS file not found\n\n"
+                        conn.send(response.encode())
+                        logging.error(f"CSS файл не найден: {css_file_path}")
+                elif path.startswith('img/'):
+                    image_filename = path[len('img/'):]
+                    image_file = domain_info.get('image_file')
+                    image_file_path = os.path.join('img', image_filename)
+                    if image_file and os.path.exists(image_file_path):
+                        send_large_file(conn, image_file_path)
+                    else:
+                        response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Image file not found\n\n"
+                        conn.send(response.encode())
+                        logging.error(f"Изображение файл не найден: {image_file_path}")
                 else:
                     # Запрос на получение HTML страницы
-                    domain_info = domain_mapping.get(resource)
-                    if not domain_info:
-                        response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Domain not found\n\n"
-                        conn.send(response.encode())
-                        logging.error(f"Домен не найден: {resource}")
-                        continue
-
                     html_file = domain_info.get('html_file')
-                    if html_file and os.path.exists(html_file):
-                        send_large_file(conn, html_file)
+                    html_file_path = os.path.join('html', html_file)
+                    if html_file and os.path.exists(html_file_path):
+                        send_large_file(conn, html_file_path)
                     else:
                         response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: HTML file not found\n\n"
                         conn.send(response.encode())
-                        logging.error(f"HTML файл не найден: {html_file}")
+                        logging.error(f"HTML файл не найден: {html_file_path}")
             else:
                 response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Invalid action or resource\n\n"
                 conn.send(response.encode())

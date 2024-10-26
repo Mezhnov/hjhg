@@ -1,11 +1,72 @@
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <title>Тестовая Страница</title>
-    </head>
-    <body>
-        <h1>Привет, мир!</h1>
-        <p>Это тестовая страница.</p>
-    </body>
-    </html>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Простая страница</title>
+    <style>
+        /* Стили для всей страницы */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* Стили для заголовка */
+        header h1 {
+            color: #4CAF50;
+            margin-top: 20px;
+        }
+
+        /* Основное содержимое */
+        main {
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* Стили для кнопки */
+        .cta-button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        /* Изменение цвета кнопки при наведении */
+        .cta-button:hover {
+            background-color: #45a049;
+        }
+
+        /* Стили для подвала */
+        footer {
+            margin-top: auto;
+            padding: 10px;
+            background-color: #333;
+            color: white;
+            width: 100%;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Добро пожаловать на мою страницу</h1>
+    </header>
+    <main>
+        <p>Это пример базовой HTML страницы с использованием CSS.</p>
+        <button class="cta-button">Нажми меня</button>
+    </main>
+    <footer>
+        <p>&copy; 2024 Мой сайт</p>
+    </footer>
+</body>
+</html>

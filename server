@@ -30,13 +30,20 @@ def send_large_file(conn, filepath):
     """
     if not os.path.exists(filepath):
         logging.error(f"Файл не найден: {filepath}")
-        response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: File not found\n\n"
-        conn.send(response.encode())
+        message = "File not found"
+        response = (
+            f"SMP 1.0\n"
+            f"STATUS: ERROR\n"
+            f"MESSAGE: {message}\n"
+            f"CONTENT-TYPE: text/plain\n"
+            f"CONTENT-LENGTH: {len(message)}\n\n"
+            f"{message}"
+        )
+        conn.sendall(response.encode())
         return
 
     try:
         file_size = os.path.getsize(filepath)
-        # Определение типа контента по расширению файла
         _, ext = os.path.splitext(filepath)
         ext = ext.lower()
         if ext in ['.html', '.htm']:
@@ -47,17 +54,17 @@ def send_large_file(conn, filepath):
             content_type = 'image/png'
         elif ext in ['.jpg', '.jpeg']:
             content_type = 'image/jpeg'
-        elif ext in ['.gif']:
+        elif ext == '.gif':
             content_type = 'image/gif'
-        elif ext in ['.js']:
+        elif ext == '.js':
             content_type = 'application/javascript'
         else:
             content_type = 'application/octet-stream'
 
         # Отправка заголовков
         response_headers = (
-            "SMP 1.0\n"
-            "STATUS: OK\n"
+            f"SMP 1.0\n"
+            f"STATUS: OK\n"
             f"CONTENT-TYPE: {content_type}\n"
             f"CONTENT-LENGTH: {file_size}\n\n"
         )
@@ -75,17 +82,34 @@ def send_large_file(conn, filepath):
 
     except Exception as e:
         logging.error(f"Ошибка при отправке файла {filepath}: {e}")
-        response = f"SMP 1.0\nSTATUS: ERROR\nMESSAGE: Error sending file: {e}\n\n"
-        conn.send(response.encode())
+        message = f"Error sending file: {e}"
+        response = (
+            f"SMP 1.0\n"
+            f"STATUS: ERROR\n"
+            f"MESSAGE: {message}\n"
+            f"CONTENT-TYPE: text/plain\n"
+            f"CONTENT-LENGTH: {len(message)}\n\n"
+            f"{message}"
+        )
+        conn.sendall(response.encode())
 
 def handle_client(conn, addr):
     """
-    Обрабатывает подключения клиентов.
+    Обрабатывает подключения клиентов в отдельных потоках.
     """
     logging.info(f"Подключен клиент: {addr}")
     # Сообщение об успешном подключении
-    initial_message = "SMP 1.0\nSTATUS: OK\nMESSAGE: Connected to SMP server\n\n"
-    conn.send(initial_message.encode())
+    initial_message = "Connected to SMP server"
+    response = (
+        f"SMP 1.0\n"
+        f"STATUS: OK\n"
+        f"MESSAGE: {initial_message}\n"
+        f"CONTENT-TYPE: text/plain\n"
+        f"CONTENT-LENGTH: {len(initial_message)}\n\n"
+        f"{initial_message}"
+    )
+    conn.send(response.encode())
+    logging.info(f"Отправлено {addr}: {initial_message}")
 
     while True:
         try:
@@ -113,35 +137,69 @@ def handle_client(conn, addr):
                 path = parsed.path.lstrip('/')  # Удаление ведущего '/'
 
                 if domain not in allowed_domains:
-                    response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Domain not allowed\n\n"
+                    message = "Domain not allowed"
+                    response = (
+                        f"SMP 1.0\n"
+                        f"STATUS: ERROR\n"
+                        f"MESSAGE: {message}\n"
+                        f"CONTENT-TYPE: text/plain\n"
+                        f"CONTENT-LENGTH: {len(message)}\n\n"
+                        f"{message}"
+                    )
                     conn.send(response.encode())
                     logging.warning(f"Запрошен запрещенный домен: {domain}")
                     continue
 
-                # Соответствие серверной директории
+                # Определение пути к файлу
                 domain_root = allowed_domains[domain]
                 file_path = os.path.join(domain_root, path) if path else os.path.join(domain_root, 'index.html')
 
                 # Предотвращение обхода директорий
-                if not os.path.realpath(file_path).startswith(os.path.realpath(domain_root)):
-                    response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Invalid resource path\n\n"
+                real_file_path = os.path.realpath(file_path)
+                real_domain_root = os.path.realpath(domain_root)
+                if not real_file_path.startswith(real_domain_root):
+                    message = "Invalid resource path"
+                    response = (
+                        f"SMP 1.0\n"
+                        f"STATUS: ERROR\n"
+                        f"MESSAGE: {message}\n"
+                        f"CONTENT-TYPE: text/plain\n"
+                        f"CONTENT-LENGTH: {len(message)}\n\n"
+                        f"{message}"
+                    )
                     conn.send(response.encode())
-                    logging.warning(f"Запрошен некорректный путь ресурса: {file_path}")
+                    logging.warning(f"Некорректный путь ресурса: {file_path}")
                     continue
 
                 # Если путь указывает на директорию, отправить index.html
                 if os.path.isdir(file_path):
                     file_path = os.path.join(file_path, 'index.html')
-
                 if os.path.exists(file_path):
                     send_large_file(conn, file_path)
                 else:
                     # Ресурс не найден
-                    response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Resource not found\n\n"
+                    message = "Resource not found"
+                    response = (
+                        f"SMP 1.0\n"
+                        f"STATUS: ERROR\n"
+                        f"MESSAGE: {message}\n"
+                        f"CONTENT-TYPE: text/plain\n"
+                        f"CONTENT-LENGTH: {len(message)}\n\n"
+                        f"{message}"
+                    )
                     conn.send(response.encode())
                     logging.warning(f"Ресурс не найден: {file_path}")
+
             else:
-                response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Invalid ACTION or missing RESOURCE\n\n"
+                message = "Invalid ACTION or missing RESOURCE"
+                response = (
+                    f"SMP 1.0\n"
+                    f"STATUS: ERROR\n"
+                    f"MESSAGE: {message}\n"
+                    f"CONTENT-TYPE: text/plain\n"
+                    f"CONTENT-LENGTH: {len(message)}\n\n"
+                    f"{message}"
+                )
                 conn.send(response.encode())
                 logging.warning(f"Некорректный запрос: ACTION={action}, RESOURCE={resource}")
 
@@ -157,7 +215,7 @@ def handle_client(conn, addr):
 
 def start_server():
     """
-    Запускает SMP сервер.
+    Запускает SMP сервер для прослушивания входящих подключений.
     """
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         server_socket.bind((HOST, PORT))

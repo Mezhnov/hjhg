@@ -98,19 +98,9 @@ def handle_client(conn, addr):
     Обрабатывает подключения клиентов в отдельных потоках.
     """
     logging.info(f"Подключен клиент: {addr}")
-    # Сообщение об успешном подключении
-    initial_message = "Connected to SMP server"
-    response = (
-        f"SMP 1.0\n"
-        f"STATUS: OK\n"
-        f"MESSAGE: {initial_message}\n"
-        f"CONTENT-TYPE: text/plain\n"
-        f"CONTENT-LENGTH: {len(initial_message)}\n\n"
-        f"{initial_message}"
-    )
-    conn.send(response.encode())
-    logging.info(f"Отправлено {addr}: {initial_message}")
-
+    
+    # Удалена отправка начального сообщения
+    
     while True:
         try:
             data = b""
@@ -212,6 +202,7 @@ def handle_client(conn, addr):
 
     conn.close()
     logging.info(f"Соединение с {addr} закрыто")
+
 
 def start_server():
     """

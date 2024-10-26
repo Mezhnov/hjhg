@@ -99,8 +99,6 @@ def handle_client(conn, addr):
     """
     logging.info(f"Подключен клиент: {addr}")
     
-    # Удалена отправка начального сообщения
-    
     while True:
         try:
             data = b""

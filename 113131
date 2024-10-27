@@ -1,14 +1,22 @@
-<!-- templates/search.html -->
+<!-- templates/results.html -->
 <!DOCTYPE html>
 <html>
 <head>
-    <title>SMP Search</title>
+    <title>Search Results for "{{ query }}"</title>
 </head>
 <body>
-    <h1>Search SMP</h1>
-    <form action="/search" method="get">
-        <input type="text" name="q" placeholder="Enter search terms..." required>
-        <button type="submit">Search</button>
-    </form>
+    <h1>Search Results for "{{ query }}"</h1>
+    {% if results %}
+        <ul>
+            {% for result in results %}
+                <li>
+                    <a href="{{ result.path }}">{{ result.title }}</a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No results found.</p>
+    {% endif %}
+    <a href="/">Back to Search</a>
 </body>
 </html>

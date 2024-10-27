@@ -1,20 +1,119 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <title>Поиск по SMP</title>
-    <link rel="stylesheet" href="/static/styles.css">
-    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
-</head>
-<body>
-    <div class="search-container">
-        <div class="logo">
-            <img src="/static/logo.png" alt="Логотип">
-        </div>
-        <form method="GET" action="/search">
-            <input type="text" name="q" placeholder="Введите запрос..." required autocomplete="off">
-            <button type="submit">Найти</button>
-        </form>
-    </div>
-</body>
-</html>
+# indexer.py
+
+import os
+import re
+import nltk
+from bs4 import BeautifulSoup
+from nltk.stem.snowball import RussianStemmer
+from nltk.corpus import stopwords
+from whoosh.index import create_in, open_dir
+from whoosh.fields import Schema, TEXT, ID, STORED
+
+# Загрузка необходимых ресурсов NLTK
+nltk.download('punkt')
+nltk.download('stopwords')
+
+class LocalHTMLIndexer:
+    def __init__(self, pages_dir, index_dir='indexdir'):
+        self.pages_dir = pages_dir
+        self.index_dir = index_dir
+        self.stemmer = RussianStemmer()
+        self.stop_words = set(stopwords.words('russian'))
+
+        if not os.path.exists(index_dir):
+            os.mkdir(index_dir)
+            self.schema = Schema(
+                path=ID(stored=True, unique=True),
+                title=TEXT(stored=True),
+                content=TEXT,
+                description=STORED,
+                logo=STORED
+            )
+            self.ix = create_in(index_dir, self.schema)
+        else:
+            self.ix = open_dir(index_dir)
+
+    def clean_text(self, text):
+        try:
+            tokens = nltk.word_tokenize(text.lower(), language='russian')
+        except LookupError as e:
+            # Обработка отсутствующих ресурсов
+            print(f"NLTK LookupError: {e}")
+            print("Попытка загрузить отсутствующие ресурсы...")
+            nltk.download('punkt')
+            tokens = nltk.word_tokenize(text.lower(), language='russian')
+        except Exception as e:
+            print(f"Unexpected error during tokenization: {e}")
+            tokens = []
+        
+        tokens = [re.sub(r'\W+', '', token) for token in tokens]
+        tokens = [token for token in tokens if token and token not in self.stop_words]
+        tokens = [self.stemmer.stem(token) for token in tokens]
+        return ' '.join(tokens)
+
+    def extract_description(self, text):
+        description = text.strip().replace('\n', ' ')
+        if len(description) > 200:
+            description = description[:200] + '...'
+        return description
+
+    def extract_logo(self, soup, base_path):
+        icon_link = soup.find("link", rel=lambda r: r and "icon" in r.lower())
+        if icon_link and 'href' in icon_link.attrs:
+            logo_path = os.path.join(os.path.dirname(base_path), icon_link['href'])
+            if os.path.exists(logo_path):
+                # Копируем логотип в статическую папку
+                dest_dir = os.path.join('static', 'logos')
+                if not os.path.exists(dest_dir):
+                    os.makedirs(dest_dir)
+                logo_filename = os.path.basename(logo_path)
+                dest_path = os.path.join(dest_dir, logo_filename)
+                if not os.path.exists(dest_path):
+                    try:
+                        with open(logo_path, 'rb') as src_file:
+                            with open(dest_path, 'wb') as dest_file:
+                                dest_file.write(src_file.read())
+                    except Exception as e:
+                        print(f"Ошибка при копировании логотипа: {e}")
+                        return None
+                return os.path.join('logos', logo_filename)
+        return None
+
+    def index(self):
+        writer = self.ix.writer()
+        for root, dirs, files in os.walk(self.pages_dir):
+            for file in files:
+                if file.endswith('.html'):
+                    file_path = os.path.join(root, file)
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            soup = BeautifulSoup(f, 'html.parser')
+                            title_tag = soup.find('title')
+                            title = title_tag.get_text().strip() if title_tag else file
+                            text = soup.get_text()
+                            clean_content = self.clean_text(text)
+                            description = self.extract_description(text)
+                            logo_path = self.extract_logo(soup, file_path)
+
+                            relative_path = os.path.relpath(file_path, self.pages_dir)
+                            domain, _, _ = relative_path.partition(os.sep)
+                            url = f"/{domain}/"
+
+                            writer.update_document(
+                                path=url,
+                                title=title,
+                                content=clean_content,
+                                description=description,
+                                logo=logo_path
+                            )
+                            print(f"Indexed: {url}")
+                    except Exception as e:
+                        print(f"Error indexing file {file_path}: {e}")
+        writer.commit()
+        print("Indexing completed.")
+
+if __name__ == "__main__":
+    pages_directory = 'pages'  # Папка с HTML-файлами
+    index_directory = 'indexdir'
+    indexer = LocalHTMLIndexer(pages_directory, index_directory)
+    indexer.index()

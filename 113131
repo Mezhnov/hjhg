@@ -1,63 +1,476 @@
-# search_app.py
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Анна Щербакова - Фигуристка</title>
+    <!-- Подключение шрифтов Google -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Основные стили */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-from flask import Flask, request, render_template, send_from_directory, abort
-from whoosh.index import open_dir
-from whoosh.qparser import MultifieldParser
-import nltk
-from nltk.stem.snowball import RussianStemmer
-from nltk.corpus import stopwords
-import re
-import os
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: #121212;
+            color: #fff;
+            line-height: 1.6;
+        }
 
-nltk.download('punkt')
-nltk.download('stopwords')
+        a {
+            color: inherit;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
 
-app = Flask(__name__)
-index_dir = 'indexdir'
-stemmer = RussianStemmer()
-stop_words = set(stopwords.words('russian'))
+        /* Навигация */
+        nav {
+            position: fixed;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px 0;
+            z-index: 1000;
+            transition: background 0.3s, padding 0.3s;
+        }
 
-if not os.path.exists(index_dir):
-    raise Exception(f"Index directory '{index_dir}' does not exist. Please run the indexer script first.")
+        nav.scrolled {
+            background: rgba(0, 0, 0, 0.95);
+            padding: 10px 0;
+        }
 
-ix = open_dir(index_dir)
+        nav ul {
+            list-style: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
 
-def clean_query(query):
-    tokens = nltk.word_tokenize(query.lower(), language='russian')
-    tokens = [re.sub(r'\W+', '', token) for token in tokens]
-    tokens = [token for token in tokens if token and token not in stop_words]
-    tokens = [stemmer.stem(token) for token in tokens]
-    return ' '.join(tokens)
+        nav ul li {
+            margin: 0 20px;
+        }
 
-@app.route('/', methods=['GET', 'POST'])
-def search():
-    if request.method == 'POST':
-        query_str = request.form['query']
-        clean_query_str = clean_query(query_str)
-        with ix.searcher() as searcher:
-            parser = MultifieldParser(["title", "content"], ix.schema)
-            query = parser.parse(clean_query_str)
-            results = searcher.search(query, limit=10)
-            hits = [
-                {
-                    'title': r['title'],
-                    'url': r['path'],
-                    'description': r['description'],
-                    'logo': r.get('logo', None)  # Retrieve the logo path
-                }
-                for r in results
-            ]
-        return render_template('results.html', query=query_str, hits=hits)
-    return render_template('index.html')
+        nav ul li a {
+            color: #fff;
+            font-size: 1em;
+            font-weight: 600;
+        }
 
-@app.route('/pages/<path:filename>')
-def serve_page(filename):
-    pages_dir = os.path.join(os.getcwd(), 'pages')
-    file_path = os.path.join(pages_dir, filename)
-    if os.path.isfile(file_path):
-        return send_from_directory(pages_dir, filename)
-    else:
-        abort(404)
+        nav ul li a:hover {
+            color: #00cc66; /* Изменено с #ffcc00 на зелёный */
+        }
 
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000, debug=False)
+        /* Хедер */
+        header {
+            background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('https://img.championat.com/s/1350x900/news/big/c/y/anna-scherbakova-opublikoval.jpg') no-repeat center center/cover;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            padding: 0 20px;
+        }
+
+        /* Добавление анимации параллакса для хедера */
+        header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(18, 18, 18, 0.7);
+            z-index: 1;
+        }
+
+        header h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 4em;
+            margin-bottom: 40px; /* Увеличен отступ с 20px до 40px */
+            z-index: 2;
+            position: relative;
+            animation: fadeInDown 1s ease-out forwards;
+        }
+
+        header p {
+            font-size: 1.5em;
+            max-width: 700px;
+            z-index: 2;
+            position: relative;
+            animation: fadeInUp 1s ease-out forwards;
+            animation-delay: 0.5s;
+            opacity: 0;
+        }
+
+        /* Секции */
+        section {
+            padding: 100px 20px;
+            max-width: 1200px;
+            margin: auto;
+        }
+
+        section h2 {
+            text-align: center;
+            margin-bottom: 50px; /* Увеличен отступ с 40px до 50px */
+            font-family: 'Playfair Display', serif;
+            font-size: 2.5em;
+            color: #00cc66; /* Изменено с #ffcc00 на зелёный */
+            position: relative;
+            display: inline-block;
+        }
+
+        section h2::after {
+            content: '';
+            width: 60px;
+            height: 4px;
+            background: #00cc66; /* Изменено с #ffcc00 на зелёный */
+            position: absolute;
+            left: 50%;
+            bottom: -15px;
+            transform: translateX(-50%);
+        }
+
+        .about, .achievements, .gallery {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    padding: 60px;
+    margin: 120px auto 60px; /* Изменен верхний отступ с 60px на 120px */
+    backdrop-filter: blur(15px);
+    box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.37);
+    transition: transform 0.4s, box-shadow 0.4s;
+    position: relative;
+    overflow: hidden;
+        }
+
+        .about:hover, .achievements:hover, .gallery:hover {
+            transform: translateY(-15px);
+            box-shadow: 0 24px 80px 0 rgba(31, 38, 135, 0.37);
+        }
+
+        .about p {
+            font-size: 1.2em;
+            color: #e0e0e0;
+            line-height: 1.8;
+        }
+
+        .achievements ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .achievements ul li {
+            background: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><circle cx="8" cy="8" r="8" fill="%2300cc66"/></svg>') no-repeat left center; /* Изменено с %23ffcc00 на зелёный */
+            background-size: 12px;
+            padding-left: 30px;
+            margin-bottom: 20px;
+            font-size: 1.1em;
+            color: #e0e0e0;
+            transition: transform 0.3s;
+        }
+
+        .achievements ul li:hover {
+            transform: scale(1.05);
+            color: #00cc66; /* Изменено с #ffcc00 на зелёный */
+        }
+
+        /* Галерея с слайдером */
+        .gallery-container {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .gallery-slider {
+            display: flex;
+            transition: transform 0.5s ease-in-out;
+        }
+
+        .gallery-slider img {
+            width: 100%;
+            max-width: 400px;
+            margin: 0 15px;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: transform 0.3s, filter 0.3s;
+            filter: brightness(0.85);
+        }
+
+        .gallery-slider img:hover {
+            transform: scale(1.05);
+            filter: brightness(1);
+        }
+
+        /* Кнопки слайдера */
+        .prev, .next {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0, 204, 102, 0.9); /* Изменено с rgba(255, 204, 0, 0.9) на зелёный */
+            color: #1e1e1e;
+            border: none;
+            padding: 12px 25px;
+            cursor: pointer;
+            border-radius: 50px;
+            font-size: 1.2em;
+            transition: background 0.3s, transform 0.3s;
+            z-index: 2;
+        }
+
+        .prev:hover, .next:hover {
+            background: #00cc66; /* Изменено с #ffcc00 на зелёный */
+            transform: scale(1.1);
+        }
+
+        .prev {
+            left: 10px;
+        }
+
+        .next {
+            right: 10px;
+        }
+
+        /* Футер */
+        footer {
+            background: rgba(0,0,0,0.8);
+            color: #fff;
+            text-align: center;
+            padding: 30px 20px;
+            font-size: 1em;
+        }
+
+        /* Анимации */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 1.2s ease-out, transform 1.2s ease-out;
+        }
+
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Дополнительные анимации для хедера */
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Медиа-запросы */
+        @media (max-width: 1024px) {
+            header h1 {
+                font-size: 3.5em;
+            }
+
+            header p {
+                font-size: 1.3em;
+            }
+
+            section {
+                padding: 80px 20px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            nav ul {
+                flex-direction: column;
+            }
+
+            nav ul li {
+                margin: 10px 0;
+            }
+
+            .gallery-slider {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .gallery-slider img {
+                max-width: 90%;
+            }
+
+            .prev, .next {
+                padding: 10px 20px;
+                font-size: 1em;
+            }
+
+            header h1 {
+                font-size: 2.8em;
+            }
+
+            header p {
+                font-size: 1.1em;
+            }
+        }
+
+        @media (max-width: 480px) {
+            nav ul li {
+                margin: 5px 0;
+            }
+
+            .achievements ul li {
+                padding-left: 20px;
+            }
+
+            section h2 {
+                font-size: 2em;
+            }
+
+            .prev, .next {
+                padding: 8px 16px;
+                font-size: 0.9em;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <nav id="navbar">
+        <ul>
+            <li><a href="#home">Главная</a></li>
+            <li><a href="#achievements">Достижения</a></li>
+            <!-- Контакты удалены -->
+        </ul>
+    </nav>
+
+    <header id="home">
+        <h1>Анна Щербакова</h1>
+        <p>Чемпионка мира и Олимпийских игр по фигурному катанию</p>
+    </header>
+
+
+
+    <section class="achievements fade-in" id="achievements">
+        <h2>Достижения</h2>
+        <ul>
+            <li>Золотая медаль Олимпийских игр 2022</li>
+            <li>Чемпион мира 2021 и 2022</li>
+            <li>Чемпион Европы 2020, 2021 и 2022</li>
+            <li>Победителька многочисленных международных соревнований</li>
+            <li>Многократная обладательница медалей на национальных чемпионатах</li>
+            <li>Рекордсменка по количеству совершенных тройных прыжков в соревнованиях</li>
+            <li>Призы и награды от Спортивных организаций России</li>
+            <!-- Добавьте дополнительные достижения здесь -->
+        </ul>
+    </section>
+
+    <section class="gallery fade-in" id="gallery">
+        <h2>Галерея</h2>
+        <div class="gallery-container">
+            <button class="prev">&#10094;</button>
+            <div class="gallery-slider" id="gallerySlider">
+                <img src="https://img.championat.com/s/1350x900/news/big/c/y/anna-scherbakova-opublikoval.jpg" alt="Анна Щербакова на льду 1">
+                <img src="https://example.com/image2.jpg" alt="Анна Щербакова на льду 2">
+                <img src="https://example.com/image3.jpg" alt="Анна Щербакова на льду 3">
+                <img src="https://example.com/image4.jpg" alt="Анна Щербакова на льду 4">
+                <!-- Добавьте больше изображений по мере необходимости -->
+            </div>
+            <button class="next">&#10095;</button>
+        </div>
+    </section>
+
+    <!-- Футер -->
+    <footer>
+        <p>&copy; 2023 Анна Щербакова. Все права защищены.</p>
+    </footer>
+
+    <script>
+        // Изменение навигационной панели при прокрутке
+        window.addEventListener('scroll', function() {
+            const navbar = document.getElementById('navbar');
+            if (window.scrollY > 50) {
+                navbar.classList.add('scrolled');
+            } else {
+                navbar.classList.remove('scrolled');
+            }
+        });
+
+        // Анимация появления элементов при прокрутке
+        document.addEventListener('DOMContentLoaded', function() {
+            const faders = document.querySelectorAll('.fade-in');
+
+            const appearOptions = {
+                threshold: 0.1,
+                rootMargin: "0px 0px -50px 0px"
+            };
+
+            const appearOnScroll = new IntersectionObserver(function(
+                entries,
+                appearOnScroll
+            ) {
+                entries.forEach(entry => {
+                    if (!entry.isIntersecting) {
+                        return;
+                    } else {
+                        entry.target.classList.add('visible');
+                        appearOnScroll.unobserve(entry.target);
+                    }
+                });
+            }, appearOptions);
+
+            faders.forEach(fader => {
+                appearOnScroll.observe(fader);
+            });
+        });
+
+        // Слайдер галереи
+        const gallerySlider = document.getElementById('gallerySlider');
+        const prevButton = document.querySelector('.prev');
+        const nextButton = document.querySelector('.next');
+
+        let currentIndex = 0;
+
+        function updateSlider() {
+            const sliderWidth = gallerySlider.clientWidth;
+            gallerySlider.style.transform = `translateX(-${currentIndex * (sliderWidth + 30)}px)`;
+        }
+
+        window.addEventListener('resize', updateSlider);
+
+        prevButton.addEventListener('click', () => {
+            const totalImages = gallerySlider.children.length;
+            if(currentIndex > 0) {
+                currentIndex--;
+            } else {
+                currentIndex = totalImages -1;
+            }
+            updateSlider();
+        });
+
+        nextButton.addEventListener('click', () => {
+            const totalImages = gallerySlider.children.length;
+            if(currentIndex < totalImages -1) {
+                currentIndex++;
+            } else {
+                currentIndex = 0;
+            }
+            updateSlider();
+        });
+
+        // Инициализация слайдера
+        updateSlider();
+    </script>
+</body>
+</html>

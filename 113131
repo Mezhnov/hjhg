@@ -1,102 +1,333 @@
-# indexer.py
+# server.py
 
+import socket
+import threading
+import logging
 import os
-import re
-import nltk
-from bs4 import BeautifulSoup
-from nltk.stem.snowball import RussianStemmer
-from nltk.corpus import stopwords
-from whoosh.index import create_in, open_dir
-from whoosh.fields import Schema, TEXT, ID, STORED
+from urllib.parse import urlparse, parse_qs
+from whoosh.index import open_dir
+from whoosh.qparser import MultifieldParser
 
-# Загрузка необходимых ресурсов NLTK
-nltk.download('punkt')
-nltk.download('stopwords')
+# Настройки сервера
+HOST = '0.0.0.0'  # Слушать на всех интерфейсах
+PORT = 8080
+BUFFER_SIZE = 4096  # Размер буфера для передачи данных
 
+# Настройка логирования
+logging.basicConfig(
+    filename='smp_server.log',
+    level=logging.INFO,
+    format='%(asctime)s:%(levelname)s:%(message)s'
+)
 
-class LocalHTMLIndexer:
-    def __init__(self, pages_dir, index_dir='indexdir'):
-        self.pages_dir = pages_dir
-        self.index_dir = index_dir
-        self.stemmer = RussianStemmer()
-        self.stop_words = set(stopwords.words('russian'))
+# Разрешенные домены и их корневые директории
+allowed_domains = {
+    'search.com': 'pages/search.com',
+    'example.com': 'pages/example.com'
+}
 
-        if not os.path.exists(index_dir):
-            os.mkdir(index_dir)
-            self.schema = Schema(
-                path=ID(stored=True, unique=True),
-                title=TEXT(stored=True),
-                content=TEXT,
-                description=STORED,
-                logo=STORED
-            )
-            self.ix = create_in(index_dir, self.schema)
-        else:
-            self.ix = open_dir(index_dir)
+# Открытие Whoosh индекса
+index_dir = 'indexdir'
+if not os.path.exists(index_dir):
+    raise Exception(f"Index directory '{index_dir}' does not exist. Please run indexer.py first.")
+ix = open_dir(index_dir)
 
-    def clean_text(self, text):
-        tokens = nltk.word_tokenize(text.lower(), language='russian')
-        tokens = [re.sub(r'\W+', '', token) for token in tokens]
-        tokens = [token for token in tokens if token and token not in self.stop_words]
-        tokens = [self.stemmer.stem(token) for token in tokens]
-        return ' '.join(tokens)
+def perform_search(query_str):
+    """
+    Выполняет поиск по индексу Whoosh и возвращает результаты.
+    """
+    with ix.searcher() as searcher:
+        parser = MultifieldParser(["title", "content"], ix.schema)
+        query = parser.parse(query_str)
+        results = searcher.search(query, limit=10)
+        hits = [
+            {
+                'title': r['title'],
+                'url': r['path'],
+                'description': r['description'],
+                'logo': r.get('logo', None)  # Retrieve the logo path
+            }
+            for r in results
+        ]
+    return hits
 
-    def extract_description(self, text):
-        description = text.strip().replace('\n', ' ')
-        if len(description) > 200:
-            description = description[:200] + '...'
-        return description
+def send_response(conn, headers, body):
+    """
+    Отправляет ответ клиенту.
+    """
+    response = ''
+    for key, value in headers.items():
+        response += f"{key}: {value}\n"
+    response += "\n"
+    conn.sendall(response.encode() + body)
 
-    def extract_logo(self, soup, base_path):
-        icon_link = soup.find("link", rel=lambda r: r and "icon" in r.lower())
-        if icon_link and 'href' in icon_link.attrs:
-            logo_path = os.path.join(os.path.dirname(base_path), icon_link['href'])
-            if os.path.exists(logo_path):
-                # Копируем логотип в статическую папку
-                dest_dir = os.path.join('static', 'logos')
-                if not os.path.exists(dest_dir):
-                    os.makedirs(dest_dir)
-                logo_filename = os.path.basename(logo_path)
-                dest_path = os.path.join(dest_dir, logo_filename)
-                if not os.path.exists(dest_path):
-                    with open(logo_path, 'rb') as src_file:
-                        with open(dest_path, 'wb') as dest_file:
-                            dest_file.write(src_file.read())
-                return os.path.join('logos', logo_filename)
-        return None
+def handle_search_request(resource):
+    """
+    Обрабатывает поисковый запрос и генерирует HTML результаты.
+    """
+    parsed_url = urlparse(resource)
+    query_params = parse_qs(parsed_url.query)
+    query = query_params.get('q', [''])[0]
+    if not query:
+        # Пустой запрос
+        html_body = "<html><head><title>Поиск</title></head><body><h1>Введите поисковый запрос</h1></body></html>"
+        return {'CONTENT-TYPE': 'text/html', 'CONTENT-LENGTH': str(len(html_body))}, html_body.encode()
 
-    def index(self):
-        writer = self.ix.writer()
-        for root, dirs, files in os.walk(self.pages_dir):
-            for file in files:
-                if file.endswith('.html'):
-                    file_path = os.path.join(root, file)
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        soup = BeautifulSoup(f, 'html.parser')
-                        title_tag = soup.find('title')
-                        title = title_tag.get_text().strip() if title_tag else file
-                        text = soup.get_text()
-                        clean_content = self.clean_text(text)
-                        description = self.extract_description(text)
-                        logo_path = self.extract_logo(soup, file_path)
+    # Выполняем поиск
+    hits = perform_search(query)
 
-                        relative_path = os.path.relpath(file_path, self.pages_dir)
-                        domain, _, _ = relative_path.partition(os.sep)
-                        url = f"/{domain}/"
+    # Генерация HTML
+    html_body = f"<html><head><title>Результаты поиска для \"{query}\"</title>"
+    html_body += "<link rel='stylesheet' href='/static/styles.css'>"
+    html_body += "</head><body>"
+    html_body += f"<h1>Результаты поиска для \"{query}\"</h1>"
 
-                        writer.update_document(
-                            path=url,
-                            title=title,
-                            content=clean_content,
-                            description=description,
-                            logo=logo_path
-                        )
-                        print(f"Indexed: {url}")
-        writer.commit()
+    if hits:
+        for hit in hits:
+            html_body += "<div class='result'>"
+            # Логотип сайта
+            if hit['logo']:
+                html_body += f"<div class='site-logo'><img src='/static/{hit['logo']}' alt='Site Logo'></div>"
+            else:
+                html_body += f"<div class='site-logo'><img src='/static/default_icon.png' alt='Default Logo'></div>"
+            # Контент результата
+            html_body += "<div class='result-content'>"
+            html_body += f"<h2><a href='{hit['url']}' target='_blank'>{hit['title']}</a></h2>"
+            html_body += f"<div class='description'>{hit['description']}</div>"
+            html_body += "</div></div>"
+    else:
+        html_body += "<p>Ничего не найдено.</p>"
 
+    html_body += "</body></html>"
+    return {'CONTENT-TYPE': 'text/html', 'CONTENT-LENGTH': str(len(html_body))}, html_body.encode()
 
-if __name__ == "__main__":
-    pages_directory = 'pages'  # Папка с HTML-файлами
-    index_directory = 'indexdir'
-    indexer = LocalHTMLIndexer(pages_directory, index_directory)
-    indexer.index()
+def handle_search_form():
+    """
+    Отправляет поисковую форму.
+    """
+    html_body = """
+    <html>
+    <head>
+        <title>Поиск</title>
+        <link rel='stylesheet' href='/static/styles.css'>
+        <link rel='icon' href='/static/favicon.ico' type='image/x-icon'>
+    </head>
+    <body>
+        <div class="search-container">
+            <div class="logo">
+                <img src="/static/logo.png" alt="Логотип">
+            </div>
+            <form method="GET">
+                <input type="text" name="q" placeholder="Введите запрос..." required autocomplete="off">
+                <button type="submit">Найти</button>
+            </form>
+        </div>
+    </body>
+    </html>
+    """
+    return {'CONTENT-TYPE': 'text/html', 'CONTENT-LENGTH': str(len(html_body))}, html_body.encode()
+
+def serve_static_file(path):
+    """
+    Обслуживает статический файл из папки static/.
+    """
+    static_dir = 'static'
+    file_path = os.path.join(static_dir, path)
+    if not os.path.exists(file_path):
+        return {'STATUS': 'ERROR', 'MESSAGE': 'File not found', 'CONTENT-TYPE': 'text/plain', 'CONTENT-LENGTH': str(len('File not found'))}, b'File not found'
+    
+    with open(file_path, 'rb') as f:
+        content = f.read()
+    
+    # Определение типа контента
+    _, ext = os.path.splitext(file_path)
+    ext = ext.lower()
+    if ext in ['.html', '.htm']:
+        content_type = 'text/html'
+    elif ext == '.css':
+        content_type = 'text/css'
+    elif ext == '.png':
+        content_type = 'image/png'
+    elif ext in ['.jpg', '.jpeg']:
+        content_type = 'image/jpeg'
+    elif ext == '.gif':
+        content_type = 'image/gif'
+    elif ext == '.js':
+        content_type = 'application/javascript'
+    elif ext == '.ico':
+        content_type = 'image/x-icon'
+    else:
+        content_type = 'application/octet-stream'
+    
+    headers = {'CONTENT-TYPE': content_type, 'CONTENT-LENGTH': str(len(content))}
+    return headers, content
+
+def handle_client(conn, addr):
+    """
+    Обрабатывает подключения клиентов в отдельных потоках.
+    """
+    logging.info(f"Подключен клиент: {addr}")
+    
+    try:
+        while True:
+            data = b""
+            while b"\n\n" not in data:
+                part = conn.recv(BUFFER_SIZE)
+                if not part:
+                    raise ConnectionResetError("Клиент закрыл соединение")
+                data += part
+
+            header_data, _, body = data.partition(b"\n\n")
+            headers = {}
+            for line in header_data.decode().split('\n'):
+                if ': ' in line:
+                    key, value = line.split(': ', 1)
+                    headers[key.strip().upper()] = value.strip()
+
+            action = headers.get('ACTION')
+            resource = headers.get('RESOURCE')
+            logging.info(f"Получен запрос ACTION={action}, RESOURCE={resource}")
+
+            if action == 'GET' and resource:
+                parsed_resource = urlparse(resource)
+                domain = parsed_resource.hostname
+                path = parsed_resource.path.lstrip('/')  # Удаление ведущего '/'
+                query = parsed_resource.query
+
+                if domain not in allowed_domains:
+                    message = "Domain not allowed"
+                    response = (
+                        f"SMP 1.0\n"
+                        f"STATUS: ERROR\n"
+                        f"MESSAGE: {message}\n"
+                        f"CONTENT-TYPE: text/plain\n"
+                        f"CONTENT-LENGTH: {len(message)}\n\n"
+                        f"{message}"
+                    )
+                    conn.sendall(response.encode())
+                    logging.warning(f"Запрошен запрещенный домен: {domain}")
+                    continue
+
+                domain_root = allowed_domains[domain]
+
+                if domain == 'search.com':
+                    if path == '' or path == '/':
+                        # Отправить поисковую форму
+                        headers_resp, body_resp = handle_search_form()
+                        response = f"SMP 1.0\nSTATUS: OK\n" + "\n".join([f"{k}: {v}" for k, v in headers_resp.items()]) + "\n\n"
+                        conn.sendall(response.encode() + body_resp)
+                        logging.info(f"Отправлена поисковая форма клиенту {addr}")
+                    elif path == 'search':
+                        # Обработка поискового запроса
+                        headers_resp, body_resp = handle_search_request(resource)
+                        response = f"SMP 1.0\nSTATUS: {headers_resp.get('STATUS', 'OK')}\n" + "\n".join([f"{k}: {v}" for k, v in headers_resp.items() if k not in ['STATUS', 'MESSAGE']]) + "\n\n"
+                        conn.sendall(response.encode() + body_resp)
+                        logging.info(f"Отправлены результаты поиска клиенту {addr}")
+                    else:
+                        # Обслуживание других ресурсов в search.com, например, статических
+                        if path.startswith('static/'):
+                            static_path = path[len('static/'):]
+                            headers_resp, body_resp = serve_static_file(static_path)
+                            if headers_resp.get('STATUS') == 'ERROR':
+                                response = f"SMP 1.0\nSTATUS: ERROR\nMESSAGE: {headers_resp.get('MESSAGE')}\nCONTENT-TYPE: text/plain\nCONTENT-LENGTH: {headers_resp.get('CONTENT-LENGTH')}\n\n{headers_resp.get('MESSAGE')}"
+                                conn.sendall(response.encode())
+                            else:
+                                response = f"SMP 1.0\nSTATUS: OK\n" + "\n".join([f"{k}: {v}" for k, v in headers_resp.items()]) + "\n\n"
+                                conn.sendall(response.encode() + body_resp)
+                        else:
+                            # Если путь не найден
+                            message = "Resource not found"
+                            response = (
+                                f"SMP 1.0\n"
+                                f"STATUS: ERROR\n"
+                                f"MESSAGE: {message}\n"
+                                f"CONTENT-TYPE: text/plain\n"
+                                f"CONTENT-LENGTH: {len(message)}\n\n"
+                                f"{message}"
+                            )
+                            conn.sendall(response.encode())
+                            logging.warning(f"Ресурс не найден в search.com: {path}")
+                else:
+                    # Обслуживание других доменов
+                    if path.startswith('static/'):
+                        static_path = path[len('static/'):]
+                        headers_resp, body_resp = serve_static_file(static_path)
+                        if headers_resp.get('STATUS') == 'ERROR':
+                            response = f"SMP 1.0\nSTATUS: ERROR\nMESSAGE: {headers_resp.get('MESSAGE')}\nCONTENT-TYPE: text/plain\nCONTENT-LENGTH: {headers_resp.get('CONTENT-LENGTH')}\n\n{headers_resp.get('MESSAGE')}"
+                            conn.sendall(response.encode())
+                        else:
+                            response = f"SMP 1.0\nSTATUS: OK\n" + "\n".join([f"{k}: {v}" for k, v in headers_resp.items()]) + "\n\n"
+                            conn.sendall(response.encode() + body_resp)
+                    else:
+                        # Обслуживание статических HTML-файлов
+                        file_path = os.path.join(domain_root, path)
+                        if os.path.isdir(file_path):
+                            file_path = os.path.join(file_path, 'index.html')
+                        if os.path.exists(file_path):
+                            with open(file_path, 'rb') as f:
+                                content = f.read()
+                            # Определение типа контента
+                            _, ext = os.path.splitext(file_path)
+                            ext = ext.lower()
+                            if ext in ['.html', '.htm']:
+                                content_type = 'text/html'
+                            elif ext == '.css':
+                                content_type = 'text/css'
+                            elif ext == '.png':
+                                content_type = 'image/png'
+                            elif ext in ['.jpg', '.jpeg']:
+                                content_type = 'image/jpeg'
+                            elif ext == '.gif':
+                                content_type = 'image/gif'
+                            elif ext == '.js':
+                                content_type = 'application/javascript'
+                            else:
+                                content_type = 'application/octet-stream'
+                            
+                            headers_resp = {'CONTENT-TYPE': content_type, 'CONTENT-LENGTH': str(len(content))}
+                            response = f"SMP 1.0\nSTATUS: OK\n" + "\n".join([f"{k}: {v}" for k, v in headers_resp.items()]) + "\n\n"
+                            conn.sendall(response.encode() + content)
+                            logging.info(f"Отправлен файл {file_path} клиенту {addr}")
+                        else:
+                            # Ресурс не найден
+                            message = "Resource not found"
+                            response = (
+                                f"SMP 1.0\n"
+                                f"STATUS: ERROR\n"
+                                f"MESSAGE: {message}\n"
+                                f"CONTENT-TYPE: text/plain\n"
+                                f"CONTENT-LENGTH: {len(message)}\n\n"
+                                f"{message}"
+                            )
+                            conn.sendall(response.encode())
+                            logging.warning(f"Ресурс не найден: {file_path}")
+            else:
+                # Неподдерживаемый метод или отсутствующие параметры
+                message = "Invalid ACTION or missing RESOURCE"
+                response = (
+                    f"SMP 1.0\n"
+                    f"STATUS: ERROR\n"
+                    f"MESSAGE: {message}\n"
+                    f"CONTENT-TYPE: text/plain\n"
+                    f"CONTENT-LENGTH: {len(message)}\n\n"
+                    f"{message}"
+                )
+                conn.sendall(response.encode())
+                logging.warning(f"Некорректный запрос: ACTION={action}, RESOURCE={resource}")
+
+    def start_server():
+        """
+        Запускает SMP сервер для прослушивания входящих подключений.
+        """
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+            server_socket.bind((HOST, PORT))
+            server_socket.listen()
+            logging.info(f"SMP Server запущен на {HOST}:{PORT}")
+
+            while True:
+                conn, addr = server_socket.accept()
+                client_thread = threading.Thread(target=handle_client, args=(conn, addr), daemon=True)
+                client_thread.start()
+
+    if __name__ == "__main__":
+        start_server()

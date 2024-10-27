@@ -1,334 +1,39 @@
-import socket
-import threading
-import logging
+# search_app.py
+
+from flask import Flask, request, render_template
+from whoosh import index
+from whoosh.qparser import MultifieldParser
 import os
-import re
-from urllib.parse import urlparse
-from collections import defaultdict
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
 
-# Настройки сервера
-HOST = '0.0.0.0' # Слушать на всех интерфейсах
-PORT = 8080
-BUFFER_SIZE = 4096 # Размер буфера для передачи данных
+app = Flask(__name__)
 
-# Настройка логирования
-logging.basicConfig(
-    filename='smp_server.log',
-    level=logging.INFO,
-    format='%(asctime)s:%(levelname)s:%(message)s'
-)
+# Directory where the index is stored
+INDEX_DIR = "search_index"
 
-# Разрешенные домены и их корневые директории
-allowed_domains = {
-    'example.com': 'example',
-    'test.com': 'test'
-}
+# Open the existing index
+if not os.path.exists(INDEX_DIR):
+    raise ValueError("Index directory does not exist. Please run indexer.py first.")
+ix = index.open_dir(INDEX_DIR)
 
-# Initialize the inverted index
-inverted_index = defaultdict(set)
+@app.route('/')
+def home():
+    return render_template('search.html')
 
-def build_index():
-    """
-    Scans all allowed domains and indexes the content of HTML files.
-    """
-    for domain, root_dir in allowed_domains.items():
-        if not os.path.isdir(root_dir):
-            logging.warning(f"Root directory for domain '{domain}' does not exist: {root_dir}")
-            continue
-        for root, _, files in os.walk(root_dir):
-            for file in files:
-                if file.lower().endswith(('.html', '.htm')):
-                    filepath = os.path.join(root, file)
-                    try:
-                        with open(filepath, 'r', encoding='utf-8') as f:
-                            content = f.read().lower()
-                            # Tokenize the content into words
-                            words = re.findall(r'\b\w+\b', content)
-                            for word in words:
-                                inverted_index[word].add(filepath)
-                    except Exception as e:
-                        logging.error(f"Failed to index file {filepath}: {e}")
-    logging.info("Indexing complete.")
-
-def send_large_file(conn, filepath):
-    """
-    Отправляет файл клиенту частями с соответствующими заголовками.
-    """
-    if not os.path.exists(filepath):
-        logging.error(f"Файл не найден: {filepath}")
-        message = "File not found"
-        response = (
-            f"SMP 1.0\n"
-            f"STATUS: ERROR\n"
-            f"MESSAGE: {message}\n"
-            f"CONTENT-TYPE: text/plain\n"
-            f"CONTENT-LENGTH: {len(message)}\n\n"
-            f"{message}"
-        )
-        conn.sendall(response.encode())
-        return
-
-    try:
-        file_size = os.path.getsize(filepath)
-        _, ext = os.path.splitext(filepath)
-        ext = ext.lower()
-        if ext in ['.html', '.htm']:
-            content_type = 'text/html'
-        elif ext == '.css':
-            content_type = 'text/css'
-        elif ext == '.png':
-            content_type = 'image/png'
-        elif ext in ['.jpg', '.jpeg']:
-            content_type = 'image/jpeg'
-        elif ext == '.gif':
-            content_type = 'image/gif'
-        elif ext == '.js':
-            content_type = 'application/javascript'
-        else:
-            content_type = 'application/octet-stream'
-
-        # Отправка заголовков
-        response_headers = (
-            f"SMP 1.0\n"
-            f"STATUS: OK\n"
-            f"CONTENT-TYPE: {content_type}\n"
-            f"CONTENT-LENGTH: {file_size}\n\n"
-        )
-        conn.send(response_headers.encode())
-        logging.info(f"Отправка файла: {filepath}")
-
-        # Отправка файла частями
-        with open(filepath, 'rb') as f:
-            while True:
-                chunk = f.read(BUFFER_SIZE)
-                if not chunk:
-                    break
-                conn.sendall(chunk)
-        logging.info(f"Файл отправлен: {filepath}")
-
-    except Exception as e:
-        logging.error(f"Ошибка при отправке файла {filepath}: {e}")
-        message = f"Error sending file: {e}"
-        response = (
-            f"SMP 1.0\n"
-            f"STATUS: ERROR\n"
-            f"MESSAGE: {message}\n"
-            f"CONTENT-TYPE: text/plain\n"
-            f"CONTENT-LENGTH: {len(message)}\n\n"
-            f"{message}"
-        )
-        conn.sendall(response.encode())
-
-def send_error(conn, message):
-    """
-    Отправляет сообщение об ошибке клиенту.
-    """
-    response = (
-        f"SMP 1.0\n"
-        f"STATUS: ERROR\n"
-        f"MESSAGE: {message}\n"
-        f"CONTENT-TYPE: text/plain\n"
-        f"CONTENT-LENGTH: {len(message)}\n\n"
-        f"{message}"
-    )
-    conn.sendall(response.encode())
-
-def handle_get_action(conn, resource):
-    """
-    Обрабатывает GET запросы.
-    """
-    # Разбор ресурса для извлечения домена и пути
-    parsed = urlparse('smp://' + resource) # Для использования urlparse
-    domain = parsed.hostname
-    path = parsed.path.lstrip('/') # Удаление ведущего '/'
-
-    if domain not in allowed_domains:
-        message = "Domain not allowed"
-        send_error(conn, message)
-        logging.warning(f"Запрошен запрещенный домен: {domain}")
-        return
-
-    # Определение пути к файлу
-    domain_root = allowed_domains[domain]
-    file_path = os.path.join(domain_root, path) if path else os.path.join(domain_root, 'index.html')
-
-    # Предотвращение обхода директорий
-    real_file_path = os.path.realpath(file_path)
-    real_domain_root = os.path.realpath(domain_root)
-    if not real_file_path.startswith(real_domain_root):
-        message = "Invalid resource path"
-        send_error(conn, message)
-        logging.warning(f"Некорректный путь ресурса: {file_path}")
-        return
-
-    # Если путь указывает на директорию, отправить index.html
-    if os.path.isdir(real_file_path):
-        file_path = os.path.join(real_file_path, 'index.html')
-        if not os.path.exists(file_path):
-            message = "Resource not found"
-            send_error(conn, message)
-            logging.warning(f"Ресурс не найден: {file_path}")
-            return
-
-    send_large_file(conn, file_path)
-
-def handle_search_action(conn, query):
-    """
-    Обрабатывает SEARCH запросы.
-    """
-    logging.info(f"Выполнение поиска по запросу: '{query}'")
-    keywords = query.lower().split()
-    if not keywords:
-        send_error(conn, "Empty search query")
-        return
-
-    # Perform intersection of sets to handle multiple keywords
-    result_sets = [inverted_index.get(keyword, set()) for keyword in keywords]
-    if not result_sets:
-        matched_files = set()
-    else:
-        matched_files = set.intersection(*result_sets)
-
-    if not matched_files:
-        message = "No results found"
-        response = (
-            f"SMP 1.0\n"
-            f"STATUS: OK\n"
-            f"MESSAGE: {message}\n"
-            f"CONTENT-TYPE: text/plain\n"
-            f"CONTENT-LENGTH: {len(message)}\n\n"
-            f"{message}"
-        )
-        conn.sendall(response.encode())
-        logging.info("Поиск не дал результатов.")
-        return
-
-    # Prepare search results
-    results = "\n".join([os.path.relpath(filepath) for filepath in matched_files])
-    response = (
-        f"SMP 1.0\n"
-        f"STATUS: OK\n"
-        f"MESSAGE: Search results\n"
-        f"CONTENT-TYPE: text/plain\n"
-        f"CONTENT-LENGTH: {len(results)}\n\n"
-        f"{results}"
-    )
-    conn.sendall(response.encode())
-    logging.info(f"Поиск завершен. Найдено файлов: {len(matched_files)}")
-
-def handle_client(conn, addr):
-    """
-    Обрабатывает подключения клиентов в отдельных потоках.
-    """
-    logging.info(f"Подключен клиент: {addr}")
-
-    while True:
-        try:
-            data = b""
-            while b"\n\n" not in data:
-                part = conn.recv(BUFFER_SIZE)
-                if not part:
-                    raise ConnectionResetError("Клиент закрыл соединение")
-                data += part
-
-            header_data, _, body = data.partition(b"\n\n")
-            headers = {}
-            for line in header_data.decode().split('\n'):
-                if ': ' in line:
-                    key, value = line.split(': ', 1)
-                    headers[key.strip().upper()] = value.strip()
-
-            action = headers.get('ACTION')
-            if action == 'GET':
-                resource = headers.get('RESOURCE')
-                if resource:
-                    handle_get_action(conn, resource)
-                else:
-                    send_error(conn, "Missing RESOURCE for GET action")
-            elif action == 'SEARCH':
-                query = headers.get('QUERY')
-                if query:
-                    handle_search_action(conn, query)
-                else:
-                    send_error(conn, "Missing QUERY for SEARCH action")
-            else:
-                send_error(conn, "Unsupported ACTION")
-                logging.warning(f"Unsupported ACTION received: {action}")
-
-        except ConnectionResetError as e:
-            logging.info(f"Клиент {addr} отключился: {e}")
-            break
-        except Exception as e:
-            logging.error(f"Ошибка при обработке клиента {addr}: {e}")
-            break
-
-    conn.close()
-    logging.info(f"Соединение с {addr} закрыто")
-
-class IndexUpdateHandler(FileSystemEventHandler):
-    def on_created(self, event):
-        if not event.is_directory and event.src_path.lower().endswith(('.html', '.htm')):
-            index_file(event.src_path)
-
-    def on_modified(self, event):
-        if not event.is_directory and event.src_path.lower().endswith(('.html', '.htm')):
-            index_file(event.src_path)
-
-    def on_deleted(self, event):
-        if not event.is_directory and event.src_path.lower().endswith(('.html', '.htm')):
-            for keyword, files in inverted_index.items():
-                files.discard(event.src_path)
-
-    def index_file(self, filepath):
-        try:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                content = f.read().lower()
-                words = re.findall(r'\b\w+\b', content)
-                # Remove previous entries for this file
-                for files in inverted_index.values():
-                    files.discard(filepath)
-                for word in words:
-                    inverted_index[word].add(filepath)
-            logging.info(f"Файл проиндексирован: {filepath}")
-        except Exception as e:
-            logging.error(f"Не удалось проиндексировать файл {filepath}: {e}")
-
-def start_index_observer():
-    observer = Observer()
-    event_handler = IndexUpdateHandler()
-    for domain, root_dir in allowed_domains.items():
-        if os.path.isdir(root_dir):
-            observer.schedule(event_handler, path=root_dir, recursive=True)
-    observer.start()
-    logging.info("Обозреватель файлового индекса запущен.")
-
-    return observer
-
-def start_server():
-    """
-    Запускает SMP сервер для прослушивания входящих подключений.
-    """
-    build_index()  # Build the search index at startup
-    observer = start_index_observer()  # Start file system observer
-
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
-            server_socket.bind((HOST, PORT))
-            server_socket.listen()
-            logging.info(f"SMP Server запущен на {HOST}:{PORT}")
-
-            while True:
-                conn, addr = server_socket.accept()
-                client_thread = threading.Thread(target=handle_client, args=(conn, addr), daemon=True)
-                client_thread.start()
-    except KeyboardInterrupt:
-        logging.info("Сервер прерывается пользователем.")
-    finally:
-        observer.stop()
-        observer.join()
-        logging.info("Обозреватель файлового индекса остановлен.")
+@app.route('/search')
+def search():
+    query = request.args.get('q', '')
+    results = []
+    if query:
+        with ix.searcher() as searcher:
+            parser = MultifieldParser(["title", "content"], schema=ix.schema)
+            myquery = parser.parse(query)
+            search_results = searcher.search(myquery, limit=20)
+            for hit in search_results:
+                results.append({
+                    'title': hit['title'],
+                    'path': hit['path']
+                })
+    return render_template('results.html', query=query, results=results)
 
 if __name__ == "__main__":
-    start_server()
+    app.run(host='0.0.0.0', port=5000, debug=True)

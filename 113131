@@ -1,39 +1,14 @@
-# search_app.py
-
-from flask import Flask, request, render_template
-from whoosh import index
-from whoosh.qparser import MultifieldParser
-import os
-
-app = Flask(__name__)
-
-# Directory where the index is stored
-INDEX_DIR = "search_index"
-
-# Open the existing index
-if not os.path.exists(INDEX_DIR):
-    raise ValueError("Index directory does not exist. Please run indexer.py first.")
-ix = index.open_dir(INDEX_DIR)
-
-@app.route('/')
-def home():
-    return render_template('search.html')
-
-@app.route('/search')
-def search():
-    query = request.args.get('q', '')
-    results = []
-    if query:
-        with ix.searcher() as searcher:
-            parser = MultifieldParser(["title", "content"], schema=ix.schema)
-            myquery = parser.parse(query)
-            search_results = searcher.search(myquery, limit=20)
-            for hit in search_results:
-                results.append({
-                    'title': hit['title'],
-                    'path': hit['path']
-                })
-    return render_template('results.html', query=query, results=results)
-
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000, debug=True)
+<!-- templates/search.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SMP Search</title>
+</head>
+<body>
+    <h1>Search SMP</h1>
+    <form action="/search" method="get">
+        <input type="text" name="q" placeholder="Enter search terms..." required>
+        <button type="submit">Search</button>
+    </form>
+</body>
+</html>

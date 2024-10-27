@@ -1,22 +1,54 @@
-<!-- templates/results.html -->
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Search Results for "{{ query }}"</title>
-</head>
-<body>
-    <h1>Search Results for "{{ query }}"</h1>
-    {% if results %}
-        <ul>
-            {% for result in results %}
-                <li>
-                    <a href="{{ result.path }}">{{ result.title }}</a>
-                </li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <p>No results found.</p>
-    {% endif %}
-    <a href="/">Back to Search</a>
-</body>
-</html>
+# indexer.py
+
+import os
+from whoosh import index
+from whoosh.fields import Schema, TEXT, ID
+from whoosh.analysis import StemmingAnalyzer
+from bs4 import BeautifulSoup
+
+# Define the schema for the index
+schema = Schema(
+    path=ID(stored=True, unique=True),
+    title=TEXT(stored=True),
+    content=TEXT(analyzer=StemmingAnalyzer())
+)
+
+# Directory where the index will be stored
+INDEX_DIR = "search_index"
+
+# Ensure the index directory exists
+if not os.path.exists(INDEX_DIR):
+    os.mkdir(INDEX_DIR)
+    ix = index.create_in(INDEX_DIR, schema)
+else:
+    ix = index.open_dir(INDEX_DIR)
+
+# Allowed domains and their root directories
+allowed_domains = {
+    'example.com': 'example',
+    'test.com': 'test'
+}
+
+def index_html_files():
+    writer = ix.writer()
+    for domain, root_dir in allowed_domains.items():
+        for root, dirs, files in os.walk(root_dir):
+            for file in files:
+                if file.endswith(('.html', '.htm')):
+                    file_path = os.path.join(root, file)
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            soup = BeautifulSoup(f, 'html.parser')
+                            title = soup.title.string if soup.title else 'No Title'
+                            text = soup.get_text()
+                            # Use the SMP resource path as the unique ID
+                            resource_path = f"smp://{domain}/{os.path.relpath(file_path, root_dir)}"
+                            writer.update_document(path=resource_path, title=title, content=text)
+                            print(f"Indexed: {resource_path}")
+                    except Exception as e:
+                        print(f"Error indexing {file_path}: {e}")
+    writer.commit()
+    print("Indexing completed.")
+
+if __name__ == "__main__":
+    index_html_files()

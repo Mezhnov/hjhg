@@ -1,13 +1,68 @@
 {% extends "base.html" %}
 
+{% block title %}Результаты поиска для "{{ query }}"{% endblock %}
+
 {% block content %}
-<div class="search-container">
+<div class="header">
     <div class="logo">
-        <img src="smp://search/logos/logo.png" alt="Логотип">
+        <img src="smp://search/logos/logo.png" alt="Логотип поисковой системы">
     </div>
-    <form method="GET" action="smp://search/index.html">
-        <input type="text" name="query" placeholder="Введите запрос..." required autocomplete="off" value="{{ query | default('') }}">
+    <form method="GET" action="smp://search/index.html" class="search-form">
+        <input type="text" name="query" value="{{ query }}" required autocomplete="off" placeholder="Что вы ищете?">
         <button type="submit">Найти</button>
     </form>
 </div>
+
+<div class="tabs">
+    <button class="tab active" onclick="showResults('all')">Поиск</button>
+    <button class="tab" onclick="showResults('images')">Картинки</button>
+    <button class="tab" onclick="showResults('videos')">Видео</button>
+    <button class="tab" onclick="showResults('news')">Новости</button>
+</div>
+
+<div class="results" id="results-all">
+    {% if hits %}
+        {% for hit in hits %}
+            <div class="result">
+                <div class="site-logo">
+                    {% if hit.logo %}
+                        <img src="{{ hit.logo }}" alt="Site Logo">
+                    {% else %}
+                        <img src="smp://search/logos/default_icon.png" alt="Default Logo">
+                    {% endif %}
+                </div>
+                <div class="result-content">
+                    <h2><a href="{{ hit.url }}">{{ hit.title }}</a></h2>
+                    <div class="description">{{ hit.description }}</div>
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>Ничего не найдено для "{{ query }}"</p>
+    {% endif %}
+</div>
+
+<div class="results" id="results-images" style="display: none;">
+    <!-- Здесь будут результаты для изображений -->
+</div>
+<div class="results" id="results-videos" style="display: none;">
+    <!-- Здесь будут результаты для видео -->
+</div>
+<div class="results" id="results-news" style="display: none;">
+    <!-- Здесь будут результаты для новостей -->
+</div>
+
+<script>
+    function showResults(category) {
+        const categories = ['all', 'images', 'videos', 'news'];
+        categories.forEach(cat => {
+            const resultsDiv = document.getElementById(`results-${cat}`);
+            resultsDiv.style.display = cat === category ? 'block' : 'none';
+        });
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        document.querySelector(`.tab[onclick="showResults('${category}')"]`).classList.add('active');
+    }
+</script>
 {% endblock %}

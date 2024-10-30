@@ -1,68 +1,181 @@
-{% extends "base.html" %}
+/* search/styles.css */
 
-{% block title %}Результаты поиска для "{{ query }}"{% endblock %}
+body {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+    background-color: #ffffff;
+}
 
-{% block content %}
-<div class="header">
-    <div class="logo">
-        <img src="smp://search/logos/logo.png" alt="Логотип поисковой системы">
-    </div>
-    <form method="GET" action="smp://search/index.html" class="search-form">
-        <input type="text" name="query" value="{{ query }}" required autocomplete="off" placeholder="Что вы ищете?">
-        <button type="submit">Найти</button>
-    </form>
-</div>
+.search-container {
+    width: 60%;
+    margin: 0 auto;
+    padding-top: 30px;
+}
 
-<div class="tabs">
-    <button class="tab active" onclick="showResults('all')">Поиск</button>
-    <button class="tab" onclick="showResults('images')">Картинки</button>
-    <button class="tab" onclick="showResults('videos')">Видео</button>
-    <button class="tab" onclick="showResults('news')">Новости</button>
-</div>
+.logo img {
+    display: block;
+    margin: 0 auto;
+    width: 250px;
+    margin-bottom: 40px;
+}
 
-<div class="results" id="results-all">
-    {% if hits %}
-        {% for hit in hits %}
-            <div class="result">
-                <div class="site-logo">
-                    {% if hit.logo %}
-                        <img src="{{ hit.logo }}" alt="Site Logo">
-                    {% else %}
-                        <img src="smp://search/logos/default_icon.png" alt="Default Logo">
-                    {% endif %}
-                </div>
-                <div class="result-content">
-                    <h2><a href="{{ hit.url }}">{{ hit.title }}</a></h2>
-                    <div class="description">{{ hit.description }}</div>
-                </div>
-            </div>
-        {% endfor %}
-    {% else %}
-        <p>Ничего не найдено для "{{ query }}"</p>
-    {% endif %}
-</div>
+.search-form {
+    flex-grow: 1;
+    margin-left: 20px;
+    position: relative;
+}
 
-<div class="results" id="results-images" style="display: none;">
-    <!-- Здесь будут результаты для изображений -->
-</div>
-<div class="results" id="results-videos" style="display: none;">
-    <!-- Здесь будут результаты для видео -->
-</div>
-<div class="results" id="results-news" style="display: none;">
-    <!-- Здесь будут результаты для новостей -->
-</div>
+.search-form input[type="text"] {
+    width: 70%;
+    padding: 12px;
+    font-size: 18px;
+    border: 1px solid #dfe1e5;
+    border-radius: 24px;
+    outline: none;
+    transition: box-shadow 0.2s;
+}
 
-<script>
-    function showResults(category) {
-        const categories = ['all', 'images', 'videos', 'news'];
-        categories.forEach(cat => {
-            const resultsDiv = document.getElementById(`results-${cat}`);
-            resultsDiv.style.display = cat === category ? 'block' : 'none';
-        });
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        document.querySelector(`.tab[onclick="showResults('${category}')"]`).classList.add('active');
+.search-form input[type="text"]:focus {
+    box-shadow: 0 0 5px rgba(66, 133, 244, 0.5);
+}
+
+.search-form button {
+    padding: 12px 20px;
+    margin-left: -45px;
+    font-size: 18px;
+    border: none;
+    background-color: #4285f4;
+    color: #fff;
+    border-radius: 24px;
+    cursor: pointer;
+    outline: none;
+    transition: background-color 0.2s;
+}
+
+.search-form button:hover {
+    background-color: #357ae8;
+}
+
+.results {
+    margin-top: 30px;
+}
+
+.result {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 20px;
+}
+
+.site-logo {
+    width: 32px;
+    height: 32px;
+    margin-right: 10px;
+}
+
+.site-logo img {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.result-content {
+    flex-grow: 1;
+}
+
+.result h2 {
+    margin: 0 0 5px 0;
+    font-size: 18px;
+}
+
+.result h2 a {
+    text-decoration: none;
+    color: #1a0dab;
+}
+
+.result h2 a:hover {
+    text-decoration: underline;
+}
+
+.description {
+    color: #545454;
+    font-size: 14px;
+}
+
+/* Tabs Container */
+.tabs {
+    display: flex;
+    justify-content: flex-start;
+    border-bottom: 3px solid #dcdcdc;
+    margin-bottom: 20px;
+    padding-bottom: 8px;
+    box-shadow: inset 0 -2px 3px rgba(0, 0, 0, 0.05); /* Slight shadow for depth */
+}
+
+/* Tab Styling */
+.tab {
+    padding: 12px 25px;
+    font-size: 16px;
+    font-weight: 500;
+    color: #5f6368;
+    background-color: #f9fafb;
+    border: 1px solid #ddd;
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    margin-right: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08); /* Soft shadow for elevated feel */
+}
+
+/* Active Tab */
+.tab.active {
+    background-color: #ffffff;
+    color: #202124;
+    border: 1px solid #dcdcdc;
+    border-bottom: 3px solid #4285F4; /* Highlight active with brand color */
+    box-shadow: none; /* Remove shadow to blend with content */
+}
+
+/* Hover Effect */
+.tab:hover {
+    background-color: #f1f3f4;
+    color: #202124;
+    border-color: #dcdcdc;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); /* Increase shadow on hover for focus */
+}
+
+/* Smooth Gradient Active Background */
+.tab.active {
+    background: linear-gradient(145deg, #ffffff 0%, #f1f3f4 100%);
+    color: #1a73e8;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .search-container {
+        width: 90%;
     }
-</script>
-{% endblock %}
+
+    .search-form input[type="text"] {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+
+    .search-form button {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .logo img {
+        width: 200px;
+    }
+
+    .tabs {
+        flex-wrap: wrap;
+    }
+
+    .tab {
+        padding: 10px 15px;
+        font-size: 14px;
+    }
+}

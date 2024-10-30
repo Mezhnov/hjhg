@@ -1,122 +1,368 @@
-# crawler.py
+/* static/styles.css */
+body {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+    background-color: #ffffff;
+}
 
-import os
-import re
-import time
-import nltk
-from nltk.stem.snowball import RussianStemmer
-from nltk.corpus import stopwords
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin
-from whoosh.index import open_dir, create_in
-from whoosh.fields import Schema, TEXT, ID, STORED
+.search-container {
+    width: 60%;
+    margin: 0 auto;
+    padding-top: 30px;
+}
 
-# Ensure NLTK data is downloaded
-nltk.download('punkt')
-nltk.download('stopwords')
+.logo img {
+    display: block;
+    margin: 0 auto;
+    width: 250px;
+    margin-bottom: 40px;
+}
 
+.logo-small a img {
+    width: 120px;
+    vertical-align: middle;
+}
 
-class WebCrawler:
-    def __init__(self, root_dirs, index_dir='indexdir'):
-        self.root_dirs = root_dirs
-        self.visited_files = set()
-        self.filepaths_to_visit = []
-        self.stemmer = RussianStemmer()
-        self.stop_words = set(stopwords.words('russian'))
-        self.index_dir = index_dir
+.search-container form {
+    text-align: center;
+}
 
-        if not os.path.exists(index_dir):
-            os.mkdir(index_dir)
+.search-container input[type="text"] {
+    width: 70%;
+    padding: 12px;
+    font-size: 18px;
+    border: 1px solid #dfe1e5;
+    border-radius: 24px;
+    outline: none;
+    transition: box-shadow 0.2s;
+}
 
-        if not os.path.exists(index_dir) or not os.listdir(index_dir):
-            self.schema = Schema(
-                url=ID(stored=True, unique=True),
-                title=TEXT(stored=True),
-                content=TEXT,
-                description=TEXT(stored=True),
-                logo=STORED
-            )
-            self.ix = create_in(index_dir, self.schema)
-            print("Created new Whoosh index.")
-        else:
-            self.ix = open_dir(index_dir)
-            print("Opened existing Whoosh index.")
+.search-container input[type="text"]:focus {
+    box-shadow: 0 0 5px rgba(66, 133, 244, 0.5);
+}
 
-    def clean_text(self, text):
-        tokens = nltk.word_tokenize(text.lower(), language='russian')
-        tokens = [re.sub(r'\W+', '', token) for token in tokens]
-        tokens = [token for token in tokens if token and token not in self.stop_words]
-        tokens = [self.stemmer.stem(token) for token in tokens]
-        return ' '.join(tokens)
+.search-container button {
+    padding: 12px 20px;
+    margin-left: -45px;
+    font-size: 18px;
+    border: none;
+    background-color: #4285f4;
+    color: #fff;
+    border-radius: 24px;
+    cursor: pointer;
+    outline: none;
+    transition: background-color 0.2s;
+}
 
-    def extract_description(self, text):
-        description = text.strip().replace('\n', ' ')
-        if len(description) > 200:
-            description = description[:200] + '...'
-        return description
+.search-container button:hover {
+    background-color: #357ae8;
+}
 
-    def extract_logo(self, soup, base_path):
-        # Извлекаем путь к логотипу из тегов <img class="site-logo" src="...">
-        logo_tag = soup.find("img", {"class": "site-logo"})
-        if logo_tag and 'src' in logo_tag.attrs:
-            logo_relative = logo_tag['src'].lstrip('/')
-            logo_path = os.path.join('search', logo_relative)
-            if os.path.exists(logo_path):
-                return f"smp://search/{logo_relative}"
-        # Если логотип не найден, используем дефолтный
-        return "smp://search/logos/default_icon.png"
+.results {
+    margin-top: 30px;
+}
 
-    def crawl(self, max_pages=100):
-        page_count = 0
-        for root_dir in self.root_dirs:
-            for root, _, files in os.walk(root_dir):
-                for file in files:
-                    if file.lower().endswith(('.html', '.htm')):
-                        filepath = os.path.join(root, file)
-                        if filepath in self.visited_files:
-                            continue
-                        self.visited_files.add(filepath)
-                        try:
-                            with open(filepath, 'r', encoding='utf-8') as f:
-                                soup = BeautifulSoup(f, 'html.parser')
-                                title = soup.title.string.strip() if soup.title else 'No Title'
-                                text = soup.get_text(separator=' ', strip=True)
-                                clean_content = self.clean_text(text)
-                                description = self.extract_description(text)
+.result {
+    margin-bottom: 30px;
+}
 
-                                logo_url = self.extract_logo(soup, filepath)
+.result h2 {
+    font-size: 20px;
+    margin: 0;
+}
 
-                                # Prepare SMP resource path
-                                relative_path = os.path.relpath(filepath, root_dir).replace(os.sep, '/')
-                                resource_path = f"smp://{os.path.basename(root_dir)}/{relative_path}"
+.result h2 a {
+    text-decoration: none;
+    color: #1a0dab;
+}
 
-                                # Add document to index
-                                writer = self.ix.writer()
-                                writer.update_document(
-                                    url=resource_path,
-                                    title=title,
-                                    content=clean_content,
-                                    description=description,
-                                    logo=logo_url
-                                )
-                                writer.commit()
-                                page_count += 1
-                                print(f"Indexed: {resource_path}")
+.result h2 a:hover {
+    text-decoration: underline;
+}
 
-                                if page_count >= max_pages:
-                                    print(f"Reached max_pages limit: {max_pages}")
-                                    return
-                                time.sleep(0.1)  # Небольшая задержка для избежания высокой нагрузки
-                        except Exception as e:
-                            print(f"Failed to index file {filepath}: {e}")
-                            continue
-        print(f"Crawling completed. Total pages indexed: {page_count}")
+.url {
+    font-size: 14px;
+    color: #006621;
+}
 
+.description {
+    font-size: 14px;
+    color: #545454;
+}
 
-if __name__ == "__main__":
-    root_dirs = [
-        'search',
-        'sites'
-    ]
-    crawler = WebCrawler(root_dirs, index_dir='indexdir')
-    crawler.crawl(max_pages=100)
+@media (max-width: 768px) {
+    .search-container {
+        width: 90%;
+    }
+
+    .search-container input[type="text"] {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+
+    .search-container button {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .logo img {
+        width: 200px;
+    }
+
+    .logo-small a img {
+        width: 100px;
+    }
+}
+.result-image {
+    max-width: 150px;
+    height: auto;
+    margin-top: 10px;
+}
+/* styles.css */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    padding: 10px 20px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.logo img {
+    height: 40px;
+}
+
+.search-form {
+    flex-grow: 1;
+    margin-left: 20px;
+    position: relative;
+}
+
+.search-form input[type="text"] {
+    width: 100%;
+    padding: 10px 15px;
+    font-size: 16px;
+    border: 1px solid #dcdcdc;
+    border-radius: 4px;
+}
+
+.search-form button {
+    position: absolute;
+    right: 5px;
+    top: 5px;
+    bottom: 5px;
+    padding: 0 15px;
+    background-color: #4285F4;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.search-form button:hover {
+    background-color: #357AE8;
+}
+
+.results {
+    margin: 20px 40px;
+}
+
+.result {
+    margin-bottom: 20px;
+}
+
+.result h2 {
+    margin: 0 0 5px 0;
+    font-size: 18px;
+}
+
+.result .url {
+    color: green;
+    font-size: 14px;
+    margin-bottom: 5px;
+}
+
+.result .description {
+    color: #545454;
+    font-size: 14px;
+}
+/* styles.css */
+
+/* General Styles */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    padding: 10px 20px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.logo img {
+    height: 40px;
+}
+
+.search-form {
+    flex-grow: 1;
+    margin-left: 20px;
+    position: relative;
+}
+
+.search-form input[type="text"] {
+    width: 100%;
+    padding: 10px 15px;
+    font-size: 16px;
+    border: 1px solid #dcdcdc;
+    border-radius: 4px;
+}
+
+.search-form button {
+    position: absolute;
+    right: 5px;
+    top: 5px;
+    bottom: 5px;
+    padding: 0 15px;
+    background-color: #4285F4;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.search-form button:hover {
+    background-color: #357AE8;
+}
+
+.results {
+    margin: 20px 40px;
+}
+
+.result {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 20px;
+}
+
+.site-logo {
+    width: 32px;
+    height: 32px;
+    margin-right: 10px;
+}
+
+.site-logo img {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.result-content {
+    flex-grow: 1;
+}
+
+.result h2 {
+    margin: 0 0 5px 0;
+    font-size: 18px;
+}
+
+.result .url {
+    color: green;
+    font-size: 14px;
+    margin-bottom: 5px;
+}
+
+.result .description {
+    color: #545454;
+    font-size: 14px;
+}
+
+/* Optional: Style for default logo */
+.site-logo img[alt="Default Logo"] {
+    opacity: 0.5;
+}
+/* General Styles */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f4f6f8;
+    margin: 0;
+    padding: 20px;
+    color: #333;
+}
+
+/* Tabs Container */
+.tabs {
+    display: flex;
+    justify-content: flex-start;
+    border-bottom: 3px solid #dcdcdc;
+    margin-bottom: 20px;
+    padding-bottom: 8px;
+    box-shadow: inset 0 -2px 3px rgba(0, 0, 0, 0.05); /* Slight shadow for depth */
+}
+
+/* Tab Styling */
+.tab {
+    padding: 12px 25px;
+    font-size: 16px;
+    font-weight: 500;
+    color: #5f6368;
+    background-color: #f9fafb;
+    border: 1px solid #ddd;
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    margin-right: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08); /* Soft shadow for elevated feel */
+}
+
+/* Active Tab */
+.tab.active {
+    background-color: #ffffff;
+    color: #202124;
+    border: 1px solid #dcdcdc;
+    border-bottom: 3px solid #4285F4; /* Highlight active with brand color */
+    box-shadow: none; /* Remove shadow to blend with content */
+}
+
+/* Hover Effect */
+.tab:hover {
+    background-color: #f1f3f4;
+    color: #202124;
+    border-color: #dcdcdc;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); /* Increase shadow on hover for focus */
+}
+
+/* Smooth Gradient Active Background */
+.tab.active {
+    background: linear-gradient(145deg, #ffffff 0%, #f1f3f4 100%);
+    color: #1a73e8;
+}
+
+/* Results Section Styling */
+.results {
+    margin-top: 20px;
+    padding: 20px;
+    background-color: #ffffff;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .tab {
+        padding: 10px 15px;
+        font-size: 14px;
+    }
+
+    .tabs {
+        flex-wrap: wrap;
+    }
+}

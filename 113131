@@ -1,13 +1,13 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <title>{% block title %}Поиск{% endblock %}</title>
-    <link rel="stylesheet" href="smp://search/styles.css">
-    <link rel="icon" href="smp://search/logos/favicon.ico" type="image/x-icon">
-    {% block head %}{% endblock %}
-</head>
-<body>
-    {% block content %}{% endblock %}
-</body>
-</html>
+{% extends "base.html" %}
+
+{% block content %}
+<div class="search-container">
+    <div class="logo">
+        <img src="smp://search/logos/logo.png" alt="Логотип">
+    </div>
+    <form method="GET" action="smp://search/index.html">
+        <input type="text" name="query" placeholder="Введите запрос..." required autocomplete="off" value="{{ query | default('') }}">
+        <button type="submit">Найти</button>
+    </form>
+</div>
+{% endblock %}

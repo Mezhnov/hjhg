@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>{% block title %}Поиск{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <link rel="stylesheet" href="smp://search/styles.css">
+    <link rel="icon" href="smp://search/logos/favicon.ico" type="image/x-icon">
     {% block head %}{% endblock %}
 </head>
 <body>

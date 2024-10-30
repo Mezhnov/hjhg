@@ -1,149 +1,463 @@
-# crawler.py
+# server.py
 
-import requests
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
+import socket
+import threading
+import logging
+import os
 import re
-import time
-import nltk
-from nltk.stem.snowball import RussianStemmer
-from nltk.corpus import stopwords
+from urllib.parse import urlparse, urljoin
+
 from whoosh.index import open_dir, create_in
 from whoosh.fields import Schema, TEXT, ID, STORED
-from whoosh.qparser import QueryParser
-import os
+from whoosh.qparser import MultifieldParser
 
-# Download necessary NLTK data
-nltk.download('punkt')
-nltk.download('stopwords')
+# -----------------------------
+# Configuration and Setup
+# -----------------------------
 
-class WebCrawler:
-    def __init__(self, start_urls, allowed_domains, index_dir='indexdir'):
-        self.start_urls = start_urls
-        self.allowed_domains = allowed_domains
-        self.visited_urls = set()
-        self.urls_to_visit = start_urls[:]
-        self.stemmer = RussianStemmer()
-        self.stop_words = set(stopwords.words('russian'))
-        self.index_dir = index_dir
-        if not os.path.exists(index_dir):
-            os.mkdir(index_dir)
-        if not os.path.exists(index_dir) or not os.listdir(index_dir):
-            self.schema = Schema(
-                url=ID(stored=True, unique=True),
-                title=TEXT(stored=True),
-                content=TEXT,
-                description=TEXT(stored=True),
-                logo=STORED
-            )
-            self.ix = create_in(index_dir, self.schema)
-            print("Created new Whoosh index.")
+# Server Configuration
+HOST = '0.0.0.0'  # Listen on all interfaces
+PORT = 8080
+BUFFER_SIZE = 4096  # Buffer size for data transmission
+
+# Logging Configuration
+logging.basicConfig(
+    filename='smp_server.log',
+    level=logging.INFO,
+    format='%(asctime)s:%(levelname)s:%(message)s'
+)
+
+# Allowed Domains and Their Root Directories
+# Здесь указываем директорию 'search' и 'sites' как корневые директории
+allowed_domains = {
+    'search': 'search',
+    'sites': 'sites'
+}
+
+# Path to Whoosh Index Directory
+INDEX_DIR = 'indexdir'
+
+# Ensure the index directory exists
+if not os.path.exists(INDEX_DIR):
+    os.mkdir(INDEX_DIR)
+
+# Define the schema for the index
+schema = Schema(
+    url=ID(stored=True, unique=True),
+    title=TEXT(stored=True),
+    content=TEXT,
+    description=TEXT(stored=True),
+    logo=STORED
+)
+
+# Initialize Whoosh Index
+if not os.path.exists(INDEX_DIR) or not os.listdir(INDEX_DIR):
+    ix = create_in(INDEX_DIR, schema)
+    logging.info("Created new Whoosh index.")
+else:
+    ix = open_dir(INDEX_DIR)
+    logging.info("Opened existing Whoosh index.")
+
+# -----------------------------
+# Helper Functions
+# -----------------------------
+
+
+def send_large_file(conn, filepath):
+    """
+    Sends a file to the client in chunks along with appropriate headers.
+    """
+    if not os.path.exists(filepath):
+        logging.error(f"File not found: {filepath}")
+        message = "File not found"
+        response = (
+            f"SMP 1.0\n"
+            f"STATUS: ERROR\n"
+            f"MESSAGE: {message}\n"
+            f"CONTENT-TYPE: text/plain\n"
+            f"CONTENT-LENGTH: {len(message)}\n\n"
+            f"{message}"
+        )
+        conn.sendall(response.encode())
+        return
+
+    try:
+        file_size = os.path.getsize(filepath)
+        _, ext = os.path.splitext(filepath)
+        ext = ext.lower()
+        if ext in ['.html', '.htm']:
+            content_type = 'text/html'
+        elif ext == '.css':
+            content_type = 'text/css'
+        elif ext == '.png':
+            content_type = 'image/png'
+        elif ext in ['.jpg', '.jpeg']:
+            content_type = 'image/jpeg'
+        elif ext == '.gif':
+            content_type = 'image/gif'
+        elif ext == '.js':
+            content_type = 'application/javascript'
         else:
-            self.ix = open_dir(index_dir)
-            print("Opened existing Whoosh index.")
+            content_type = 'application/octet-stream'
 
-    def is_allowed(self, url):
-        parsed_url = urlparse(url)
-        return any(allowed_domain in parsed_url.netloc for allowed_domain in self.allowed_domains)
+        # Send headers
+        response_headers = (
+            f"SMP 1.0\n"
+            f"STATUS: OK\n"
+            f"CONTENT-TYPE: {content_type}\n"
+            f"CONTENT-LENGTH: {file_size}\n\n"
+        )
+        conn.send(response_headers.encode())
+        logging.info(f"Sending file: {filepath}")
 
-    def clean_text(self, text):
-        tokens = nltk.word_tokenize(text.lower(), language='russian')
-        tokens = [re.sub(r'\W+', '', token) for token in tokens]
-        tokens = [token for token in tokens if token and token not in self.stop_words]
-        tokens = [self.stemmer.stem(token) for token in tokens]
-        return ' '.join(tokens)
+        # Send the file in chunks
+        with open(filepath, 'rb') as f:
+            while True:
+                chunk = f.read(BUFFER_SIZE)
+                if not chunk:
+                    break
+                conn.sendall(chunk)
+        logging.info(f"File sent: {filepath}")
 
-    def extract_description(self, text):
-        description = text.strip().replace('\n', ' ')
-        if len(description) > 200:
-            description = description[:200] + '...'
-        return description
+    except Exception as e:
+        logging.error(f"Error sending file {filepath}: {e}")
+        message = f"Error sending file: {e}"
+        response = (
+            f"SMP 1.0\n"
+            f"STATUS: ERROR\n"
+            f"MESSAGE: {message}\n"
+            f"CONTENT-TYPE: text/plain\n"
+            f"CONTENT-LENGTH: {len(message)}\n\n"
+            f"{message}"
+        )
+        conn.sendall(response.encode())
 
-    def extract_logo(self, soup, base_url):
-        icon_link = soup.find("link", rel=lambda r: r and "icon" in r.lower())
-        if icon_link and 'href' in icon_link.attrs:
-            logo_url = urljoin(base_url, icon_link['href'])
-            return logo_url
-        return None
 
-    def save_logo(self, logo_url, url):
+def send_error(conn, message):
+    """
+    Sends an error message to the client.
+    """
+    response = (
+        f"SMP 1.0\n"
+        f"STATUS: ERROR\n"
+        f"MESSAGE: {message}\n"
+        f"CONTENT-TYPE: text/plain\n"
+        f"CONTENT-LENGTH: {len(message)}\n\n"
+        f"{message}"
+    )
+    conn.sendall(response.encode())
+
+
+def build_index():
+    """
+    Scans all allowed domains and indexes the content of HTML files for search functionality.
+    """
+    from bs4 import BeautifulSoup  # Import here to ensure it's available
+
+    writer = ix.writer()
+    for domain, root_dir in allowed_domains.items():
+        if not os.path.isdir(root_dir):
+            logging.warning(f"Root directory for domain '{domain}' does not exist: {root_dir}")
+            continue
+        for root, _, files in os.walk(root_dir):
+            for file in files:
+                if file.lower().endswith(('.html', '.htm')):
+                    filepath = os.path.join(root, file)
+                    try:
+                        with open(filepath, 'r', encoding='utf-8') as f:
+                            soup = BeautifulSoup(f, 'html.parser')
+                            title = soup.title.string.strip() if soup.title else 'No Title'
+                            text = soup.get_text(separator=' ', strip=True)
+                            description = text[:200] + '...' if len(text) > 200 else text
+
+                            # Extract logo path relative to 'search' directory
+                            logo_tag = soup.find("img", {"class": "site-logo"})
+                            logo_path = None
+                            if logo_tag and 'src' in logo_tag.attrs:
+                                logo_relative = logo_tag['src'].lstrip('/')
+                                logo_path = os.path.join('search', logo_relative)
+
+                            # Prepare SMP resource path as unique ID
+                            relative_path = os.path.relpath(filepath, root_dir).replace(os.sep, '/')
+                            resource_path = f"smp://{domain}/{relative_path}"
+
+                            # Add document to index
+                            writer.update_document(
+                                url=resource_path,
+                                title=title,
+                                content=text,
+                                description=description,
+                                logo=logo_path if logo_path else 'smp://search/logos/default_icon.png'  # Default logo
+                            )
+                            logging.info(f"Indexed: {resource_path}")
+                    except Exception as e:
+                        logging.error(f"Failed to index file {filepath}: {e}")
+    writer.commit()
+    logging.info("Finished indexing all HTML files.")
+
+
+def handle_search_action(conn, query):
+    """
+    Handles SEARCH requests by querying the Whoosh index and returning formatted results.
+    """
+    logging.info(f"Search request received: '{query}'")
+    from whoosh.qparser import QueryParser
+
+    try:
+        # Clean and prepare the query
+        clean_query = clean_query_string(query)
+        with ix.searcher() as searcher:
+            parser = MultifieldParser(["title", "content"], ix.schema)
+            parsed_query = parser.parse(clean_query)
+            results = searcher.search(parsed_query, limit=10)
+            hits = [
+                {
+                    'title': r['title'],
+                    'url': r['url'],
+                    'description': r['description'],
+                    'logo': r['logo'] if r['logo'] else 'smp://search/logos/default_icon.png'  # Default logo if none
+                }
+                for r in results
+            ]
+
+        # Format the search results into HTML
+        results_html = generate_search_results_html(query, hits)
+
+        content_length = len(results_html.encode('utf-8'))
+
+        # Prepare SMP response headers
+        response_headers = (
+            f"SMP 1.0\n"
+            f"STATUS: OK\n"
+            f"CONTENT-TYPE: text/html\n"
+            f"CONTENT-LENGTH: {content_length}\n\n"
+        )
+        conn.send(response_headers.encode())
+        conn.sendall(results_html.encode('utf-8'))
+        logging.info(f"Search results sent for query: '{query}'")
+
+    except Exception as e:
+        logging.error(f"Error handling search query '{query}': {e}")
+        message = f"Error processing search: {e}"
+        response = (
+            f"SMP 1.0\n"
+            f"STATUS: ERROR\n"
+            f"MESSAGE: {message}\n"
+            f"CONTENT-TYPE: text/plain\n"
+            f"CONTENT-LENGTH: {len(message)}\n\n"
+            f"{message}"
+        )
+        conn.sendall(response.encode())
+
+
+def clean_query_string(query):
+    """
+    Cleans and processes the search query.
+    """
+    import nltk
+    from nltk.stem.snowball import RussianStemmer
+    from nltk.corpus import stopwords
+
+    stemmer = RussianStemmer()
+    stop_words = set(stopwords.words('russian'))
+    from nltk.tokenize import word_tokenize
+
+    tokens = word_tokenize(query.lower(), language='russian')
+    tokens = [re.sub(r'\W+', '', token) for token in tokens]
+    tokens = [token for token in tokens if token and token not in stop_words]
+    tokens = [stemmer.stem(token) for token in tokens]
+    return ' '.join(tokens)
+
+
+def generate_search_results_html(query, hits):
+    """
+    Generates HTML content for search results.
+    """
+    html_header = f"""
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head>
+        <meta charset="UTF-8">
+        <title>Результаты поиска для "{query}"</title>
+        <link rel="stylesheet" href="smp://search/styles.css">
+    </head>
+    <body>
+        <div class="header">
+            <div class="logo">
+                <img src="smp://search/logos/logo.png" alt="Логотип поисковой системы">
+            </div>
+            <form method="GET" action="smp://search/index.html" class="search-form">
+                <input type="text" name="query" value="{query}" required autocomplete="off" placeholder="Что вы ищете?">
+                <button type="submit">Найти</button>
+            </form>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showResults('all')">Поиск</button>
+            <button class="tab" onclick="showResults('images')">Картинки</button>
+            <button class="tab" onclick="showResults('videos')">Видео</button>
+            <button class="tab" onclick="showResults('news')">Новости</button>
+        </div>
+
+        <div class="results" id="results-all">
+    """
+
+    html_footer = """
+        </div>
+
+        <div class="results" id="results-images" style="display: none;">
+            <!-- Здесь будут результаты для изображений -->
+        </div>
+        <div class="results" id="results-videos" style="display: none;">
+            <!-- Здесь будут результаты для видео -->
+        </div>
+        <div class="results" id="results-news" style="display: none;">
+            <!-- Здесь будут результаты для новостей -->
+        </div>
+
+        <script>
+            function showResults(category) {
+                const categories = ['all', 'images', 'videos', 'news'];
+                categories.forEach(cat => {
+                    const resultsDiv = document.getElementById(`results-${cat}`);
+                    resultsDiv.style.display = cat === category ? 'block' : 'none';
+                });
+                document.querySelectorAll('.tab').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                document.querySelector(`.tab[onclick="showResults('${category}')"]`).classList.add('active');
+            }
+        </script>
+    </body>
+    </html>
+    """
+
+    result_items = ""
+    for hit in hits:
+        logo_html = f"""<img src="{hit['logo']}" alt="Site Logo" class="site-logo">""" if hit['logo'] else ""
+        result_items += f"""
+        <div class="result">
+            <div class="site-logo">
+                {logo_html}
+            </div>
+            <div class="result-content">
+                <h2><a href="{hit['url']}">{hit['title']}</a></h2>
+                <div class="description">{hit['description']}</div>
+            </div>
+        </div>
+        """
+
+    return html_header + result_items + html_footer
+
+
+def handle_get_action(conn, resource):
+    """
+    Handles GET requests by serving static files or search results.
+    """
+    # Parse the resource URL
+    parsed = urlparse('smp://' + resource)  # To utilize urlparse
+    domain = parsed.hostname
+    path = parsed.path.lstrip('/')  # Remove leading '/'
+
+    if domain not in allowed_domains:
+        message = "Domain not allowed"
+        send_error(conn, message)
+        logging.warning(f"Disallowed domain requested: {domain}")
+        return
+
+    # Serve static files
+    domain_root = allowed_domains[domain]
+    file_path = os.path.join(domain_root, path) if path else os.path.join(domain_root, 'index.html')
+
+    # Prevent directory traversal
+    real_file_path = os.path.realpath(file_path)
+    real_domain_root = os.path.realpath(domain_root)
+    if not real_file_path.startswith(real_domain_root):
+        message = "Invalid resource path"
+        send_error(conn, message)
+        logging.warning(f"Invalid resource path requested: {file_path}")
+        return
+
+    # If the path points to a directory, serve index.html
+    if os.path.isdir(real_file_path):
+        file_path = os.path.join(real_file_path, 'index.html')
+        if not os.path.exists(file_path):
+            message = "Resource not found"
+            send_error(conn, message)
+            logging.warning(f"Resource not found: {file_path}")
+            return
+
+    send_large_file(conn, file_path)
+
+
+def handle_client(conn, addr):
+    """
+    Handles client connections in separate threads.
+    """
+    logging.info(f"Client connected: {addr}")
+
+    while True:
         try:
-            response = requests.get(logo_url, stream=True, timeout=5, headers={'User-Agent': 'Mozilla/5.0'})
-            if response.status_code == 200:
-                parsed_url = urlparse(url)
-                domain = parsed_url.netloc.replace(':', '_')
-                ext = os.path.splitext(logo_url)[1] if os.path.splitext(logo_url)[1] else '.ico'
-                logo_filename = f"{domain}{ext}"
-                logos_dir = os.path.join('static', 'logos')
-                if not os.path.exists(logos_dir):
-                    os.makedirs(logos_dir)
-                logo_path = os.path.join(logos_dir, logo_filename)
-                with open(logo_path, 'wb') as f:
-                    for chunk in response.iter_content(1024):
-                        f.write(chunk)
-                return os.path.join('logos', logo_filename)
-        except requests.RequestException as e:
-            print(f"Failed to download logo: {e}")
-        return None
+            data = b""
+            # Receive data until headers and body are separated by double newline
+            while b"\n\n" not in data:
+                part = conn.recv(BUFFER_SIZE)
+                if not part:
+                    raise ConnectionResetError("Client closed the connection")
+                data += part
 
-    def crawl(self, max_pages=100):
-        page_count = 0
-        while self.urls_to_visit and page_count < max_pages:
-            url = self.urls_to_visit.pop(0)
-            if url in self.visited_urls:
-                continue
-            self.visited_urls.add(url)
-            if not self.is_allowed(url):
-                continue
-            try:
-                response = requests.get(url, timeout=5, headers={'User-Agent': 'Mozilla/5.0'})
-                if response.status_code == 200:
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    title_tag = soup.find('title')
-                    title = title_tag.get_text().strip() if title_tag else url
-                    text = soup.get_text(separator=' ', strip=True)
-                    clean_content = self.clean_text(text)
-                    description = self.extract_description(text)
+            header_data, _, body = data.partition(b"\n\n")
+            headers = {}
+            for line in header_data.decode().split('\n'):
+                if ': ' in line:
+                    key, value = line.split(': ', 1)
+                    headers[key.strip().upper()] = value.strip()
 
-                    logo_url = self.extract_logo(soup, url)
-                    logo_path = None
-                    if logo_url:
-                        logo_path = self.save_logo(logo_url, url)
+            action = headers.get('ACTION')
+            resource = headers.get('RESOURCE')
 
-                    # Update Whoosh index
-                    writer = self.ix.writer()
-                    writer.update_document(
-                        url=url,
-                        title=title,
-                        content=clean_content,
-                        description=description,
-                        logo=logo_path
-                    )
-                    writer.commit()
-                    page_count += 1
-                    print(f"Indexed: {url}")
+            if action == 'GET' and resource:
+                handle_get_action(conn, resource)
+            elif action == 'SEARCH' and headers.get('QUERY'):
+                query = headers.get('QUERY')
+                handle_search_action(conn, query)
+            else:
+                message = "Invalid ACTION or missing RESOURCE/QUERY"
+                send_error(conn, message)
+                logging.warning(f"Invalid request: ACTION={action}, RESOURCE={resource}")
 
-                    # Extract and enqueue all found links
-                    for link in soup.find_all('a', href=True):
-                        absolute_link = urljoin(url, link['href'])
-                        if absolute_link not in self.visited_urls and self.is_allowed(absolute_link):
-                            self.urls_to_visit.append(absolute_link)
-                    time.sleep(1)  # Respectful crawling
-            except requests.RequestException as e:
-                print(f"Request failed: {e}")
-                continue
-            except Exception as e:
-                print(f"An error occurred: {e}")
-                continue
+        except ConnectionResetError as e:
+            logging.info(f"Client {addr} disconnected: {e}")
+            break
+        except Exception as e:
+            logging.error(f"Error handling client {addr}: {e}")
+            break
 
-        print(f"Crawling completed. Total pages indexed: {page_count}")
+    conn.close()
+    logging.info(f"Connection with {addr} closed")
+
+
+# -----------------------------
+# Server Initialization
+# -----------------------------
+
+def start_server():
+    """
+    Starts the SMP server to listen for incoming connections.
+    """
+    build_index()  # Build the search index at startup
+    logging.info("Whoosh indexing completed.")
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+        server_socket.bind((HOST, PORT))
+        server_socket.listen()
+        logging.info(f"SMP Server started on {HOST}:{PORT}")
+
+        while True:
+            conn, addr = server_socket.accept()
+            client_thread = threading.Thread(target=handle_client, args=(conn, addr), daemon=True)
+            client_thread.start()
+
 
 if __name__ == "__main__":
-    start_urls = [
-        'smp://garik2004.pythonanywhere.com/'  # Example SMP URL
-    ]
-    allowed_domains = [
-        'garik2004.pythonanywhere.com'
-    ]
-    crawler = WebCrawler(start_urls, allowed_domains, index_dir=INDEX_DIR)
-    crawler.crawl(max_pages=50)
+    start_server()

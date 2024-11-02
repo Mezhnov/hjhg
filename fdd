@@ -29,7 +29,8 @@ using namespace Gdiplus;
 // Structure to store image information
 struct ImageItem {
     Image* image;
-    std::wstring title;
+    std::wstring title; // Display title
+    std::wstring filename; // Filename extracted from URL
     float x; // X-coordinate on the screen
     float y; // Y-coordinate on the screen
     float width; // Width of the displayed image
@@ -49,8 +50,17 @@ int currentLanguageIndex = 0; // Current language index
 // List of additional images
 std::vector<ImageItem> images;
 
+// Function to extract filename from URL
+std::wstring ExtractFilenameFromURL(const std::wstring& url) {
+    size_t pos = url.find_last_of(L"/\\");
+    if (pos != std::wstring::npos && pos + 1 < url.length()) {
+        return url.substr(pos + 1);
+    }
+    return L"Unknown";
+}
+
 // Function to load image from URL
-bool LoadImageFromURL(const std::wstring& url, Image*& outImage) {
+bool LoadImageFromURL(const std::wstring& url, Image*& outImage, std::wstring& outFilename) {
     HINTERNET hInternet = InternetOpen(L"ImageLoader", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (!hInternet) {
         OutputDebugString(L"InternetOpen failed\n");
@@ -118,6 +128,8 @@ bool LoadImageFromURL(const std::wstring& url, Image*& outImage) {
     }
 
     outImage = img;
+    // Extract filename from URL
+    outFilename = ExtractFilenameFromURL(url);
     OutputDebugString(L"Image loaded successfully\n");
     return true;
 }
@@ -181,10 +193,12 @@ bool InitializeImages() {
 
     for (size_t i = 0; i < imageData.size(); ++i) {
         Image* img = nullptr;
-        if (LoadImageFromURL(imageData[i].first, img)) {
+        std::wstring filename;
+        if (LoadImageFromURL(imageData[i].first, img, filename)) {
             ImageItem item;
             item.image = img;
             item.title = imageData[i].second;
+            item.filename = filename;
             item.x = startX + i * spacing; // Position along X-axis with spacing
             item.y = startY; // Fixed Y position
             item.width = 100.0f; // Image width
@@ -210,7 +224,8 @@ bool InitializeImages() {
     };
 
     for (const auto& icon : iconsToLoad) {
-        if (!LoadImageFromURL(icon.url, *(icon.imagePtr))) {
+        std::wstring dummyFilename;
+        if (!LoadImageFromURL(icon.url, *(icon.imagePtr), dummyFilename)) {
             OutputDebugString((L"Failed to load icon: " + icon.url + L"\n").c_str());
             return false;
         }
@@ -231,13 +246,143 @@ struct WindowData {
     bool isCreatingFolder = false; // Flag to indicate folder creation
 };
 
+// Structure to pass data to Image Window
+struct ImageWindowData {
+    Image* image; // Image to display
+    std::wstring title; // Window title (filename)
+};
+
+// Window Procedure for Image Window
+LRESULT CALLBACK ImageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    ImageWindowData* imgData = reinterpret_cast<ImageWindowData*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+
+    switch (uMsg) {
+    case WM_CREATE: {
+        // Retrieve pointer to Image and title from CREATESTRUCT
+        CREATESTRUCT* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
+        ImageWindowData* data = reinterpret_cast<ImageWindowData*>(cs->lpCreateParams);
+        SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(data));
+        return 0;
+    }
+
+    case WM_DESTROY:
+        // Clean up ImageWindowData but not the image itself as it's managed elsewhere
+        if (imgData) {
+            delete imgData;
+        }
+        return 0;
+
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
+        Graphics graphics(hdc);
+
+        // Set high-quality rendering settings
+        graphics.SetSmoothingMode(SmoothingModeHighQuality);
+        graphics.SetInterpolationMode(InterpolationModeHighQualityBicubic);
+        graphics.SetPixelOffsetMode(PixelOffsetModeHighQuality);
+
+        // Get client area dimensions
+        RECT clientRect;
+        GetClientRect(hwnd, &clientRect);
+
+        // Draw the image centered and scaled to fit the window while maintaining aspect ratio
+        if (imgData && imgData->image) {
+            UINT imgWidth = imgData->image->GetWidth();
+            UINT imgHeight = imgData->image->GetHeight();
+
+            double windowAspect = static_cast<double>(clientRect.right) / clientRect.bottom;
+            double imageAspect = static_cast<double>(imgWidth) / imgHeight;
+
+            double drawWidth, drawHeight;
+            if (windowAspect > imageAspect) {
+                // Window is wider than image
+                drawHeight = clientRect.bottom;
+                drawWidth = imageAspect * drawHeight;
+            }
+            else {
+                // Window is narrower or equal to image
+                drawWidth = clientRect.right;
+                drawHeight = drawWidth / imageAspect;
+            }
+
+            float x = static_cast<float>((clientRect.right - drawWidth) / 2.0);
+            float y = static_cast<float>((clientRect.bottom - drawHeight) / 2.0);
+            graphics.DrawImage(imgData->image, x, y, static_cast<REAL>(drawWidth), static_cast<REAL>(drawHeight));
+        }
+
+        EndPaint(hwnd, &ps);
+        return 0;
+    }
+
+    default:
+        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }
+}
+
+// Function to create an Image Window
+bool CreateImageWindow(HINSTANCE hInstance, Image* image, const std::wstring& title) {
+    const wchar_t IMAGE_CLASS_NAME[] = L"ImageWindowClass";
+
+    // Register Image Window Class if not already registered
+    static bool classRegistered = false;
+    if (!classRegistered) {
+        WNDCLASS wc = {};
+        wc.lpfnWndProc = ImageWindowProc;
+        wc.hInstance = hInstance;
+        wc.lpszClassName = IMAGE_CLASS_NAME;
+        wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+        wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+
+        if (!RegisterClass(&wc)) {
+            MessageBox(NULL, L"Failed to register Image Window class.", L"Error", MB_ICONERROR);
+            return false;
+        }
+        classRegistered = true;
+    }
+
+    // Prepare data for the Image Window
+    ImageWindowData* imgData = new ImageWindowData();
+    imgData->image = image;
+    imgData->title = title;
+
+    // Create the Image Window
+    HWND hwndImage = CreateWindowEx(
+        0,
+        IMAGE_CLASS_NAME,
+        imgData->title.c_str(),
+        WS_OVERLAPPEDWINDOW, // Standard window style
+        CW_USEDEFAULT, CW_USEDEFAULT, 800, 600, // Initial size
+        NULL,
+        NULL,
+        hInstance,
+        imgData // Pass the ImageWindowData as lpParam
+    );
+
+    if (hwndImage == NULL) {
+        MessageBox(NULL, L"Failed to create Image Window.", L"Error", MB_ICONERROR);
+        delete imgData;
+        return false;
+    }
+
+    ShowWindow(hwndImage, SW_SHOW);
+    UpdateWindow(hwndImage);
+
+    return true;
+}
+
 // Function to create a context menu
 void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex, bool isOnImage) {
     HMENU hMenu = CreatePopupMenu();
     if (hMenu) {
         if (isOnImage && imageIndex < images.size()) {
-            // Context menu for images
-            AppendMenu(hMenu, MF_STRING, 1, L"Открыть");       // Open
+            // Extract the filename
+            std::wstring filename = images[imageIndex].filename;
+
+            // Create "Open [filename]" menu item
+            std::wstring openMenuItem = L"Открыть " + filename;
+            AppendMenu(hMenu, MF_STRING, 1, openMenuItem.c_str());
+
             AppendMenu(hMenu, MF_STRING, 2, L"Переименовать"); // Rename
             AppendMenu(hMenu, MF_STRING, 3, L"Удалить");       // Delete
         }
@@ -249,7 +394,7 @@ void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex, bool isOnImag
         // Set foreground to ensure the menu disappears correctly
         SetForegroundWindow(hwnd);
 
-        // Track the popup menu
+        // Track the popup menu and get the selected command
         int cmd = TrackPopupMenu(
             hMenu,
             TPM_RETURNCMD | TPM_TOPALIGN | TPM_LEFTALIGN,
@@ -262,8 +407,18 @@ void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex, bool isOnImag
 
         // Handle menu selections
         if (isOnImage && imageIndex < images.size()) {
-            if (cmd == 1) { // Open
-                MessageBox(hwnd, (images[imageIndex].title + L" открыта.").c_str(), L"Открыть", MB_OK);
+            if (cmd == 1) { // Open [filename]
+                // Open the image in a new window
+                ImageItem& selectedItem = images[imageIndex];
+                bool success = CreateImageWindow(
+                    GetModuleHandle(NULL),
+                    selectedItem.image,
+                    selectedItem.filename // Use filename as window title
+                );
+
+                if (!success) {
+                    MessageBox(hwnd, L"Не удалось открыть изображение.", L"Ошибка", MB_ICONERROR);
+                }
             }
             else if (cmd == 2) { // Rename
                 // Initiate renaming by creating an Edit control
@@ -321,8 +476,11 @@ void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex, bool isOnImag
                 if (data && data->editControl == NULL) {
                     ImageItem newItem;
                     // You can set a default folder icon URL or use a local resource
-                    if (LoadImageFromURL(L"https://i.postimg.cc/4x8HknSh/nyc01-temp-32d4-T5s3-TEIMt1-R3qrjho.png", newItem.image)) {
+                    std::wstring defaultFolderURL = L"https://i.postimg.cc/4x8HknSh/nyc01-temp-32d4-T5s3-TEIMt1-R3qrjho.png";
+                    std::wstring filename;
+                    if (LoadImageFromURL(defaultFolderURL, newItem.image, filename)) {
                         newItem.title = L"Новая папка"; // Default name
+                        newItem.filename = ExtractFilenameFromURL(defaultFolderURL);
                         // Position the new folder where the user right-clicked
                         newItem.x = static_cast<float>(x);
                         newItem.y = static_cast<float>(y);
@@ -366,7 +524,7 @@ void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex, bool isOnImag
     }
 }
 
-// Window Procedure
+// Window Procedure for the Main Window
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     // Retrieve WindowData
     WindowData* data = reinterpret_cast<WindowData*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
@@ -483,7 +641,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             // Draw Sound Icon
             graphics.DrawImage(soundIcon, currentX, iconY, iconSize, iconSize);
             currentX += iconSize + 10.0f;
-
+        
             // Draw Battery Icon
             graphics.DrawImage(batteryIcon, currentX, iconY, iconSize, iconSize);
             currentX += iconSize + 30.0f; // Extra spacing before language and time
@@ -491,7 +649,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         // Get current time
         std::wstring timeString = GetCurrentTimeString();
-        std::wstring langString = languages[currentLanguageIndex]; // Current language
+    std::wstring langString = languages[currentLanguageIndex]; // Current language
 
         // Use GDI+ to draw text
         FontFamily fontFamilyObj(L"Segoe UI"); // Font selection
@@ -747,13 +905,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     }
 
     default:
-        // **Removed Error C2065**: EN_ENVELOPE is not a valid identifier
-        // Removed the following invalid code block:
-        /*
-        if (uMsg == WM_COMMAND && HIWORD(wParam) == EN_ENVELOPE && lParam != 0) {
-            // Handle specific edit control notifications
-        }
-        */
         return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
 }
@@ -812,7 +963,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     }
 
     // Load background image from URL
-    if (!LoadImageFromURL(L"https://i.pinimg.com/originals/56/cb/5f/56cb5ff3d83e4159c447b04d5d3a333e.jpg", backgroundImage)) {
+    if (!LoadImageFromURL(L"https://i.pinimg.com/originals/56/cb/5f/56cb5ff3d83e4159c447b04d5d3a333e.jpg", backgroundImage, std::wstring())) {
         MessageBox(hwnd, L"Не удалось загрузить фон. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
         DestroyWindow(hwnd);
         GdiplusShutdown(gdiplusToken);

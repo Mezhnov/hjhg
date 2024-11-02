@@ -11,10 +11,8 @@
 #include <windowsx.h>
 #include <mmsystem.h> // For PlaySound
 #include <CommCtrl.h> // For common controls
-#define IDR_WAVE1 101
-#define IDR_WAVE2 102
-#define IDR_WAVE3 103
-#define IDR_WAVE4 104
+#include <map>        // For tracking edit controls
+#include <algorithm>  // For std::find_if
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "wininet.lib")
 #pragma comment(lib, "winmm.lib") // Link with winmm.lib for PlaySound
@@ -32,18 +30,40 @@ struct ImageItem {
     float height; // Height of the displayed image
 };
 
+// Structure to store window-specific data
+struct WindowData {
+    bool isDragging = false;
+    size_t draggingImageIndex = SIZE_MAX; // Invalid index initially
+    POINT lastMousePos = { 0, 0 };
+    bool isRenaming = false;
+    size_t renamingImageIndex = SIZE_MAX;
+    HWND hwndEdit = NULL; // Handle to the Edit control if renaming
+};
+
 // Global Variables
 Image* backgroundImage = nullptr;
 Image* wifiIcon = nullptr;
 Image* soundIcon = nullptr;
 Image* batteryIcon = nullptr;
+Image* sidebarImage = nullptr;
 
 // List of languages
 std::vector<std::wstring> languages = { L"РУС", L"ENG" }; // Russian and English
 int currentLanguageIndex = 0; // Current language index
 
-// List of additional images
+// List of additional images (folders)
 std::vector<ImageItem> images;
+
+// Function Declarations
+bool LoadImageFromURL(const std::wstring& url, Image*& outImage);
+std::wstring GetCurrentTimeString();
+void PlaySoundByLanguage(const std::wstring& soundName);
+bool InitializeImages();
+bool InitializeFolderImages();
+bool InitializeIcons();
+bool InitializeSidebar();
+void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex);
+bool ShowRenameEditControl(HWND hwnd, WindowData* data, size_t imageIndex);
 
 // Function to load image from URL
 bool LoadImageFromURL(const std::wstring& url, Image*& outImage) {
@@ -136,13 +156,11 @@ std::wstring GetCurrentTimeString() {
 void PlaySoundByLanguage(const std::wstring& soundName) {
     // Define sound file paths or use system sounds
     // For demonstration, we'll use system sounds based on soundName
-    // You can replace this with actual file paths or URLs
+    // You can replace this with actual file paths or resources
 
     std::wstring soundPath;
     if (currentLanguageIndex == 0) { // Russian
         if (soundName == L"WindowsLogo") {
-            // Play a system sound or specify a custom path
-            // Example: PlaySound(L"C:\\Sounds\\windows_logo.wav", NULL, SND_FILENAME | SND_ASYNC);
             PlaySound(MAKEINTRESOURCE(IDR_WAVE1), NULL, SND_RESOURCE | SND_ASYNC);
         }
         else if (soundName == L"WiFi") {
@@ -160,8 +178,8 @@ void PlaySoundByLanguage(const std::wstring& soundName) {
     }
 }
 
-// Function to initialize additional images
-bool InitializeImages() {
+// Function to initialize additional images (folders)
+bool InitializeFolderImages() {
     // List of image URLs and corresponding titles
     std::vector<std::pair<std::wstring, std::wstring>> imageData = {
         { L"https://i.postimg.cc/4x8HknSh/nyc01-temp-32d4-T5s3-TEIMt1-R3qrjho.png", L"Новая папка" }, // New Folder
@@ -170,9 +188,9 @@ bool InitializeImages() {
     };
 
     // Initial positions for images
-    float startX = 50.0f;
+    float startX = 220.0f; // Starting after sidebar (200px) + padding
     float startY = 150.0f; // Positioned below the announcement
-    float spacing = 150.0f; // Reduced spacing for better layout
+    float spacing = 150.0f; // Spacing between folders
 
     for (size_t i = 0; i < imageData.size(); ++i) {
         Image* img = nullptr;
@@ -192,6 +210,11 @@ bool InitializeImages() {
         }
     }
 
+    return true;
+}
+
+// Function to initialize icons (WiFi, Sound, Battery)
+bool InitializeIcons() {
     // Load Wi-Fi, Sound, and Battery icons
     struct IconData {
         Image** imagePtr;
@@ -214,116 +237,27 @@ bool InitializeImages() {
     return true;
 }
 
-// Structure to store window-specific data
-struct WindowData {
-    bool isDragging = false;
-    size_t draggingImageIndex = SIZE_MAX; // Invalid index initially
-    POINT lastMousePos = { 0, 0 };
-};
+// Function to initialize the sidebar image
+bool InitializeSidebar() {
+    // Load sidebar image from URL
+    std::wstring sidebarURL = L"https://i.postimg.cc/MTGRD2S3/sidebar-image.png"; // Replace with your desired URL
+    if (!LoadImageFromURL(sidebarURL, sidebarImage)) {
+        OutputDebugString(L"Failed to load sidebar image\n");
+        return false;
+    }
+    return true;
+}
+
+// Function to initialize all images
+bool InitializeImages() {
+    if (!InitializeFolderImages()) return false;
+    if (!InitializeIcons()) return false;
+    if (!InitializeSidebar()) return false;
+    return true;
+}
 
 // Function to display a simple rename dialog and get user input
-bool ShowRenameDialog(HWND hwndOwner, const std::wstring& currentName, std::wstring& newName) {
-    // Register dialog class if not already
-    const wchar_t DIALOG_CLASS_NAME[] = L"RenameDialogClass";
-
-    WNDCLASS wc = { 0 };
-    wc.lpfnWndProc = DefWindowProc;
-    wc.hInstance = GetModuleHandle(NULL);
-    wc.lpszClassName = DIALOG_CLASS_NAME;
-    RegisterClass(&wc);
-
-    // Create dialog window
-    HWND hwndDialog = CreateWindowEx(
-        WS_EX_DLGMODALFRAME,
-        DIALOG_CLASS_NAME,
-        L"Переименование",
-        WS_POPUP | WS_CAPTION | WS_SYSMENU,
-        CW_USEDEFAULT, CW_USEDEFAULT, 300, 120,
-        hwndOwner,
-        NULL,
-        GetModuleHandle(NULL),
-        NULL
-    );
-
-    if (!hwndDialog) return false;
-
-    // Create static text
-    HWND hwndText = CreateWindow(
-        L"STATIC",
-        L"Введите новое имя:",
-        WS_CHILD | WS_VISIBLE,
-        10, 10, 280, 20,
-        hwndDialog,
-        NULL,
-        GetModuleHandle(NULL),
-        NULL
-    );
-
-    // Create edit control
-    HWND hwndEdit = CreateWindowEx(
-        0,
-        L"EDIT",
-        currentName.c_str(),
-        WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
-        10, 40, 260, 25,
-        hwndDialog,
-        NULL,
-        GetModuleHandle(NULL),
-        NULL
-    );
-
-    // Create OK button
-    HWND hwndOK = CreateWindow(
-        L"BUTTON",
-        L"OK",
-        WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
-        70, 80, 60, 25,
-        hwndDialog,
-        (HMENU)1,
-        GetModuleHandle(NULL),
-        NULL
-    );
-
-    // Create Cancel button
-    HWND hwndCancel = CreateWindow(
-        L"BUTTON",
-        L"Отмена",
-        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        170, 80, 60, 25,
-        hwndDialog,
-        (HMENU)2,
-        GetModuleHandle(NULL),
-        NULL
-    );
-
-    // Show the dialog
-    ShowWindow(hwndDialog, SW_SHOW);
-
-    // Message loop for the dialog
-    MSG msg;
-    BOOL result = FALSE;
-    while (GetMessage(&msg, NULL, 0, 0)) {
-        if (msg.message == WM_COMMAND) {
-            if (LOWORD(msg.wParam) == 1) { // OK
-                wchar_t buffer[256];
-                GetWindowText(hwndEdit, buffer, 256);
-                newName = buffer;
-                EndDialog(hwndDialog, 1);
-                result = TRUE;
-                break;
-            }
-            else if (LOWORD(msg.wParam) == 2) { // Cancel
-                EndDialog(hwndDialog, 0);
-                break;
-            }
-        }
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-    }
-
-    DestroyWindow(hwndDialog);
-    return result;
-}
+// (Removed as we are implementing inline renaming)
 
 // Function to create a context menu
 void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex) {
@@ -352,23 +286,120 @@ void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex) {
 
         // Handle menu selections
         if (cmd == 1) { // Open
-            MessageBox(hwnd, L"Открыть выбранную папку.", L"Открыть", MB_OK);
-        }
-        else if (cmd == 2) { // Rename
-            std::wstring newName;
-            if (ShowRenameDialog(hwnd, images[imageIndex].title, newName)) {
-                if (!newName.empty()) {
-                    images[imageIndex].title = newName;
-                    InvalidateRect(hwnd, NULL, TRUE); // Redraw to show new name
-                }
+            // Open the folder by creating a new window
+            // Pass the folder title as the window title
+            std::wstring folderName = images[imageIndex].title;
+
+            // Register a new window class for folder windows if not already registered
+            const wchar_t FOLDER_CLASS_NAME[] = L"FolderWindowClass";
+            static bool folderClassRegistered = false;
+            if (!folderClassRegistered) {
+                WNDCLASS wcFolder = { 0 };
+                wcFolder.lpfnWndProc = DefWindowProc;
+                wcFolder.hInstance = GetModuleHandle(NULL);
+                wcFolder.lpszClassName = FOLDER_CLASS_NAME;
+                wcFolder.hCursor = LoadCursor(NULL, IDC_ARROW);
+                wcFolder.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+                RegisterClass(&wcFolder);
+                folderClassRegistered = true;
+            }
+
+            // Get the instance handle
+            HINSTANCE hInstance = GetModuleHandle(NULL);
+
+            // Create the folder window
+            HWND hwndFolder = CreateWindowEx(
+                0,
+                FOLDER_CLASS_NAME,
+                folderName.c_str(),
+                WS_OVERLAPPEDWINDOW,
+                CW_USEDEFAULT, CW_USEDEFAULT, 600, 400,
+                NULL,
+                NULL,
+                hInstance,
+                NULL
+            );
+
+            if (hwndFolder) {
+                ShowWindow(hwndFolder, SW_SHOW);
+                UpdateWindow(hwndFolder);
+            }
+            else {
+                MessageBox(hwnd, L"Не удалось открыть папку.", L"Ошибка", MB_ICONERROR);
             }
         }
+        else if (cmd == 2) { // Rename
+            // Implement inline renaming
+            // Post a custom message to the main window to handle renaming
+            // Alternatively, implement directly here
+            // For simplicity, use a custom message
+            // Create an Edit control over the folder title
+            // This requires access to the WindowData
+
+            // Since we cannot access WindowData here, we'll handle it in the main WindowProc via a global map
+            // Alternatively, you can use GWLP_USERDATA to store additional info
+            // To keep it simple, we'll use a lambda capture with SetWindowLongPtr
+
+            // Post a custom message with the image index
+            LPARAM lParamMsg = static_cast<LPARAM>(imageIndex);
+            SendMessage(hwnd, WM_USER + 1, 0, lParamMsg);
+        }
         else if (cmd == 3) { // Delete
-            MessageBox(hwnd, L"Функция удаления не реализована.", L"Удалить", MB_OK);
+            // Remove the image from the list
+            delete images[imageIndex].image;
+            images.erase(images.begin() + imageIndex);
+            InvalidateRect(hwnd, NULL, TRUE); // Redraw window
         }
 
         DestroyMenu(hMenu);
     }
+}
+
+// Function to create an edit control for renaming
+bool ShowRenameEditControl(HWND hwnd, WindowData* data, size_t imageIndex) {
+    if (data->isRenaming) return false; // Already renaming
+
+    if (imageIndex >= images.size()) return false;
+
+    // Get folder title dimensions
+    // For simplicity, assume fixed height for titles
+    // In a complete implementation, calculate actual position
+
+    // Calculate position for the Edit control based on folder index
+    // Assuming titles are drawn below the images
+
+    // Get Client Rect
+    RECT clientRect;
+    GetClientRect(hwnd, &clientRect);
+
+    // Create the Edit control
+    HWND hwndEdit = CreateWindowEx(
+        WS_EX_CLIENTEDGE,
+        L"EDIT",
+        images[imageIndex].title.c_str(),
+        WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+        static_cast<int>(images[imageIndex].x),
+        static_cast<int>(images[imageIndex].y + images[imageIndex].height + 5),
+        static_cast<int>(images[imageIndex].width + 20),
+        25,
+        hwnd,
+        (HMENU)1001, // Arbitrary ID
+        GetModuleHandle(NULL),
+        NULL
+    );
+
+    if (hwndEdit == NULL) return false;
+
+    // Set focus to the Edit control
+    SetFocus(hwndEdit);
+    SendMessage(hwndEdit, EM_SETSEL, 0, -1); // Select all text
+
+    // Update WindowData
+    data->isRenaming = true;
+    data->renamingImageIndex = imageIndex;
+    data->hwndEdit = hwndEdit;
+
+    return true;
 }
 
 // Window Procedure
@@ -384,6 +415,39 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         return 0;
     }
 
+    case WM_USER + 1: { // Custom message to handle renaming
+        if (data) {
+            size_t imageIndex = static_cast<size_t>(lParam);
+            ShowRenameEditControl(hwnd, data, imageIndex);
+        }
+        return 0;
+    }
+
+    case WM_COMMAND: {
+        if (data && data->isRenaming && LOWORD(wParam) == 1001) { // Edit control ID
+            if (HIWORD(wParam) == EN_KILLFOCUS || HIWORD(wParam) == EN_MAXTEXT || HIWORD(wParam) == EN_CHANGE) {
+                // Get the new text
+                wchar_t buffer[256];
+                GetWindowText(data->hwndEdit, buffer, 256);
+                std::wstring newName = buffer;
+
+                if (!newName.empty() && data->renamingImageIndex < images.size()) {
+                    images[data->renamingImageIndex].title = newName;
+                }
+
+                // Destroy the Edit control
+                DestroyWindow(data->hwndEdit);
+                data->hwndEdit = NULL;
+                data->isRenaming = false;
+                data->renamingImageIndex = SIZE_MAX;
+
+                // Redraw the window
+                InvalidateRect(hwnd, NULL, TRUE);
+            }
+        }
+        return 0;
+    }
+
     case WM_DESTROY:
         // Clean up WindowData
         if (data) {
@@ -395,6 +459,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         delete wifiIcon;
         delete soundIcon;
         delete batteryIcon;
+        delete sidebarImage;
         for (auto& imgItem : images) {
             delete imgItem.image;
         }
@@ -443,12 +508,18 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         RECT windowRect;
         GetClientRect(hwnd, &windowRect);
 
+        // Draw sidebar
+        if (sidebarImage) {
+            float sidebarWidth = 200.0f;
+            graphics.DrawImage(sidebarImage, 0, 0, sidebarWidth, static_cast<float>(windowRect.bottom));
+        }
+
         // Draw background image while maintaining aspect ratio
         if (backgroundImage) {
             UINT imgWidth = backgroundImage->GetWidth();
             UINT imgHeight = backgroundImage->GetHeight();
 
-            double windowAspect = static_cast<double>(windowRect.right) / windowRect.bottom;
+            double windowAspect = static_cast<double>(windowRect.right - 200) / windowRect.bottom; // Adjust for sidebar
             double imageAspect = static_cast<double>(imgWidth) / imgHeight;
 
             double drawWidth, drawHeight;
@@ -459,11 +530,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             }
             else {
                 // Window is narrower or equal to image
-                drawWidth = windowRect.right;
+                drawWidth = windowRect.right - 200;
                 drawHeight = drawWidth / imageAspect;
             }
 
-            float x = static_cast<float>((windowRect.right - drawWidth) / 2.0);
+            float x = static_cast<float>(200 + ((windowRect.right - 200) - drawWidth) / 2.0);
             float y = static_cast<float>((windowRect.bottom - drawHeight) / 2.0);
             graphics.DrawImage(backgroundImage, x, y, static_cast<REAL>(drawWidth), static_cast<REAL>(drawHeight));
         }
@@ -479,7 +550,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
             // Positions with padding
             float padding = 15.0f;
-            float currentX = padding + 1280.0f;
+            float currentX = 200.0f + padding + 1280.0f; // Adjusted for sidebar
+
+            // Ensure the icons fit within the window
+            if (currentX + iconSize * 3 + 30.0f > windowRect.right) {
+                // Adjust spacing or size if necessary
+                currentX = windowRect.right - iconSize * 3 - 30.0f;
+            }
 
             // Draw Wi-Fi Icon
             graphics.DrawImage(wifiIcon, currentX, iconY, iconSize, iconSize);
@@ -535,14 +612,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         graphics.MeasureString(announcement.c_str(), -1, &largeFont, PointF(0, 0), &announcementRect);
 
         // Position announcement at the center
-        float xAnnouncement = (static_cast<float>(windowRect.right) - announcementRect.Width) / 2.0f;
+        float xAnnouncement = (static_cast<float>(windowRect.right - 200) - announcementRect.Width) / 2.0f + 200.0f; // Adjusted for sidebar
         float yAnnouncement = (static_cast<float>(windowRect.bottom) - announcementRect.Height) / 2.0f;
         PointF announcementPoint(xAnnouncement, yAnnouncement);
 
         SolidBrush announcementBrush(Color(255, 255, 255, 255)); // White text color for announcement
         graphics.DrawString(announcement.c_str(), -1, &largeFont, announcementPoint, &announcementBrush);
 
-        // Draw additional images and their titles
+        // Draw additional images (folders) and their titles
         for (const auto& imgItem : images) {
             // Draw image
             graphics.DrawImage(imgItem.image, imgItem.x, imgItem.y, imgItem.width, imgItem.height);
@@ -565,7 +642,33 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         return 0;
     }
 
-    case WM_LBUTTONDOWN: {
+    case WM_LBUTTONDBLCLK: {
+        // Handle double left-click to open folder
+        if (data) {
+            int mouseX = GET_X_LPARAM(lParam);
+            int mouseY = GET_Y_LPARAM(lParam);
+            POINT mousePt = { mouseX, mouseY };
+
+            // Check if the click is on any image (from top to bottom)
+            for (size_t i = 0; i < images.size(); ++i) {
+                const auto& imgItem = images[i];
+                RECT imgRect = {
+                    static_cast<LONG>(imgItem.x),
+                    static_cast<LONG>(imgItem.y),
+                    static_cast<LONG>(imgItem.x + imgItem.width),
+                    static_cast<LONG>(imgItem.y + imgItem.height)
+                };
+                if (PtInRect(&imgRect, mousePt)) {
+                    // Simulate "Open" action by sending a custom message
+                    CreateContextMenu(hwnd, mouseX, mouseY, i);
+                    break;
+                }
+            }
+        }
+        return 0;
+    }
+
+    case WM_RBUTTONDOWN: {
         if (data) {
             // Get mouse position
             int mouseX = GET_X_LPARAM(lParam);
@@ -573,7 +676,33 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             POINT mousePt = { mouseX, mouseY };
 
             // Check if the click is on any image (from top to bottom)
-            for (size_t i = images.size(); i-- > 0;) {
+            for (size_t i = 0; i < images.size(); ++i) {
+                const auto& imgItem = images[i];
+                RECT imgRect = {
+                    static_cast<LONG>(imgItem.x),
+                    static_cast<LONG>(imgItem.y),
+                    static_cast<LONG>(imgItem.x + imgItem.width),
+                    static_cast<LONG>(imgItem.y + imgItem.height)
+                };
+                if (PtInRect(&imgRect, mousePt)) {
+                    // Show context menu
+                    CreateContextMenu(hwnd, mouseX, mouseY, i);
+                    break;
+                }
+            }
+        }
+        return 0;
+    }
+
+    case WM_LBUTTONDOWN: {
+        if (data && !data->isRenaming) {
+            // Get mouse position
+            int mouseX = GET_X_LPARAM(lParam);
+            int mouseY = GET_Y_LPARAM(lParam);
+            POINT mousePt = { mouseX, mouseY };
+
+            // Check if the click is on any image (from top to bottom)
+            for (size_t i = 0; i < images.size(); ++i) {
                 const auto& imgItem = images[i];
                 RECT imgRect = {
                     static_cast<LONG>(imgItem.x),
@@ -604,12 +733,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         return 0;
     }
 
-    case WM_RBUTTONDOWN: {
-        // Optional: Handle right-clicks for context menus
-        // Not implemented in this example
-        return 0;
-    }
-
     case WM_MOUSEMOVE: {
         if (data && data->isDragging && data->draggingImageIndex < images.size()) {
             // Get current mouse position
@@ -630,16 +753,18 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 RECT windowRect;
                 GetClientRect(hwnd, &windowRect);
 
-                // Ensure the image stays within window bounds
-                if (images[data->draggingImageIndex].x < 0)
-                    images[data->draggingImageIndex].x = 0;
+                // Ensure the image stays within window bounds (excluding sidebar and panel)
+                float sidebarWidth = 200.0f;
+                float panelHeight = 40.0f;
+                if (images[data->draggingImageIndex].x < sidebarWidth)
+                    images[data->draggingImageIndex].x = sidebarWidth;
                 if (images[data->draggingImageIndex].y < 0)
                     images[data->draggingImageIndex].y = 0;
                 if (images[data->draggingImageIndex].x +
                     images[data->draggingImageIndex].width > windowRect.right)
                     images[data->draggingImageIndex].x = windowRect.right - images[data->draggingImageIndex].width;
-                if (images[data->draggingImageIndex].y + images[data->draggingImageIndex].height > windowRect.bottom - 40) // 40 for panel
-                    images[data->draggingImageIndex].y = windowRect.bottom - 40 - images[data->draggingImageIndex].height;
+                if (images[data->draggingImageIndex].y + images[data->draggingImageIndex].height > windowRect.bottom - panelHeight) // 40 for panel
+                    images[data->draggingImageIndex].y = windowRect.bottom - panelHeight - images[data->draggingImageIndex].height;
 
                 // Update last mouse position
                 data->lastMousePos = currentPt;
@@ -680,6 +805,26 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         return 0;
     }
 
+    default:
+        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }
+}
+
+// Folder Window Procedure (simple placeholder)
+LRESULT CALLBACK FolderWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    switch (uMsg) {
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
+        // Simple text indicating folder contents
+        std::wstring content = L"Содержимое папки";
+        TextOut(hdc, 50, 50, content.c_str(), static_cast<int>(content.length()));
+        EndPaint(hwnd, &ps);
+        return 0;
+    }
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        return 0;
     default:
         return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
@@ -760,6 +905,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     // Message loop
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
+        // Handle messages for child windows (like Edit controls)
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }

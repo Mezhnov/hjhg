@@ -23,6 +23,7 @@
 #pragma comment(lib, "wininet.lib")
 #pragma comment(lib, "winmm.lib") // Link with winmm.lib for PlaySound
 #pragma comment(lib, "comctl32.lib") // Link with comctl32.lib for common controls
+#pragma comment(lib, "urlmon.lib") // Link with urlmon.lib for URL moniker (optional)
 
 using namespace Gdiplus;
 
@@ -171,13 +172,14 @@ bool InitializeImages() {
     std::vector<std::pair<std::wstring, std::wstring>> imageData = {
         { L"https://i.postimg.cc/4x8HknSh/nyc01-temp-32d4-T5s3-TEIMt1-R3qrjho.png", L"Новая папка" }, // New Folder
         { L"https://i.postimg.cc/0Q12Jw0R/fra01-temp-r-MINe9-WDa-DPi-KQl-Rb3p-F-processed.png", L"Этот компьютер" }, // This Computer
+        { L"https://i.postimg.cc/Hkzy10p7/new-folder-icon.png", L"Мои документы" } // My Documents (New Image)
         // Add more images as needed
     };
 
     // Initial positions for images
     float startX = 50.0f;
     float startY = 150.0f; // Positioned below the announcement
-    float spacing = 150.0f; // Reduced spacing for better layout
+    float spacing = 150.0f; // Adjusted spacing for better layout with 3 images
 
     for (size_t i = 0; i < imageData.size(); ++i) {
         Image* img = nullptr;
@@ -326,8 +328,8 @@ void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex, bool isOnImag
                         // Position the new folder where the user right-clicked
                         newItem.x = static_cast<float>(x);
                         newItem.y = static_cast<float>(y);
-                        newItem.width = 100.0f;
-                        newItem.height = 100.0f;
+                        newItem.width = 100.0f; // Image width
+                        newItem.height = 100.0f; // Image height
                         images.push_back(newItem);
                         size_t newIndex = images.size() - 1;
                         data->editingImageIndex = newIndex;
@@ -474,7 +476,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
             // Positions with padding
             float padding = 15.0f;
-            float currentX = padding + 1280.0f;
+            float currentX = padding; // Start from the left side
 
             // Draw Wi-Fi Icon
             graphics.DrawImage(wifiIcon, currentX, iconY, iconSize, iconSize);
@@ -747,13 +749,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     }
 
     default:
-        // **Removed Error C2065**: EN_ENVELOPE is not a valid identifier
-        // Removed the following invalid code block:
-        /*
-        if (uMsg == WM_COMMAND && HIWORD(wParam) == EN_ENVELOPE && lParam != 0) {
-            // Handle specific edit control notifications
-        }
-        */
         return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
 }

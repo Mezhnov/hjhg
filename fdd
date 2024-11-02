@@ -11,10 +11,14 @@
 #include <windowsx.h>
 #include <mmsystem.h> // For PlaySound
 #include <CommCtrl.h> // For common controls
+#include <richedit.h> // For rich edit controls
+#include "resource.h" // Ensure you have this header for resource IDs
+
 #define IDR_WAVE1 101
 #define IDR_WAVE2 102
 #define IDR_WAVE3 103
 #define IDR_WAVE4 104
+
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "wininet.lib")
 #pragma comment(lib, "winmm.lib") // Link with winmm.lib for PlaySound
@@ -219,122 +223,27 @@ struct WindowData {
     bool isDragging = false;
     size_t draggingImageIndex = SIZE_MAX; // Invalid index initially
     POINT lastMousePos = { 0, 0 };
+
+    // Editing state
+    size_t editingImageIndex = SIZE_MAX; // Index of the image being edited
+    HWND editControl = NULL; // Handle to the current edit control
+    bool isCreatingFolder = false; // Flag to indicate folder creation
 };
 
-// Function to display a simple rename dialog and get user input
-bool ShowRenameDialog(HWND hwndOwner, const std::wstring& currentName, std::wstring& newName) {
-    // Register dialog class if not already
-    const wchar_t DIALOG_CLASS_NAME[] = L"RenameDialogClass";
-
-    WNDCLASS wc = { 0 };
-    wc.lpfnWndProc = DefWindowProc;
-    wc.hInstance = GetModuleHandle(NULL);
-    wc.lpszClassName = DIALOG_CLASS_NAME;
-    RegisterClass(&wc);
-
-    // Create dialog window
-    HWND hwndDialog = CreateWindowEx(
-        WS_EX_DLGMODALFRAME,
-        DIALOG_CLASS_NAME,
-        L"Переименование",
-        WS_POPUP | WS_CAPTION | WS_SYSMENU,
-        CW_USEDEFAULT, CW_USEDEFAULT, 300, 120,
-        hwndOwner,
-        NULL,
-        GetModuleHandle(NULL),
-        NULL
-    );
-
-    if (!hwndDialog) return false;
-
-    // Create static text
-    HWND hwndText = CreateWindow(
-        L"STATIC",
-        L"Введите новое имя:",
-        WS_CHILD | WS_VISIBLE,
-        10, 10, 280, 20,
-        hwndDialog,
-        NULL,
-        GetModuleHandle(NULL),
-        NULL
-    );
-
-    // Create edit control
-    HWND hwndEdit = CreateWindowEx(
-        0,
-        L"EDIT",
-        currentName.c_str(),
-        WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
-        10, 40, 260, 25,
-        hwndDialog,
-        NULL,
-        GetModuleHandle(NULL),
-        NULL
-    );
-
-    // Create OK button
-    HWND hwndOK = CreateWindow(
-        L"BUTTON",
-        L"OK",
-        WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
-        70, 80, 60, 25,
-        hwndDialog,
-        (HMENU)1,
-        GetModuleHandle(NULL),
-        NULL
-    );
-
-    // Create Cancel button
-    HWND hwndCancel = CreateWindow(
-        L"BUTTON",
-        L"Отмена",
-        WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-        170, 80, 60, 25,
-        hwndDialog,
-        (HMENU)2,
-        GetModuleHandle(NULL),
-        NULL
-    );
-
-    // Show the dialog
-    ShowWindow(hwndDialog, SW_SHOW);
-
-    // Message loop for the dialog
-    MSG msg;
-    BOOL result = FALSE;
-    while (GetMessage(&msg, NULL, 0, 0)) {
-        if (msg.message == WM_COMMAND) {
-            if (LOWORD(msg.wParam) == 1) { // OK
-                wchar_t buffer[256];
-                GetWindowText(hwndEdit, buffer, 256);
-                newName = buffer;
-                EndDialog(hwndDialog, 1);
-                result = TRUE;
-                break;
-            }
-            else if (LOWORD(msg.wParam) == 2) { // Cancel
-                EndDialog(hwndDialog, 0);
-                break;
-            }
-        }
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-    }
-
-    DestroyWindow(hwndDialog);
-    return result;
-}
-
 // Function to create a context menu
-void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex) {
-    if (imageIndex >= images.size()) return;
-
+void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex, bool isOnImage) {
     HMENU hMenu = CreatePopupMenu();
     if (hMenu) {
-        // Add menu items
-        AppendMenu(hMenu, MF_STRING, 1, L"Открыть");       // Open
-        AppendMenu(hMenu, MF_STRING, 2, L"Переименовать"); // Rename
-        AppendMenu(hMenu, MF_STRING, 3, L"Удалить");       // Delete
+        if (isOnImage && imageIndex < images.size()) {
+            // Context menu for images
+            AppendMenu(hMenu, MF_STRING, 1, L"Открыть");       // Open
+            AppendMenu(hMenu, MF_STRING, 2, L"Переименовать"); // Rename
+            AppendMenu(hMenu, MF_STRING, 3, L"Удалить");       // Delete
+        }
+        else {
+            // Context menu for empty space
+            AppendMenu(hMenu, MF_STRING, 4, L"Создать папку"); // Create Folder
+        }
 
         // Set foreground to ensure the menu disappears correctly
         SetForegroundWindow(hwnd);
@@ -351,20 +260,105 @@ void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex) {
         );
 
         // Handle menu selections
-        if (cmd == 1) { // Open
-            MessageBox(hwnd, L"Открыть выбранную папку.", L"Открыть", MB_OK);
-        }
-        else if (cmd == 2) { // Rename
-            std::wstring newName;
-            if (ShowRenameDialog(hwnd, images[imageIndex].title, newName)) {
-                if (!newName.empty()) {
-                    images[imageIndex].title = newName;
-                    InvalidateRect(hwnd, NULL, TRUE); // Redraw to show new name
+        if (isOnImage && imageIndex < images.size()) {
+            if (cmd == 1) { // Open
+                MessageBox(hwnd, (images[imageIndex].title + L" открыта.").c_str(), L"Открыть", MB_OK);
+            }
+            else if (cmd == 2) { // Rename
+                // Initiate renaming by creating an Edit control
+                WindowData* data = reinterpret_cast<WindowData*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+                if (data && data->editControl == NULL) {
+                    data->editingImageIndex = imageIndex;
+
+                    // Calculate position for Edit control
+                    float titleWidth = 100.0f; // Approximate width
+                    Gdiplus::RectF titleRect;
+                    HDC hdc = GetDC(hwnd);
+                    Graphics graphics(hdc);
+                    FontFamily fontFamily(L"Segoe UI");
+                    Font font(&fontFamily, 16, FontStyleRegular, UnitPixel);
+                    SolidBrush brush(Color(255, 255, 255, 255)); // White text
+                    graphics.MeasureString(images[imageIndex].title.c_str(), -1, &font, PointF(0, 0), &titleRect);
+                    ReleaseDC(hwnd, hdc);
+
+                    float editX = images[imageIndex].x;
+                    float editY = images[imageIndex].y + images[imageIndex].height + 5.0f;
+                    float editWidth = titleRect.Width + 10.0f; // Slight padding
+                    float editHeight = titleRect.Height + 5.0f;
+
+                    HWND hwndEdit = CreateWindowEx(
+                        0,
+                        L"EDIT",
+                        images[imageIndex].title.c_str(),
+                        WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
+                        static_cast<int>(editX),
+                        static_cast<int>(editY),
+                        static_cast<int>(editWidth),
+                        static_cast<int>(editHeight),
+                        hwnd,
+                        NULL,
+                        GetModuleHandle(NULL),
+                        NULL
+                    );
+
+                    if (hwndEdit) {
+                        data->editControl = hwndEdit;
+                        // Set focus to the edit control
+                        SetFocus(hwndEdit);
+                    }
                 }
             }
+            else if (cmd == 3) { // Delete
+                // Implement deletion if needed
+                MessageBox(hwnd, L"Функция удаления не реализована.", L"Удалить", MB_OK);
+            }
         }
-        else if (cmd == 3) { // Delete
-            MessageBox(hwnd, L"Функция удаления не реализована.", L"Удалить", MB_OK);
+        else {
+            if (cmd == 4) { // Create Folder
+                // Initiate folder creation by adding a new ImageItem and creating an Edit control
+                WindowData* data = reinterpret_cast<WindowData*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+                if (data && data->editControl == NULL) {
+                    ImageItem newItem;
+                    // You can set a default folder icon URL or use a local resource
+                    if (LoadImageFromURL(L"https://i.postimg.cc/4x8HknSh/nyc01-temp-32d4-T5s3-TEIMt1-R3qrjho.png", newItem.image)) {
+                        newItem.title = L"Новая папка"; // Default name
+                        // Position the new folder where the user right-clicked
+                        newItem.x = static_cast<float>(x);
+                        newItem.y = static_cast<float>(y);
+                        newItem.width = 100.0f;
+                        newItem.height = 100.0f;
+                        images.push_back(newItem);
+                        size_t newIndex = images.size() - 1;
+                        data->editingImageIndex = newIndex;
+                        data->isCreatingFolder = true;
+
+                        // Create Edit control for the new folder
+                        HWND hwndEdit = CreateWindowEx(
+                            0,
+                            L"EDIT",
+                            newItem.title.c_str(),
+                            WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
+                            static_cast<int>(newItem.x),
+                            static_cast<int>(newItem.y + newItem.height + 5.0f),
+                            100,
+                            25,
+                            hwnd,
+                            NULL,
+                            GetModuleHandle(NULL),
+                            NULL
+                        );
+
+                        if (hwndEdit) {
+                            data->editControl = hwndEdit;
+                            // Set focus to the edit control
+                            SetFocus(hwndEdit);
+                        }
+                    }
+                    else {
+                        MessageBox(hwnd, L"Не удалось загрузить иконку папки.", L"Ошибка", MB_ICONERROR);
+                    }
+                }
+            }
         }
 
         DestroyMenu(hMenu);
@@ -488,7 +482,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             // Draw Sound Icon
             graphics.DrawImage(soundIcon, currentX, iconY, iconSize, iconSize);
             currentX += iconSize + 10.0f;
-
+        
             // Draw Battery Icon
             graphics.DrawImage(batteryIcon, currentX, iconY, iconSize, iconSize);
             currentX += iconSize + 30.0f; // Extra spacing before language and time
@@ -499,8 +493,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         std::wstring langString = languages[currentLanguageIndex]; // Current language
 
         // Use GDI+ to draw text
-        FontFamily fontFamily(L"Segoe UI"); // Font selection
-        Font font(&fontFamily, 14, FontStyleRegular, UnitPixel); // Font size
+        FontFamily fontFamilyObj(L"Segoe UI"); // Font selection
+        Font font(&fontFamilyObj, 14, FontStyleRegular, UnitPixel); // Font size
         SolidBrush brush(Color(255, 0, 0, 0)); // Black text color
 
         // Measure text sizes
@@ -531,7 +525,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             announcement = L"Introducing Orega OS: The Future of Performance!";
         }
         RectF announcementRect;
-        Font largeFont(&fontFamily, 40, FontStyleBold, UnitPixel); // Font for announcement
+        Font largeFont(&fontFamilyObj, 40, FontStyleBold, UnitPixel); // Font for announcement
         graphics.MeasureString(announcement.c_str(), -1, &largeFont, PointF(0, 0), &announcementRect);
 
         // Position announcement at the center
@@ -548,7 +542,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             graphics.DrawImage(imgItem.image, imgItem.x, imgItem.y, imgItem.width, imgItem.height);
 
             // Draw title below the image, centered
-            Font titleFont(&fontFamily, 16, FontStyleRegular, UnitPixel);
+            Font titleFont(&fontFamilyObj, 16, FontStyleRegular, UnitPixel);
             SolidBrush titleBrush(Color(255, 255, 255, 255)); // White text color for titles
 
             RectF titleRect;
@@ -605,8 +599,34 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     }
 
     case WM_RBUTTONDOWN: {
-        // Optional: Handle right-clicks for context menus
-        // Not implemented in this example
+        // Handle right-clicks for context menus
+        if (data) {
+            // Get mouse position
+            int mouseX = GET_X_LPARAM(lParam);
+            int mouseY = GET_Y_LPARAM(lParam);
+            POINT mousePt = { mouseX, mouseY };
+
+            // Check if clicking on any image
+            bool isOnImage = false;
+            size_t imageIndex = SIZE_MAX;
+            for (size_t i = 0; i < images.size(); ++i) {
+                const auto& imgItem = images[i];
+                RECT imgRect = {
+                    static_cast<LONG>(imgItem.x),
+                    static_cast<LONG>(imgItem.y),
+                    static_cast<LONG>(imgItem.x + imgItem.width),
+                    static_cast<LONG>(imgItem.y + imgItem.height)
+                };
+                if (PtInRect(&imgRect, mousePt)) {
+                    isOnImage = true;
+                    imageIndex = i;
+                    break;
+                }
+            }
+
+            // Create and show context menu
+            CreateContextMenu(hwnd, mouseX, mouseY, imageIndex, isOnImage);
+        }
         return 0;
     }
 
@@ -669,7 +689,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
                 if (distance < 5) { // Threshold for click
                     // It's a click, not a drag
-                    CreateContextMenu(hwnd, mouseX, mouseY, data->draggingImageIndex);
+                    CreateContextMenu(hwnd, mouseX, mouseY, data->draggingImageIndex, true);
                 }
 
                 // Stop dragging
@@ -680,7 +700,56 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         return 0;
     }
 
+    case WM_COMMAND: {
+        if (HIWORD(wParam) == EN_KILLFOCUS && LOWORD(wParam) == 0) {
+            // Edit control lost focus
+            if (data && data->editControl) {
+                std::wstring newText(256, L'\0');
+                GetWindowText(data->editControl, &newText[0], 256);
+                newText.resize(wcslen(newText.c_str()));
+
+                if (data->isCreatingFolder && data->editingImageIndex < images.size()) {
+                    // Update title for the new folder
+                    images[data->editingImageIndex].title = newText;
+                    data->isCreatingFolder = false;
+                }
+                else if (data->editingImageIndex < images.size()) {
+                    // Update existing folder title
+                    images[data->editingImageIndex].title = newText;
+                }
+
+                // Remove edit control
+                DestroyWindow(data->editControl);
+                data->editControl = NULL;
+                data->editingImageIndex = SIZE_MAX;
+
+                // Redraw window to show updated title
+                InvalidateRect(hwnd, NULL, TRUE);
+            }
+        }
+        else if (HIWORD(wParam) == EN_UPDATE && lParam != 0) {
+            // Handle Enter key in edit control
+            HWND hwndEdit = reinterpret_cast<HWND>(lParam);
+            if (data && data->editControl == hwndEdit) {
+                if (GetKeyState(VK_RETURN) & 0x8000) {
+                    // Simulate losing focus to commit the edit
+                    SendMessage(hwndEdit, WM_KILLFOCUS, 0, 0);
+                }
+            }
+        }
+        return 0;
+    }
+
+    case WM_NOTIFY: {
+        // Handle notifications if needed
+        return 0;
+    }
+
     default:
+        // Handle messages related to the edit control
+        if (uMsg == WM_COMMAND && HIWORD(wParam) == EN_ENVELOPE && lParam != 0) {
+            // Handle specific edit control notifications
+        }
         return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
 }

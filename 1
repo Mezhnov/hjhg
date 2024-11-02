@@ -1,161 +1,80 @@
-import socket
-import threading
-import logging
-import os
+case WM_PAINT: {
+    PAINTSTRUCT ps;
+    HDC hdc = BeginPaint(hwnd, &ps);
+    Graphics graphics(hdc);
 
-# Настройки сервера
-HOST = '0.0.0.0'  # Привязка к всем интерфейсам
-PORT = 8080
-BUFFER_SIZE = 4096  # Размер буфера для передачи данных
+    // Настройки высококачественного рендеринга
+    graphics.SetSmoothingMode(SmoothingModeHighQuality);
+    graphics.SetInterpolationMode(InterpolationModeHighQualityBicubic);
+    graphics.SetPixelOffsetMode(PixelOffsetModeHighQuality);
 
-# Логирование
-logging.basicConfig(filename='smp_server.log', level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
+    // Получение размеров окна
+    RECT windowRect;
+    GetClientRect(hwnd, &windowRect);
 
-# Карта ресурсов
-domain_mapping = {
-    'example.com': {
-        'html_file': 'index.html',
-        'css_file': 'styles.css',
-        'image_file': 'img.png'
-    },
-    'test.com': {
-        'html_file': 'test.html',
-        'css_file': 'style_test.css',
-        'image_file': 'image_test.jpg'
+    // Рисование фонового изображения (если требуется)
+    if (backgroundImage) {
+        // Ваш код для рисования фонового изображения
     }
+
+    // Рисование серой нижней панели
+    RECT panelRect = { 0, windowRect.bottom - 40, windowRect.right, windowRect.bottom };
+    HBRUSH hBrush = CreateSolidBrush(RGB(200, 200, 200)); // Светло-серая панель
+    FillRect(hdc, &panelRect, hBrush);
+    DeleteObject(hBrush);
+
+    // Рисование иконок Wi-Fi, Звука и Батареи
+    if (wifiIcon && soundIcon && batteryIcon) {
+        float iconSize = 24.0f; // Размер иконки
+        float iconY = static_cast<float>(windowRect.bottom - 40 + (40 - iconSize) / 2.0f); // Центрирование по вертикали
+
+        float padding = 15.0f; // Отступ от левого края
+        float spacing = 10.0f; // Расстояние между иконками
+
+        // Рисование иконки Wi-Fi
+        graphics.DrawImage(wifiIcon, padding, iconY, iconSize, iconSize);
+
+        // Рисование иконки Звука
+        float currentX = padding + iconSize + spacing;
+        graphics.DrawImage(soundIcon, currentX, iconY, iconSize, iconSize);
+
+        // Рисование иконки Батареи
+        currentX += iconSize + spacing;
+        graphics.DrawImage(batteryIcon, currentX, iconY, iconSize, iconSize);
+    }
+
+    // Получение текущего времени и выбранного языка
+    std::wstring timeString = GetCurrentTimeString();
+    std::wstring langString = languages[currentLanguageIndex]; // Текущий язык
+
+    // Настройка шрифта и кисти для текста
+    FontFamily fontFamilyObj(L"Segoe UI");
+    Font font(&fontFamilyObj, 14, FontStyleRegular, UnitPixel);
+    SolidBrush textBrush(Color(255, 0, 0, 0)); // Черный цвет текста
+
+    // Измерение размеров текста
+    RectF timeRect;
+    graphics.MeasureString(timeString.c_str(), -1, &font, PointF(0, 0), &timeRect);
+    RectF langRect;
+    graphics.MeasureString(langString.c_str(), -1, &font, PointF(0, 0), &langRect);
+
+    // Позиционирование текста слева на панели
+    float textX = 15.0f; // Отступ от левого края
+    float textY = static_cast<float>(windowRect.bottom - 40 + (40 - timeRect.Height) / 2.0f - 2); // Центрирование по вертикали
+
+    // Рисование языковой метки
+    graphics.DrawString(langString.c_str(), -1, &font, PointF(textX, textY), &textBrush);
+
+    // Рисование текущего времени рядом с языковой меткой
+    textX += langRect.Width + 10.0f; // Отступ между языком и временем
+    graphics.DrawString(timeString.c_str(), -1, &font, PointF(textX, textY), &textBrush);
+
+    // Рисование объявлений или других элементов поверх (если требуется)
+    // Ваш существующий код для объявления "Представляем Orega OS..."
+
+    // Рисование дополнительных изображений и их заголовков (если требуется)
+    // Ваш существующий код для рисования дополнительных изображений
+
+    EndPaint(hwnd, &ps);
+    return 0;
 }
-
-def send_large_file(conn, filepath):
-    """Отправка больших файлов по частям."""
-    if not os.path.exists(filepath):
-        logging.error(f"File not found: {filepath}")
-        response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: File not found\n\n"
-        conn.send(response.encode())
-        return
-
-    try:
-        file_size = os.path.getsize(filepath)
-        response = f"SMP 1.0\nSTATUS: OK\nMESSAGE: Starting file transfer\nFILE_SIZE: {file_size}\n\n"
-        conn.send(response.encode())
-        logging.info(f"Начинаем отправку файла {filepath}")
-
-        with open(filepath, 'rb') as f:
-            while True:
-                chunk = f.read(BUFFER_SIZE)
-                if not chunk:
-                    break
-                conn.sendall(chunk)
-        logging.info(f"Файл {filepath} успешно отправлен.")
-    except Exception as e:
-        logging.error(f"Ошибка при отправке файла {filepath}: {e}")
-        response = f"SMP 1.0\nSTATUS: ERROR\nMESSAGE: Error while sending file: {e}\n\n"
-        conn.send(response.encode())
-
-def handle_client(conn, addr):
-    logging.info(f"Подключен: {addr}")
-    initial_message = "SMP 1.0\nSTATUS: OK\nMESSAGE: Connected successfully\n\n"
-    conn.send(initial_message.encode())
-    logging.info(f"Отправлено {addr}:\n{initial_message}")
-
-    while True:
-        try:
-            data = conn.recv(4096).decode()
-            if not data:
-                break
-            logging.info(f"Получено от {addr}:\n{data}")
-
-            headers = {}
-            for line in data.split('\n'):
-                if ': ' in line:
-                    key, value = line.split(': ', 1)
-                    headers[key.strip()] = value.strip()
-
-            action = headers.get('ACTION')
-            resource = headers.get('RESOURCE')
-
-            if action == 'GET' and resource:
-                if resource in domain_mapping:
-                    html_file = domain_mapping[resource]['html_file']
-                    css_file = domain_mapping[resource]['css_file']
-                    image_file = domain_mapping[resource]['image_file']
-
-                    if os.path.exists(html_file):
-                        with open(html_file, 'r', encoding='utf-8') as f:
-                            html_content = f.read()
-                        response = f"SMP 1.0\nSTATUS: OK\nRESOURCE: {html_file}\n\n{html_content}"
-                        conn.send(response.encode())
-                        logging.info(f"Отправлено HTML {html_file} клиенту {addr}.")
-                    else:
-                        response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: HTML file not found\n\n"
-                        conn.send(response.encode())
-                        logging.error(f"HTML файл не найден: {html_file}")
-                else:
-                    response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Resource not found\n\n"
-                    conn.send(response.encode())
-                    logging.error(f"Ресурс не найден: {resource}")
-
-            elif action == 'GET_RESOURCE' and resource:
-                # Обработка дополнительных ресурсов (CSS, изображения)
-                if resource.startswith('css/'):
-                    css_filename = resource.split('/', 1)[1]
-                    css_file = domain_mapping.get(resource.split('.')[0], {}).get('css_file')
-                    if css_file and os.path.exists(css_file):
-                        with open(css_file, 'r', encoding='utf-8') as f:
-                            css_content = f.read()
-                        response = f"SMP 1.0\nSTATUS: OK\nRESOURCE: {css_file}\n\n{css_content}"
-                        conn.send(response.encode())
-                        logging.info(f"Отправлено CSS {css_file} клиенту {addr}.")
-                    else:
-                        response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: CSS file not found\n\n"
-                        conn.send(response.encode())
-                        logging.error(f"CSS файл не найден: {css_file}")
-
-                elif resource.startswith('img/'):
-                    image_filename = resource.split('/', 1)[1]
-                    image_file = domain_mapping.get(resource.split('.')[0], {}).get('image_file')
-                    if image_file:
-                        send_large_file(conn, image_file)
-                    else:
-                        response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Image file not found\n\n"
-                        conn.send(response.encode())
-                        logging.error(f"Image файл не найден: {image_file}")
-                else:
-                    response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Unknown resource type\n\n"
-                    conn.send(response.encode())
-                    logging.error(f"Неизвестный тип ресурса: {resource}")
-
-            elif action == 'SEND_FILE' and resource:
-                # Дополнительная обработка действие SEND_FILE, если требуется
-                file_path = domain_mapping.get(resource, {}).get('image_file')
-                if file_path:
-                    send_large_file(conn, file_path)
-                else:
-                    response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Invalid resource for file transfer\n\n"
-                    conn.send(response.encode())
-                    logging.error(f"Неверный ресурс для передачи файла: {resource}")
-            else:
-                response = "SMP 1.0\nSTATUS: ERROR\nMESSAGE: Invalid action or resource\n\n"
-                conn.send(response.encode())
-                logging.error(f"Неверное действие или ресурс: ACTION={action}, RESOURCE={resource}")
-
-        except Exception as e:
-            logging.error(f"Ошибка: {e}")
-            break
-
-    conn.close()
-    logging.info(f"Отключен: {addr}")
-
-def start_server():
-    """Запуск сервера."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
-        server_socket.bind((HOST, PORT))
-        server_socket.listen()
-        logging.info(f"Сервер запущен на {HOST}:{PORT}")
-
-        while True:
-            conn, addr = server_socket.accept()
-            client_thread = threading.Thread(target=handle_client, args=(conn, addr))
-            client_thread.start()
-
-if __name__ == "__main__":
-    start_server()

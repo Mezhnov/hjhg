@@ -153,7 +153,7 @@ std::wstring GetCurrentTimeString() {
 void PlaySoundByLanguage(const std::wstring& soundName) {
     // Define sound file paths or use system sounds
     // For demonstration, we'll use system sounds based on soundName
-    // You can replace this with actual file paths or URLs
+    // You can replace this with actual file paths or resources
 
     std::wstring soundPath;
     if (currentLanguageIndex == 0) { // Russian
@@ -477,10 +477,12 @@ void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex, bool isOnImag
                     ImageItem newItem;
                     // You can set a default folder icon URL or use a local resource
                     std::wstring defaultFolderURL = L"https://i.postimg.cc/4x8HknSh/nyc01-temp-32d4-T5s3-TEIMt1-R3qrjho.png";
-                    std::wstring filename;
-                    if (LoadImageFromURL(defaultFolderURL, newItem.image, filename)) {
+                    
+                    // **Fixed Error:** Use a std::wstring variable instead of a temporary
+                    std::wstring folderFilename;
+                    if (LoadImageFromURL(defaultFolderURL, newItem.image, folderFilename)) {
                         newItem.title = L"Новая папка"; // Default name
-                        newItem.filename = ExtractFilenameFromURL(defaultFolderURL);
+                        newItem.filename = folderFilename;
                         // Position the new folder where the user right-clicked
                         newItem.x = static_cast<float>(x);
                         newItem.y = static_cast<float>(y);
@@ -765,7 +767,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             int mouseY = GET_Y_LPARAM(lParam);
             POINT mousePt = { mouseX, mouseY };
 
-            // Check if clicking on any image
+            // Check if the click is on any image
             bool isOnImage = false;
             size_t imageIndex = SIZE_MAX;
             for (size_t i = 0; i < images.size(); ++i) {
@@ -962,8 +964,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         return 0;
     }
 
-    // Load background image from URL
-    if (!LoadImageFromURL(L"https://i.pinimg.com/originals/56/cb/5f/56cb5ff3d83e4159c447b04d5d3a333e.jpg", backgroundImage, std::wstring())) {
+    // **Fixed Error:** Use a std::wstring variable instead of a temporary
+    std::wstring backgroundFilename;
+    if (!LoadImageFromURL(L"https://i.pinimg.com/originals/56/cb/5f/56cb5ff3d83e4159c447b04d5d3a333e.jpg", backgroundImage, backgroundFilename)) {
         MessageBox(hwnd, L"Не удалось загрузить фон. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
         DestroyWindow(hwnd);
         GdiplusShutdown(gdiplusToken);
@@ -992,18 +995,3 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     GdiplusShutdown(gdiplusToken);
     return 0;
 }
-
-
-Сборка начата в 21:14...
-1>------ Сборка начата: проект: Проверка проекта, Конфигурация: Debug x64 ------
-1>Проверка проекта.cpp
-1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(966,10): error C2664: "bool LoadImageFromURL(const std::wstring &,Gdiplus::Image *&,std::wstring &)": невозможно преобразовать аргумент 3 из "std::wstring" в "std::wstring &"
-1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(966,137):
-1>    Неконстантная ссылка может быть связана только с левосторонним значением
-1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(63,6):
-1>     см. объявление "LoadImageFromURL"
-1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(966,10):
-1>    при попытке сопоставить список аргументов "(const wchar_t [77], Gdiplus::Image *, std::wstring)"
-1>Сборка проекта "Проверка проекта.vcxproj" завершена с ошибкой.
-========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
-========== Сборка завершено в 21:14 и заняло 00,836 с ==========

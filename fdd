@@ -1,10 +1,12 @@
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
-    // ... [существующий код]
-
-    // Загрузка фонового изображения из локального файла
-    if (!LoadImageFromFile(L"C:\\Users\\User\\Downloads\\afrikanskii-lev.orig.jpg", backgroundImage)) {
-        MessageBox(hwnd, L"Не удалось загрузить фон. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
-        DestroyWindow(hwnd);
-        GdiplusShutdown(gdiplusToken);
-        return 0;
+bool LoadImageFromFile(const std::wstring& filePath, Image*& outImage) {
+    Image* img = new Image(filePath.c_str());
+    if (img->GetLastStatus() != Ok) {
+        OutputDebugString(L"Не удалось загрузить изображение из файла.\n");
+        delete img;
+        outImage = nullptr;
+        return false;
     }
+    outImage = img;
+    OutputDebugString(L"Изображение из файла загружено успешно.\n");
+    return true;
+}

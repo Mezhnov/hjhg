@@ -472,7 +472,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         // Draw Start Menu Icon on the left
         if (mypassIcon) {
-            float iconSize = 24.0f; // Icon size
+            float iconSize = 42.0f; // Icon size
             float iconY = static_cast<float>(windowRect.bottom - 40 + (40 - iconSize) / 2.0); // Center vertically
 
             float padding = 15.0f;
@@ -583,11 +583,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
             // Check if the click is on the Start Menu button
             bool isOnStartMenu = false;
-            RECT startMenuRect = { 
-                15, 
-                static_cast<LONG>(GetSystemMetrics(SM_CYSCREEN) - 40 + (40 - 24) / 2), 
-                15 + 24, 
-                static_cast<LONG>(GetSystemMetrics(SM_CYSCREEN) - 40 + (40 - 24) / 2 + 24) 
+            RECT startMenuRect = {
+                15,
+                static_cast<LONG>(GetSystemMetrics(SM_CYSCREEN) - 40 + (40 - 24) / 2),
+                15 + 24,
+                static_cast<LONG>(GetSystemMetrics(SM_CYSCREEN) - 40 + (40 - 24) / 2 + 24)
             };
             if (PtInRect(&startMenuRect, mousePt)) {
                 isOnStartMenu = true;

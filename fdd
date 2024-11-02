@@ -641,7 +641,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             // Draw Sound Icon
             graphics.DrawImage(soundIcon, currentX, iconY, iconSize, iconSize);
             currentX += iconSize + 10.0f;
-        
+
             // Draw Battery Icon
             graphics.DrawImage(batteryIcon, currentX, iconY, iconSize, iconSize);
             currentX += iconSize + 30.0f; // Extra spacing before language and time
@@ -649,7 +649,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         // Get current time
         std::wstring timeString = GetCurrentTimeString();
-    std::wstring langString = languages[currentLanguageIndex]; // Current language
+        std::wstring langString = languages[currentLanguageIndex]; // Current language
 
         // Use GDI+ to draw text
         FontFamily fontFamilyObj(L"Segoe UI"); // Font selection
@@ -992,3 +992,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     GdiplusShutdown(gdiplusToken);
     return 0;
 }
+
+
+Сборка начата в 21:14...
+1>------ Сборка начата: проект: Проверка проекта, Конфигурация: Debug x64 ------
+1>Проверка проекта.cpp
+1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(966,10): error C2664: "bool LoadImageFromURL(const std::wstring &,Gdiplus::Image *&,std::wstring &)": невозможно преобразовать аргумент 3 из "std::wstring" в "std::wstring &"
+1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(966,137):
+1>    Неконстантная ссылка может быть связана только с левосторонним значением
+1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(63,6):
+1>     см. объявление "LoadImageFromURL"
+1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(966,10):
+1>    при попытке сопоставить список аргументов "(const wchar_t [77], Gdiplus::Image *, std::wstring)"
+1>Сборка проекта "Проверка проекта.vcxproj" завершена с ошибкой.
+========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
+========== Сборка завершено в 21:14 и заняло 00,836 с ==========

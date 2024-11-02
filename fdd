@@ -30,7 +30,10 @@ struct ImageItem {
     float y; // Y-coordinate on the screen
     float width; // Width of the displayed image
     float height; // Height of the displayed image
+    bool isRenaming = false; // Флаг переименования
+    HWND hEdit = NULL; // Контрол EDIT для изменения названия
 };
+
 
 // Global Variables
 Image* backgroundImage = nullptr;

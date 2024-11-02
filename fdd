@@ -781,7 +781,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     // Загрузка фонового изображения из локального файла
     // Убедитесь, что путь к файлу корректен и файл существует
-    if (!LoadImageFromFile(L"C:\\Users\\User\\Downloads\\afrikanskii-lev.orig.jpg", backgroundImage)) {
+    if (!LoadImageFromFile(L"C:\\Users\\User\\Downloads\\56cb5ff3d83e4159c447b04d5d3a333e.jpg", backgroundImage)) {
         MessageBox(hwnd, L"Не удалось загрузить фон. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
         DestroyWindow(hwnd);
         GdiplusShutdown(gdiplusToken);

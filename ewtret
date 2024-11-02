@@ -1,0 +1,396 @@
+import socket
+import threading
+import logging
+import os
+import re
+from urllib.parse import urlparse, parse_qs
+from whoosh.index import open_dir, create_in
+from whoosh.fields import Schema, TEXT, ID, STORED
+from whoosh.qparser import MultifieldParser
+from bs4 import BeautifulSoup
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+# -------------------------
+# Configuration and Setup
+# -------------------------
+
+# Server Configuration
+HOST = '0.0.0.0'  # Listen on all interfaces
+PORT = 8080
+BUFFER_SIZE = 4096  # Buffer size for data transmission
+
+# Logging Configuration
+logging.basicConfig(
+    filename='smp_server.log',
+    level=logging.INFO,
+    format='%(asctime)s:%(levelname)s:%(message)s'
+)
+
+# Allowed Domains and Their Root Directories
+allowed_domains = {
+    'search': 'search',
+    'sites': 'sites'
+}
+
+# Path to Whoosh Index Directory
+INDEX_DIR = 'indexdir'
+
+# Ensure the index directory exists
+if not os.path.exists(INDEX_DIR):
+    os.mkdir(INDEX_DIR)
+
+# Define the schema for the index
+schema = Schema(
+    url=ID(stored=True, unique=True),
+    title=TEXT(stored=True),
+    content=TEXT,
+    description=TEXT(stored=True),
+    logo=STORED
+)
+
+# Initialize Whoosh Index
+if not os.path.exists(INDEX_DIR) or not os.listdir(INDEX_DIR):
+    ix = create_in(INDEX_DIR, schema)
+    logging.info("Created new Whoosh index.")
+else:
+    ix = open_dir(INDEX_DIR)
+    logging.info("Opened existing Whoosh index.")
+
+# Set up Jinja2 Environment
+env = Environment(
+    loader=FileSystemLoader('search'),
+    autoescape=select_autoescape(['html', 'xml'])
+)
+
+# -------------------------
+# Helper Functions
+# -------------------------
+
+def send_large_file(conn, filepath):
+    """
+    Sends a file to the client in chunks along with appropriate headers.
+    """
+    if not os.path.exists(filepath):
+        logging.error(f"File not found: {filepath}")
+        message = "File not found"
+        response = (
+            f"SMP 1.0\n"
+            f"STATUS: ERROR\n"
+            f"MESSAGE: {message}\n"
+            f"CONTENT-TYPE: text/plain\n"
+            f"CONTENT-LENGTH: {len(message)}\n\n"
+            f"{message}"
+        )
+        conn.sendall(response.encode())
+        return
+
+    try:
+        file_size = os.path.getsize(filepath)
+        _, ext = os.path.splitext(filepath)
+        ext = ext.lower()
+        if ext in ['.html', '.htm']:
+            content_type = 'text/html'
+        elif ext == '.css':
+            content_type = 'text/css'
+        elif ext == '.png':
+            content_type = 'image/png'
+        elif ext in ['.jpg', '.jpeg']:
+            content_type = 'image/jpeg'
+        elif ext == '.gif':
+            content_type = 'image/gif'
+        elif ext == '.js':
+            content_type = 'application/javascript'
+        else:
+            content_type = 'application/octet-stream'
+
+        # Send headers
+        response_headers = (
+            f"SMP 1.0\n"
+            f"STATUS: OK\n"
+            f"CONTENT-TYPE: {content_type}\n"
+            f"CONTENT-LENGTH: {file_size}\n\n"
+        )
+        conn.send(response_headers.encode())
+        logging.info(f"Sending file: {filepath}")
+
+        # Send the file in chunks
+        with open(filepath, 'rb') as f:
+            while True:
+                chunk = f.read(BUFFER_SIZE)
+                if not chunk:
+                    break
+                conn.sendall(chunk)
+        logging.info(f"File sent: {filepath}")
+
+    except Exception as e:
+        logging.error(f"Error sending file {filepath}: {e}")
+        message = f"Error sending file: {e}"
+        response = (
+            f"SMP 1.0\n"
+            f"STATUS: ERROR\n"
+            f"MESSAGE: {message}\n"
+            f"CONTENT-TYPE: text/plain\n"
+            f"CONTENT-LENGTH: {len(message)}\n\n"
+            f"{message}"
+        )
+        conn.sendall(response.encode())
+
+def send_error(conn, message):
+    """
+    Sends an error message to the client.
+    """
+    response = (
+        f"SMP 1.0\n"
+        f"STATUS: ERROR\n"
+        f"MESSAGE: {message}\n"
+        f"CONTENT-TYPE: text/plain\n"
+        f"CONTENT-LENGTH: {len(message)}\n\n"
+        f"{message}"
+    )
+    conn.sendall(response.encode())
+
+def build_index():
+    """
+    Scans all allowed domains and indexes the content of HTML files for search functionality.
+    """
+    writer = ix.writer()
+    for domain, root_dir in allowed_domains.items():
+        if not os.path.isdir(root_dir):
+            logging.warning(f"Root directory for domain '{domain}' does not exist: {root_dir}")
+            continue
+        for root, _, files in os.walk(root_dir):
+            for file in files:
+                if file.lower().endswith(('.html', '.htm')):
+                    filepath = os.path.join(root, file)
+                    try:
+                        with open(filepath, 'r', encoding='utf-8') as f:
+                            soup = BeautifulSoup(f, 'html.parser')
+                            title = soup.title.string.strip() if soup.title else 'No Title'
+                            text = soup.get_text(separator=' ', strip=True)
+                            description = text[:200] + '...' if len(text) > 200 else text
+
+                            # Extract logo path relative to 'search' directory
+                            logo_tag = soup.find("img", {"class": "site-logo"})
+                            logo_path = None
+                            if logo_tag and 'src' in logo_tag.attrs:
+                                logo_relative = logo_tag['src'].lstrip('/')
+                                logo_path = os.path.join('search', logo_relative)
+
+                            # Prepare SMP resource path as unique ID
+                            relative_path = os.path.relpath(filepath, root_dir).replace(os.sep, '/')
+                            resource_path = f"smp://{domain}/{relative_path}"
+
+                            # Add document to index
+                            writer.update_document(
+                                url=resource_path,
+                                title=title,
+                                content=text,
+                                description=description,
+                                logo=logo_path if logo_path else 'smp://search/logos/default_icon.png'  # Default logo
+                            )
+                            logging.info(f"Indexed: {resource_path}")
+                    except Exception as e:
+                        logging.error(f"Failed to index file {filepath}: {e}")
+    writer.commit()
+    logging.info("Finished indexing all HTML files.")
+
+def handle_search_action(conn, query):
+    """
+    Handles SEARCH requests by querying the Whoosh index and returning formatted results.
+    """
+    logging.info(f"Search request received: '{query}'")
+    try:
+        # Clean and prepare the query
+        clean_query = clean_query_string(query)
+        with ix.searcher() as searcher:
+            parser = MultifieldParser(["title", "content"], ix.schema)
+            parsed_query = parser.parse(clean_query)
+            results = searcher.search(parsed_query, limit=10)
+            
+            # Prepare hits
+            hits = []
+            for r in results:
+                hits.append({
+                    'title': r['title'],
+                    'url': r['url'],
+                    'description': r['description'],
+                    'logo': r['logo'] if r['logo'] else 'smp://search/logos/default_icon.png'  # Default logo if none
+                })
+
+        # Render the results using Jinja2
+        template = env.get_template('results.html')
+        rendered_html = template.render(query=query, hits=hits)
+
+        # Encode the rendered HTML
+        encoded_html = rendered_html.encode('utf-8')
+        content_length = len(encoded_html)
+
+        # Prepare SMP response headers
+        response_headers = (
+            f"SMP 1.0\n"
+            f"STATUS: OK\n"
+            f"CONTENT-TYPE: text/html\n"
+            f"CONTENT-LENGTH: {content_length}\n\n"
+        )
+        conn.send(response_headers.encode())
+        conn.sendall(encoded_html)
+        logging.info(f"Search results sent for query: '{query}'")
+
+    except Exception as e:
+        logging.error(f"Error handling search query '{query}': {e}")
+        message = f"Error processing search: {e}"
+        response = (
+            f"SMP 1.0\n"
+            f"STATUS: ERROR\n"
+            f"MESSAGE: {message}\n"
+            f"CONTENT-TYPE: text/plain\n"
+            f"CONTENT-LENGTH: {len(message)}\n\n"
+            f"{message}"
+        )
+        conn.sendall(response.encode())
+
+def clean_query_string(query):
+    """
+    Cleans and processes the search query.
+    """
+    from nltk.stem.snowball import RussianStemmer
+    from nltk.corpus import stopwords
+    from nltk.tokenize import word_tokenize
+
+    stemmer = RussianStemmer()
+    stop_words = set(stopwords.words('russian'))
+
+    tokens = word_tokenize(query.lower(), language='russian')
+    tokens = [re.sub(r'\W+', '', token) for token in tokens]
+    tokens = [token for token in tokens if token and token not in stop_words]
+    tokens = [stemmer.stem(token) for token in tokens]
+    return ' '.join(tokens)
+
+def handle_get_action(conn, parsed_url):
+    """
+    Handles GET requests by serving static files or redirecting to search index.
+    """
+    domain = parsed_url.hostname
+    path = parsed_url.path.lstrip('/')  # Remove leading '/'
+
+    if domain not in allowed_domains:
+        message = "Domain not allowed"
+        send_error(conn, message)
+        logging.warning(f"Disallowed domain requested: {domain}")
+        return
+
+    # Serve static files or dynamic pages
+    domain_root = allowed_domains[domain]
+    file_path = os.path.join(domain_root, path) if path else os.path.join(domain_root, 'index.html')
+
+    # Prevent directory traversal
+    real_file_path = os.path.realpath(file_path)
+    real_domain_root = os.path.realpath(domain_root)
+    if not real_file_path.startswith(real_domain_root):
+        message = "Invalid resource path"
+        send_error(conn, message)
+        logging.warning(f"Invalid resource path requested: {file_path}")
+        return
+
+    # If the path points to a directory, serve index.html
+    if os.path.isdir(real_file_path):
+        file_path = os.path.join(real_file_path, 'index.html')
+        if not os.path.exists(file_path):
+            message = "Resource not found"
+            send_error(conn, message)
+            logging.warning(f"Resource not found: {file_path}")
+            return
+
+    # If requesting search index or results, render templates
+    if domain == 'search' and path in ['index.html', 'results.html']:
+        if path == 'index.html':
+            try:
+                template = env.get_template('index.html')
+                rendered_html = template.render()
+                encoded_html = rendered_html.encode('utf-8')
+                content_length = len(encoded_html)
+
+                response_headers = (
+                    f"SMP 1.0\n"
+                    f"STATUS: OK\n"
+                    f"CONTENT-TYPE: text/html\n"
+                    f"CONTENT-LENGTH: {content_length}\n\n"
+                )
+                conn.send(response_headers.encode())
+                conn.sendall(encoded_html)
+                logging.info(f"Rendered and sent {path}")
+            except Exception as e:
+                logging.error(f"Error rendering {path}: {e}")
+                send_error(conn, "Error rendering page.")
+        elif path == 'results.html':
+            # Normally handled via SEARCH action
+            send_error(conn, "Direct access to results is not allowed.")
+    else:
+        # Serve static files
+        send_large_file(conn, file_path)
+
+def handle_client(conn, addr):
+    """
+    Handles client connections in separate threads.
+    """
+    logging.info(f"Client connected: {addr}")
+    try:
+        data = b""
+        # Receive data until headers and body are separated by double newline
+        while b"\n\n" not in data:
+            part = conn.recv(BUFFER_SIZE)
+            if not part:
+                raise ConnectionResetError("Client closed the connection")
+            data += part
+
+        header_data, _, body = data.partition(b"\n\n")
+        headers = {}
+        for line in header_data.decode().split('\n'):
+            if ': ' in line:
+                key, value = line.split(': ', 1)
+                headers[key.strip().upper()] = value.strip()
+
+        action = headers.get('ACTION')
+        resource = headers.get('RESOURCE')
+        query = headers.get('QUERY')
+
+        if action == 'GET' and resource:
+            parsed_url = urlparse(resource)
+            handle_get_action(conn, parsed_url)
+        elif action == 'SEARCH' and query:
+            handle_search_action(conn, query)
+        else:
+            message = "Invalid ACTION or missing RESOURCE/QUERY"
+            send_error(conn, message)
+            logging.warning(f"Invalid request: ACTION={action}, RESOURCE={resource}, QUERY={query}")
+
+    except ConnectionResetError as e:
+        logging.info(f"Client {addr} disconnected: {e}")
+    except Exception as e:
+        logging.error(f"Error handling client {addr}: {e}")
+        send_error(conn, "Internal server error.")
+    finally:
+        conn.close()
+        logging.info(f"Connection with {addr} closed")
+
+# -------------------------
+# Server Initialization
+# -------------------------
+
+def start_server():
+    """
+    Starts the SMP server to listen for incoming connections.
+    """
+    build_index()  # Build the search index at startup
+    logging.info("Whoosh indexing completed.")
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+        server_socket.bind((HOST, PORT))
+        server_socket.listen()
+        logging.info(f"SMP Server started on {HOST}:{PORT}")
+        while True:
+            conn, addr = server_socket.accept()
+            client_thread = threading.Thread(target=handle_client, args=(conn, addr), daemon=True)
+            client_thread.start()
+
+if __name__ == "__main__":
+    start_server()

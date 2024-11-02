@@ -96,7 +96,8 @@ bool LoadImageFromURL(const std::wstring& url, Image*& outImage) {
     }
 
     ULONG written;
-    if (FAILED(stream->Write(buffer.data(), buffer.size(), &written)) || written != buffer.size()) {
+    // **Fixed Warning C4267**: Explicitly cast buffer.size() to ULONG
+    if (FAILED(stream->Write(buffer.data(), static_cast<ULONG>(buffer.size()), &written)) || written != static_cast<ULONG>(buffer.size())) {
         OutputDebugString(L"Stream write failed\n");
         stream->Release();
         return false;
@@ -482,7 +483,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             // Draw Sound Icon
             graphics.DrawImage(soundIcon, currentX, iconY, iconSize, iconSize);
             currentX += iconSize + 10.0f;
-        
+
             // Draw Battery Icon
             graphics.DrawImage(batteryIcon, currentX, iconY, iconSize, iconSize);
             currentX += iconSize + 30.0f; // Extra spacing before language and time
@@ -746,10 +747,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     }
 
     default:
-        // Handle messages related to the edit control
+        // **Removed Error C2065**: EN_ENVELOPE is not a valid identifier
+        // Removed the following invalid code block:
+        /*
         if (uMsg == WM_COMMAND && HIWORD(wParam) == EN_ENVELOPE && lParam != 0) {
             // Handle specific edit control notifications
         }
+        */
         return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
 }
@@ -837,13 +841,3 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     GdiplusShutdown(gdiplusToken);
     return 0;
 }
-
-Сборка начата в 19:35...
-1>------ Сборка начата: проект: Проверка проекта, Конфигурация: Debug x64 ------
-1>Проверка проекта.cpp
-1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(99,9): warning C4267: аргумент: преобразование из "size_t" в "ULONG"; возможна потеря данных
-1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(750,53): error C2065: EN_ENVELOPE: необъявленный идентификатор
-1>Сборка проекта "Проверка проекта.vcxproj" завершена с ошибкой.
-========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
-========== Сборка завершено в 19:35 и заняло 00,680 с ==========
-

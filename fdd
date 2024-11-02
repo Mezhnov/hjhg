@@ -41,6 +41,7 @@ Image* backgroundImage = nullptr;
 Image* wifiIcon = nullptr;
 Image* soundIcon = nullptr;
 Image* batteryIcon = nullptr;
+Image* mypassIcon = nullptr; // Start Menu Icon
 
 // List of languages
 std::vector<std::wstring> languages = { L"РУС", L"ENG" }; // Russian and English
@@ -197,7 +198,7 @@ bool InitializeImages() {
         }
     }
 
-    // Load Wi-Fi, Sound, and Battery icons
+    // Load Wi-Fi, Sound, Battery, and Start Menu icons
     struct IconData {
         Image** imagePtr;
         std::wstring url;
@@ -207,8 +208,7 @@ bool InitializeImages() {
         { &wifiIcon, L"https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Feather-core-wifi.svg/1200px-Feather-core-wifi.svg.png" },
         { &soundIcon, L"https://cdn-icons-png.flaticon.com/512/84/84922.png" },
         { &batteryIcon, L"https://i.postimg.cc/1RFQP7JK/Remove-bg-ai-1729799941732.png" },
-        { &mypassIcon, L"https://i.postimg.cc/4NdmpG5m/fra01-temp-p5-FXAe-Zabapcdd-X5k-Pb0-R-1.png" },
-
+        { &mypassIcon, L"https://i.postimg.cc/4NdmpG5m/fra01-temp-p5-FXAe-Zabapcdd-X5k-Pb0-R-1.png" }, // Start Menu Icon
     };
 
     for (const auto& icon : iconsToLoad) {
@@ -392,6 +392,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         delete wifiIcon;
         delete soundIcon;
         delete batteryIcon;
+        delete mypassIcon; // Clean up Start Menu Icon
         for (auto& imgItem : images) {
             delete imgItem.image;
         }
@@ -469,14 +470,25 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         RECT panelRect = { 0, windowRect.bottom - 40, windowRect.right, windowRect.bottom };
         FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1)); // Panel color
 
-        // Draw Wi-Fi, Sound, and Battery Icons
+        // Draw Start Menu Icon on the left
+        if (mypassIcon) {
+            float iconSize = 24.0f; // Icon size
+            float iconY = static_cast<float>(windowRect.bottom - 40 + (40 - iconSize) / 2.0); // Center vertically
+
+            float padding = 15.0f;
+            float startMenuX = padding;
+
+            graphics.DrawImage(mypassIcon, startMenuX, iconY, iconSize, iconSize);
+        }
+
+        // Draw Wi-Fi, Sound, and Battery Icons on the right
         if (wifiIcon && soundIcon && batteryIcon) {
             float iconSize = 24.0f; // Icon size
             float iconY = static_cast<float>(windowRect.bottom - 40 + (40 - iconSize) / 2.0); // Center vertically
 
             // Positions with padding
             float padding = 15.0f;
-            float currentX = padding + 1280.0f;
+            float currentX = windowRect.right - padding - (iconSize * 3 + 30.0f); // Adjusted for three icons and spacing
 
             // Draw Wi-Fi Icon
             graphics.DrawImage(wifiIcon, currentX, iconY, iconSize, iconSize);
@@ -488,7 +500,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
             // Draw Battery Icon
             graphics.DrawImage(batteryIcon, currentX, iconY, iconSize, iconSize);
-            currentX += iconSize + 30.0f; // Extra spacing before language and time
+            //currentX += iconSize + 30.0f; // Extra spacing before language and time
         }
 
         // Get current time
@@ -568,6 +580,21 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             int mouseX = GET_X_LPARAM(lParam);
             int mouseY = GET_Y_LPARAM(lParam);
             POINT mousePt = { mouseX, mouseY };
+
+            // Check if the click is on the Start Menu button
+            bool isOnStartMenu = false;
+            RECT startMenuRect = { 
+                15, 
+                static_cast<LONG>(GetSystemMetrics(SM_CYSCREEN) - 40 + (40 - 24) / 2), 
+                15 + 24, 
+                static_cast<LONG>(GetSystemMetrics(SM_CYSCREEN) - 40 + (40 - 24) / 2 + 24) 
+            };
+            if (PtInRect(&startMenuRect, mousePt)) {
+                isOnStartMenu = true;
+                // Handle Start Menu click
+                MessageBox(hwnd, L"Start Menu Clicked!", L"Start Menu", MB_OK);
+                return 0;
+            }
 
             // Check if the click is on any image (from top to bottom)
             for (size_t i = images.size(); i-- > 0;) {
@@ -749,13 +776,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     }
 
     default:
-        // **Removed Error C2065**: EN_ENVELOPE is not a valid identifier
-        // Removed the following invalid code block:
-        /*
-        if (uMsg == WM_COMMAND && HIWORD(wParam) == EN_ENVELOPE && lParam != 0) {
-            // Handle specific edit control notifications
-        }
-        */
         return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
 }

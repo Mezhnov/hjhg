@@ -29,8 +29,7 @@ using namespace Gdiplus;
 // Structure to store image information
 struct ImageItem {
     Image* image;
-    std::wstring title; // Display title
-    std::wstring filename; // Filename extracted from URL
+    std::wstring title;
     float x; // X-coordinate on the screen
     float y; // Y-coordinate on the screen
     float width; // Width of the displayed image
@@ -50,20 +49,8 @@ int currentLanguageIndex = 0; // Current language index
 // List of additional images
 std::vector<ImageItem> images;
 
-// Forward declarations
-LRESULT CALLBACK FolderWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-
-// Function to extract filename from URL
-std::wstring ExtractFilenameFromURL(const std::wstring& url) {
-    size_t pos = url.find_last_of(L"/\\");
-    if (pos != std::wstring::npos && pos + 1 < url.length()) {
-        return url.substr(pos + 1);
-    }
-    return L"Unknown";
-}
-
 // Function to load image from URL
-bool LoadImageFromURL(const std::wstring& url, Image*& outImage, std::wstring& outFilename) {
+bool LoadImageFromURL(const std::wstring& url, Image*& outImage) {
     HINTERNET hInternet = InternetOpen(L"ImageLoader", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (!hInternet) {
         OutputDebugString(L"InternetOpen failed\n");
@@ -131,8 +118,6 @@ bool LoadImageFromURL(const std::wstring& url, Image*& outImage, std::wstring& o
     }
 
     outImage = img;
-    // Extract filename from URL
-    outFilename = ExtractFilenameFromURL(url);
     OutputDebugString(L"Image loaded successfully\n");
     return true;
 }
@@ -156,7 +141,7 @@ std::wstring GetCurrentTimeString() {
 void PlaySoundByLanguage(const std::wstring& soundName) {
     // Define sound file paths or use system sounds
     // For demonstration, we'll use system sounds based on soundName
-    // You can replace this with actual file paths or resources
+    // You can replace this with actual file paths or URLs
 
     std::wstring soundPath;
     if (currentLanguageIndex == 0) { // Russian
@@ -196,12 +181,10 @@ bool InitializeImages() {
 
     for (size_t i = 0; i < imageData.size(); ++i) {
         Image* img = nullptr;
-        std::wstring filename;
-        if (LoadImageFromURL(imageData[i].first, img, filename)) {
+        if (LoadImageFromURL(imageData[i].first, img)) {
             ImageItem item;
             item.image = img;
             item.title = imageData[i].second;
-            item.filename = filename;
             item.x = startX + i * spacing; // Position along X-axis with spacing
             item.y = startY; // Fixed Y position
             item.width = 100.0f; // Image width
@@ -210,7 +193,7 @@ bool InitializeImages() {
         }
         else {
             OutputDebugString((L"Failed to load image: " + imageData[i].first + L"\n").c_str());
-            // Continue loading other images instead of returning false
+            return false;
         }
     }
 
@@ -227,10 +210,9 @@ bool InitializeImages() {
     };
 
     for (const auto& icon : iconsToLoad) {
-        std::wstring dummyFilename;
-        if (!LoadImageFromURL(icon.url, *(icon.imagePtr), dummyFilename)) {
+        if (!LoadImageFromURL(icon.url, *(icon.imagePtr))) {
             OutputDebugString((L"Failed to load icon: " + icon.url + L"\n").c_str());
-            // Continue loading other icons instead of returning false
+            return false;
         }
     }
 
@@ -249,283 +231,13 @@ struct WindowData {
     bool isCreatingFolder = false; // Flag to indicate folder creation
 };
 
-// Structure to pass data to Image Window
-struct ImageWindowData {
-    Image* image; // Image to display
-    std::wstring title; // Window title (filename)
-};
-
-// Structure to pass data to Folder Window
-struct FolderWindowData {
-    std::wstring folderName;
-    std::vector<ImageItem> folderImages;
-};
-
-// Window Procedure for Image Window
-LRESULT CALLBACK ImageWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    ImageWindowData* imgData = reinterpret_cast<ImageWindowData*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
-
-    switch (uMsg) {
-    case WM_CREATE: {
-        // Retrieve pointer to Image and title from CREATESTRUCT
-        CREATESTRUCT* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
-        ImageWindowData* data = reinterpret_cast<ImageWindowData*>(cs->lpCreateParams);
-        SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(data));
-        return 0;
-    }
-
-    case WM_DESTROY:
-        // Clean up ImageWindowData but not the image itself as it's managed elsewhere
-        if (imgData) {
-            delete imgData;
-        }
-        return 0;
-
-    case WM_PAINT: {
-        PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(hwnd, &ps);
-        Graphics graphics(hdc);
-
-        // Set high-quality rendering settings
-        graphics.SetSmoothingMode(SmoothingModeHighQuality);
-        graphics.SetInterpolationMode(InterpolationModeHighQualityBicubic);
-        graphics.SetPixelOffsetMode(PixelOffsetModeHighQuality);
-
-        // Get client area dimensions
-        RECT clientRect;
-        GetClientRect(hwnd, &clientRect);
-
-        // Draw the image centered and scaled to fit the window while maintaining aspect ratio
-        if (imgData && imgData->image) {
-            UINT imgWidth = imgData->image->GetWidth();
-            UINT imgHeight = imgData->image->GetHeight();
-
-            double windowAspect = static_cast<double>(clientRect.right) / clientRect.bottom;
-            double imageAspect = static_cast<double>(imgWidth) / imgHeight;
-
-            double drawWidth, drawHeight;
-            if (windowAspect > imageAspect) {
-                // Window is wider than image
-                drawHeight = clientRect.bottom;
-                drawWidth = imageAspect * drawHeight;
-            }
-            else {
-                // Window is narrower or equal to image
-                drawWidth = clientRect.right;
-                drawHeight = drawWidth / imageAspect;
-            }
-
-            float x = static_cast<float>((clientRect.right - drawWidth) / 2.0);
-            float y = static_cast<float>((clientRect.bottom - drawHeight) / 2.0);
-            graphics.DrawImage(imgData->image, x, y, static_cast<REAL>(drawWidth), static_cast<REAL>(drawHeight));
-        }
-
-        EndPaint(hwnd, &ps);
-        return 0;
-    }
-
-    default:
-        return DefWindowProc(hwnd, uMsg, wParam, lParam);
-    }
-}
-
-// Window Procedure for Folder Window
-LRESULT CALLBACK FolderWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    FolderWindowData* folderData = reinterpret_cast<FolderWindowData*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
-
-    switch (uMsg) {
-    case WM_CREATE: {
-        // Retrieve pointer to FolderWindowData from CREATESTRUCT
-        CREATESTRUCT* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
-        FolderWindowData* data = reinterpret_cast<FolderWindowData*>(cs->lpCreateParams);
-        SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(data));
-        return 0;
-    }
-
-    case WM_DESTROY:
-        // Clean up FolderWindowData but not the images themselves as they're managed elsewhere
-        if (folderData) {
-            delete folderData;
-        }
-        return 0;
-
-    case WM_PAINT: {
-        PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(hwnd, &ps);
-        Graphics graphics(hdc);
-
-        // Set high-quality rendering settings
-        graphics.SetSmoothingMode(SmoothingModeHighQuality);
-        graphics.SetInterpolationMode(InterpolationModeHighQualityBicubic);
-        graphics.SetPixelOffsetMode(PixelOffsetModeHighQuality);
-
-        // Get client area dimensions
-        RECT clientRect;
-        GetClientRect(hwnd, &clientRect);
-
-        // Draw background (optional, can be solid color or another image)
-        SolidBrush backgroundBrush(Color(255, 240, 240, 240)); // Light gray background
-        graphics.FillRectangle(&backgroundBrush, Rect(0, 0, clientRect.right, clientRect.bottom));
-
-        // Draw folder name at the top
-        if (folderData) {
-            FontFamily fontFamilyObj(L"Segoe UI");
-            Font font(&fontFamilyObj, 20, FontStyleBold, UnitPixel);
-            SolidBrush textBrush(Color(255, 0, 0, 0)); // Black text
-
-            // Изменено на PointF вместо RectF
-            PointF textPoint(10.0f, 10.0f);
-            graphics.DrawString(folderData->folderName.c_str(), -1, &font, textPoint, &textBrush);
-
-            // Draw images within the folder
-            float startX = 20.0f;
-            float startY = 50.0f;
-            float spacing = 150.0f;
-
-            for (size_t i = 0; i < folderData->folderImages.size(); ++i) {
-                const auto& imgItem = folderData->folderImages[i];
-                graphics.DrawImage(imgItem.image, imgItem.x, imgItem.y, imgItem.width, imgItem.height);
-
-                // Draw title below the image, centered
-                Font titleFont(&fontFamilyObj, 12, FontStyleRegular, UnitPixel);
-                SolidBrush titleBrush(Color(255, 0, 0, 0)); // Black text
-
-                RectF titleRect;
-                graphics.MeasureString(imgItem.title.c_str(), -1, &titleFont, PointF(0, 0), &titleRect);
-
-                float xTitle = imgItem.x + (imgItem.width - titleRect.Width) / 2.0f;
-                float yTitle = imgItem.y + imgItem.height + 5.0f; // Offset below image
-
-                PointF titlePoint(xTitle, yTitle);
-                graphics.DrawString(imgItem.title.c_str(), -1, &titleFont, titlePoint, &titleBrush);
-            }
-        }
-
-        EndPaint(hwnd, &ps);
-        return 0;
-    }
-
-    default:
-        return DefWindowProc(hwnd, uMsg, wParam, lParam);
-    }
-}
-
-// Function to create an Image Window
-bool CreateImageWindow(HINSTANCE hInstance, Image* image, const std::wstring& title) {
-    const wchar_t IMAGE_CLASS_NAME[] = L"ImageWindowClass";
-
-    // Register Image Window Class if not already registered
-    static bool classRegistered = false;
-    if (!classRegistered) {
-        WNDCLASS wc = {};
-        wc.lpfnWndProc = ImageWindowProc;
-        wc.hInstance = hInstance;
-        wc.lpszClassName = IMAGE_CLASS_NAME;
-        wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-        wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-
-        if (!RegisterClass(&wc)) {
-            MessageBox(NULL, L"Failed to register Image Window class.", L"Error", MB_ICONERROR);
-            return false;
-        }
-        classRegistered = true;
-    }
-
-    // Prepare data for the Image Window
-    ImageWindowData* imgData = new ImageWindowData();
-    imgData->image = image;
-    imgData->title = title;
-
-    // Create the Image Window
-    HWND hwndImage = CreateWindowEx(
-        0,
-        IMAGE_CLASS_NAME,
-        imgData->title.c_str(),
-        WS_OVERLAPPEDWINDOW, // Standard window style
-        CW_USEDEFAULT, CW_USEDEFAULT, 800, 600, // Initial size
-        NULL,
-        NULL,
-        hInstance,
-        imgData // Pass the ImageWindowData as lpParam
-    );
-
-    if (hwndImage == NULL) {
-        MessageBox(NULL, L"Failed to create Image Window.", L"Error", MB_ICONERROR);
-        delete imgData;
-        return false;
-    }
-
-    ShowWindow(hwndImage, SW_SHOW);
-    UpdateWindow(hwndImage);
-
-    return true;
-}
-
-// Function to create a Folder Window
-bool CreateFolderWindow(HINSTANCE hInstance, const std::wstring& folderName, const std::vector<ImageItem>& folderImages) {
-    const wchar_t FOLDER_CLASS_NAME[] = L"FolderWindowClass";
-
-    // Register Folder Window Class if not already registered
-    static bool classRegistered = false;
-    if (!classRegistered) {
-        WNDCLASS wc = {};
-        wc.lpfnWndProc = FolderWindowProc;
-        wc.hInstance = hInstance;
-        wc.lpszClassName = FOLDER_CLASS_NAME;
-        wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-        wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-
-        if (!RegisterClass(&wc)) {
-            MessageBox(NULL, L"Failed to register Folder Window class.", L"Error", MB_ICONERROR);
-            return false;
-        }
-        classRegistered = true;
-    }
-
-    // Prepare data for the Folder Window
-    FolderWindowData* folderData = new FolderWindowData();
-    folderData->folderName = folderName;
-    folderData->folderImages = folderImages;
-
-    // Create the Folder Window
-    HWND hwndFolder = CreateWindowEx(
-        0,
-        FOLDER_CLASS_NAME,
-        folderData->folderName.c_str(),
-        WS_OVERLAPPEDWINDOW, // Standard window style
-        CW_USEDEFAULT, CW_USEDEFAULT, 800, 600, // Initial size
-        NULL,
-        NULL,
-        hInstance,
-        folderData // Pass the FolderWindowData as lpParam
-    );
-
-    if (hwndFolder == NULL) {
-        MessageBox(NULL, L"Failed to create Folder Window.", L"Error", MB_ICONERROR);
-        delete folderData;
-        return false;
-    }
-
-    ShowWindow(hwndFolder, SW_SHOW);
-    UpdateWindow(hwndFolder);
-
-    return true;
-}
-
 // Function to create a context menu
 void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex, bool isOnImage) {
     HMENU hMenu = CreatePopupMenu();
-    int cmd = 0; // Переместили объявление сюда
-
     if (hMenu) {
         if (isOnImage && imageIndex < images.size()) {
-            // Extract the filename
-            std::wstring filename = images[imageIndex].filename;
-
-            // Create "Open [filename]" menu item
-            std::wstring openMenuItem = L"Открыть " + filename;
-            AppendMenu(hMenu, MF_STRING, 1, openMenuItem.c_str());
-
+            // Context menu for images
+            AppendMenu(hMenu, MF_STRING, 1, L"Открыть");       // Open
             AppendMenu(hMenu, MF_STRING, 2, L"Переименовать"); // Rename
             AppendMenu(hMenu, MF_STRING, 3, L"Удалить");       // Delete
         }
@@ -537,8 +249,8 @@ void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex, bool isOnImag
         // Set foreground to ensure the menu disappears correctly
         SetForegroundWindow(hwnd);
 
-        // Track the popup menu and get the selected command
-        cmd = TrackPopupMenu(
+        // Track the popup menu
+        int cmd = TrackPopupMenu(
             hMenu,
             TPM_RETURNCMD | TPM_TOPALIGN | TPM_LEFTALIGN,
             x,
@@ -550,18 +262,8 @@ void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex, bool isOnImag
 
         // Handle menu selections
         if (isOnImage && imageIndex < images.size()) {
-            if (cmd == 1) { // Open [filename]
-                // Open the image in a new window
-                ImageItem& selectedItem = images[imageIndex];
-                bool success = CreateImageWindow(
-                    GetModuleHandle(NULL),
-                    selectedItem.image,
-                    selectedItem.filename // Use filename as window title
-                );
-
-                if (!success) {
-                    MessageBox(hwnd, L"Не удалось открыть изображение.", L"Ошибка", MB_ICONERROR);
-                }
+            if (cmd == 1) { // Open
+                MessageBox(hwnd, (images[imageIndex].title + L" открыта.").c_str(), L"Открыть", MB_OK);
             }
             else if (cmd == 2) { // Rename
                 // Initiate renaming by creating an Edit control
@@ -570,10 +272,20 @@ void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex, bool isOnImag
                     data->editingImageIndex = imageIndex;
 
                     // Calculate position for Edit control
+                    float titleWidth = 100.0f; // Approximate width
+                    Gdiplus::RectF titleRect;
+                    HDC hdc = GetDC(hwnd);
+                    Graphics graphics(hdc);
+                    FontFamily fontFamily(L"Segoe UI");
+                    Font font(&fontFamily, 16, FontStyleRegular, UnitPixel);
+                    SolidBrush brush(Color(255, 255, 255, 255)); // White text
+                    graphics.MeasureString(images[imageIndex].title.c_str(), -1, &font, PointF(0, 0), &titleRect);
+                    ReleaseDC(hwnd, hdc);
+
                     float editX = images[imageIndex].x;
-                    float editY = images[imageIndex].y + images[imageIndex].height + 20.0f; // Offset below image
-                    float editWidth = 100.0f; // Fixed width
-                    float editHeight = 25.0f; // Fixed height
+                    float editY = images[imageIndex].y + images[imageIndex].height + 5.0f;
+                    float editWidth = titleRect.Width + 10.0f; // Slight padding
+                    float editHeight = titleRect.Height + 5.0f;
 
                     HWND hwndEdit = CreateWindowEx(
                         0,
@@ -599,14 +311,7 @@ void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex, bool isOnImag
             }
             else if (cmd == 3) { // Delete
                 // Implement deletion if needed
-                // For safety, confirm deletion
-                int result = MessageBox(hwnd, L"Вы уверены, что хотите удалить этот элемент?", L"Удалить", MB_YESNO | MB_ICONQUESTION);
-                if (result == IDYES && imageIndex < images.size()) {
-                    // Delete image
-                    delete images[imageIndex].image;
-                    images.erase(images.begin() + imageIndex);
-                    InvalidateRect(hwnd, NULL, TRUE);
-                }
+                MessageBox(hwnd, L"Функция удаления не реализована.", L"Удалить", MB_OK);
             }
         }
         else {
@@ -615,13 +320,9 @@ void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex, bool isOnImag
                 WindowData* data = reinterpret_cast<WindowData*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
                 if (data && data->editControl == NULL) {
                     ImageItem newItem;
-                    // Use a default folder icon URL or use a local resource
-                    std::wstring defaultFolderURL = L"https://i.postimg.cc/4x8HknSh/nyc01-temp-32d4-T5s3-TEIMt1-R3qrjho.png";
-
-                    std::wstring folderFilename;
-                    if (LoadImageFromURL(defaultFolderURL, newItem.image, folderFilename)) {
+                    // You can set a default folder icon URL or use a local resource
+                    if (LoadImageFromURL(L"https://i.postimg.cc/4x8HknSh/nyc01-temp-32d4-T5s3-TEIMt1-R3qrjho.png", newItem.image)) {
                         newItem.title = L"Новая папка"; // Default name
-                        newItem.filename = folderFilename;
                         // Position the new folder where the user right-clicked
                         newItem.x = static_cast<float>(x);
                         newItem.y = static_cast<float>(y);
@@ -663,14 +364,9 @@ void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex, bool isOnImag
 
         DestroyMenu(hMenu);
     }
-
-    // Handle menu selections immediately after tracking
-    // Нет необходимости в дополнительной обработке здесь
-
-    return;
 }
 
-// Window Procedure for the Main Window
+// Window Procedure
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     // Retrieve WindowData
     WindowData* data = reinterpret_cast<WindowData*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
@@ -737,7 +433,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         graphics.SetSmoothingMode(SmoothingModeHighQuality);
         graphics.SetInterpolationMode(InterpolationModeHighQualityBicubic);
         graphics.SetPixelOffsetMode(PixelOffsetModeHighQuality);
-        graphics.SetCompositingQuality(CompositingQualityHighQuality);
 
         // Get window dimensions
         RECT windowRect;
@@ -769,9 +464,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         }
 
         // Draw bottom panel
-        Rect panelRect(0, windowRect.bottom - 40, windowRect.right, 40);
-        SolidBrush panelBrush(Color(255, 200, 200, 200)); // Light gray panel
-        graphics.FillRectangle(&panelBrush, panelRect);
+        RECT panelRect = { 0, windowRect.bottom - 40, windowRect.right, windowRect.bottom };
+        FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1)); // Panel color
 
         // Draw Wi-Fi, Sound, and Battery Icons
         if (wifiIcon && soundIcon && batteryIcon) {
@@ -780,7 +474,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
             // Positions with padding
             float padding = 15.0f;
-            float currentX = padding;
+            float currentX = padding + 1280.0f;
 
             // Draw Wi-Fi Icon
             graphics.DrawImage(wifiIcon, currentX, iconY, iconSize, iconSize);
@@ -812,11 +506,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         // Calculate positions for text
         float paddingText = 15.0f;
-        float xTime = static_cast<float>(windowRect.right) - timeRect.Width - langRect.Width - paddingText;
+        float xTime = static_cast<float>(windowRect.right - timeRect.Width - langRect.Width - 30); // Right margin
         float yText = static_cast<float>(windowRect.bottom - 40 + (40 - timeRect.Height) / 2.0 - 1); // Vertical alignment
 
         // Draw current language
-        PointF langPoint(xTime - langRect.Width - 10.0f, yText);
+        PointF langPoint(xTime - langRect.Width - 10, yText); // Position to the left of time
         graphics.DrawString(langString.c_str(), -1, &font, langPoint, &brush);
 
         // Draw current time
@@ -913,7 +607,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             int mouseY = GET_Y_LPARAM(lParam);
             POINT mousePt = { mouseX, mouseY };
 
-            // Check if the click is on any image
+            // Check if clicking on any image
             bool isOnImage = false;
             size_t imageIndex = SIZE_MAX;
             for (size_t i = 0; i < images.size(); ++i) {
@@ -1053,6 +747,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     }
 
     default:
+        // **Removed Error C2065**: EN_ENVELOPE is not a valid identifier
+        // Removed the following invalid code block:
+        /*
+        if (uMsg == WM_COMMAND && HIWORD(wParam) == EN_ENVELOPE && lParam != 0) {
+            // Handle specific edit control notifications
+        }
+        */
         return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
 }
@@ -1110,9 +811,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
         return 0;
     }
 
-    // **Fixed Error:** Use a std::wstring variable instead of a temporary
-    std::wstring backgroundFilename;
-    if (!LoadImageFromURL(L"https://i.pinimg.com/originals/56/cb/5f/56cb5ff3d83e4159c447b04d5d3a333e.jpg", backgroundImage, backgroundFilename)) {
+    // Load background image from URL
+    if (!LoadImageFromURL(L"https://i.pinimg.com/originals/56/cb/5f/56cb5ff3d83e4159c447b04d5d3a333e.jpg", backgroundImage)) {
         MessageBox(hwnd, L"Не удалось загрузить фон. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
         DestroyWindow(hwnd);
         GdiplusShutdown(gdiplusToken);
@@ -1121,8 +821,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     // Initialize additional images
     if (!InitializeImages()) {
-        MessageBox(hwnd, L"Не удалось загрузить дополнительные изображения.", L"Ошибка", MB_ICONERROR);
-        // Continue running even if some images failed to load
+        MessageBox(hwnd, L"Не удалось загрузить дополнительные изображения. Приложение будет закрыто.", L"Ошибка", MB_ICONERROR);
+        DestroyWindow(hwnd);
+        GdiplusShutdown(gdiplusToken);
+        return 0;
     }
 
     ShowWindow(hwnd, nCmdShow);
@@ -1131,11 +833,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     // Message loop
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
-        // Handle keyboard input for edit controls
-        if (!IsDialogMessage(hwnd, &msg)) {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
     }
 
     // Shutdown GDI+

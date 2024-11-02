@@ -373,8 +373,9 @@ LRESULT CALLBACK FolderWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lP
             Font font(&fontFamilyObj, 20, FontStyleBold, UnitPixel);
             SolidBrush textBrush(Color(255, 0, 0, 0)); // Black text
 
-            RectF textRect(10.0f, 10.0f, static_cast<float>(clientRect.right) - 20.0f, 30.0f);
-            graphics.DrawString(folderData->folderName.c_str(), -1, &font, textRect, &textBrush);
+            // Изменено на PointF вместо RectF
+            PointF textPoint(10.0f, 10.0f);
+            graphics.DrawString(folderData->folderName.c_str(), -1, &font, textPoint, &textBrush);
 
             // Draw images within the folder
             float startX = 20.0f;
@@ -514,6 +515,8 @@ bool CreateFolderWindow(HINSTANCE hInstance, const std::wstring& folderName, con
 // Function to create a context menu
 void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex, bool isOnImage) {
     HMENU hMenu = CreatePopupMenu();
+    int cmd = 0; // Переместили объявление сюда
+
     if (hMenu) {
         if (isOnImage && imageIndex < images.size()) {
             // Extract the filename
@@ -535,7 +538,7 @@ void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex, bool isOnImag
         SetForegroundWindow(hwnd);
 
         // Track the popup menu and get the selected command
-        int cmd = TrackPopupMenu(
+        cmd = TrackPopupMenu(
             hMenu,
             TPM_RETURNCMD | TPM_TOPALIGN | TPM_LEFTALIGN,
             x,
@@ -662,9 +665,7 @@ void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex, bool isOnImag
     }
 
     // Handle menu selections immediately after tracking
-    if (hMenu && cmd) {
-        // Additional handling if needed
-    }
+    // Нет необходимости в дополнительной обработке здесь
 
     return;
 }
@@ -1141,26 +1142,3 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     GdiplusShutdown(gdiplusToken);
     return 0;
 }
-
-Сборка начата в 21:52...
-1>------ Сборка начата: проект: Проверка проекта, Конфигурация: Debug x64 ------
-1>Проверка проекта.cpp
-1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(377,22): error C2665: "Gdiplus::Graphics::DrawString": ни одна перегруженная функция не может преобразовать все типы аргументов
-1>    C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\um\GdiplusGraphics.h(1225,5):
-1>    может быть "Gdiplus::Status Gdiplus::Graphics::DrawString(const WCHAR *,INT,const Gdiplus::Font *,const Gdiplus::PointF &,const Gdiplus::Brush *)"
-1>        C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(377,22):
-1>        "Gdiplus::Status Gdiplus::Graphics::DrawString(const WCHAR *,INT,const Gdiplus::Font *,const Gdiplus::PointF &,const Gdiplus::Brush *)": невозможно преобразовать аргумент 4 из "Gdiplus::RectF" в "const Gdiplus::PointF &"
-1>            C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(377,76):
-1>            Причина: невозможно преобразовать "Gdiplus::RectF" в "const Gdiplus::PointF"
-1>            C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(377,76):
-1>            Для выполнения данного преобразования нет доступного оператора преобразования, определенного пользователем, или вызов оператора невозможен
-1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(377,22):
-1>    при попытке сопоставить список аргументов "(const _Elem *, int, Gdiplus::Font *, Gdiplus::RectF, Gdiplus::SolidBrush *)"
-1>        with
-1>        [
-1>            _Elem=wchar_t
-1>        ]
-1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(665,18): error C2065: cmd: необъявленный идентификатор
-1>Сборка проекта "Проверка проекта.vcxproj" завершена с ошибкой.
-========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
-========== Сборка завершено в 21:52 и заняло 00,732 с ==========

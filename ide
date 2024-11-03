@@ -57,6 +57,7 @@ void AddNewTab(HWND hTab);
 void ResizeLayout(HWND hWnd, int width, int height);
 HWND InitOutputConsole(HWND hWndParent);
 HWND InitDebuggerPanel(HWND hWndParent);
+void InitializeRichEditFonts(HWND hParent);
 
 // Точка входа
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
@@ -198,6 +199,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             // Инициализация панели отладки
             hDebuggerPanel = InitDebuggerPanel(hWnd);
+
+            // Установка шрифтов для Rich Edit контролов
+            InitializeRichEditFonts(hWnd);
         }
         break;
     case WM_SIZE:
@@ -217,12 +221,32 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 AddNewTab(hTabControl);
                 break;
             case ID_FILE_OPEN:
-                // Реализуйте функциональность открытия файла
-                MessageBox(hWnd, L"Функциональность открытия файла не реализована.", L"Информация", MB_OK | MB_ICONINFORMATION);
+                {
+                    // Реализуйте функциональность открытия файла
+                    OPENFILENAME ofn;       // Структура открывающегося окна
+                    wchar_t szFileName[MAX_PATH] = L"";
+
+                    ZeroMemory(&ofn, sizeof(ofn));
+                    ofn.lStructSize = sizeof(ofn);
+                    ofn.hwndOwner = hWnd;
+                    ofn.lpstrFilter = L"Файлы C++ (*.cpp;*.h)\0*.cpp;*.h\0Все файлы (*.*)\0*.*\0";
+                    ofn.lpstrFile = szFileName;
+                    ofn.nMaxFile = MAX_PATH;
+                    ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
+                    ofn.lpstrDefExt = L"cpp";
+
+                    if (GetOpenFileName(&ofn))
+                    {
+                        // Здесь необходимо добавить код для чтения файла и отображения его в редакторе
+                        MessageBox(hWnd, L"Функциональность открытия файла не реализована.", L"Информация", MB_OK | MB_ICONINFORMATION);
+                    }
+                }
                 break;
             case ID_FILE_SAVE:
-                // Реализуйте функциональность сохранения файла
-                MessageBox(hWnd, L"Функциональность сохранения файла не реализована.", L"Информация", MB_OK | MB_ICONINFORMATION);
+                {
+                    // Реализуйте функциональность сохранения файла
+                    MessageBox(hWnd, L"Функциональность сохранения файла не реализована.", L"Информация", MB_OK | MB_ICONINFORMATION);
+                }
                 break;
             case ID_FILE_EXIT:
                 DestroyWindow(hWnd);
@@ -231,16 +255,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 MessageBox(hWnd, L"Simple IDE v1.0\nСоздано с использованием Win32 API.", L"О программе", MB_OK | MB_ICONINFORMATION);
                 break;
             case IDT_RUN:
-                // Реализуйте функциональность запуска
-                MessageBox(hWnd, L"Функциональность запуска не реализована.", L"Информация", MB_OK | MB_ICONINFORMATION);
+                {
+                    // Реализуйте функциональность запуска
+                    MessageBox(hWnd, L"Функциональность запуска не реализована.", L"Информация", MB_OK | MB_ICONINFORMATION);
+                }
                 break;
             case IDT_DEBUG:
-                // Реализуйте функциональность отладки
-                MessageBox(hWnd, L"Функциональность отладки не реализована.", L"Информация", MB_OK | MB_ICONINFORMATION);
+                {
+                    // Реализуйте функциональность отладки
+                    MessageBox(hWnd, L"Функциональность отладки не реализована.", L"Информация", MB_OK | MB_ICONINFORMATION);
+                }
                 break;
             case IDT_BUILD:
-                // Реализуйте функциональность сборки
-                MessageBox(hWnd, L"Функциональность сборки не реализована.", L"Информация", MB_OK | MB_ICONINFORMATION);
+                {
+                    // Реализуйте функциональность сборки
+                    MessageBox(hWnd, L"Функциональность сборки не реализована.", L"Информация", MB_OK | MB_ICONINFORMATION);
+                }
                 break;
             default:
                 break;
@@ -368,7 +398,7 @@ HWND InitToolbar(HWND hWnd)
 HWND CreateTabControl(HWND hParent)
 {
     HWND hTab = CreateWindowEx(0, WC_TABCONTROL, NULL,
-        WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | TCS_MULTILINE | TCS_TABS,
+        WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | TCS_TABS,
         200, 40, 800, 500, hParent, (HMENU)(INT_PTR)IDC_TAB_CONTROL, hInstGlobal, NULL);
 
     if (!hTab)
@@ -453,6 +483,23 @@ void ResizeLayout(HWND hWnd, int width, int height)
     {
         SetWindowPos(hDebuggerPanel, NULL, width - 300, toolbarHeight, 300, height - toolbarHeight - 200, SWP_NOZORDER);
     }
+
+    // Изменение размеров Rich Edit контролов внутри таб-контрола
+    if (hTabControl)
+    {
+        int tabCount = TabCtrl_GetItemCount(hTabControl);
+        for (int i = 0; i < tabCount; ++i)
+        {
+            HWND hEditor = GetDlgItem(hTabControl, 2000 + i);
+            if (hEditor)
+            {
+                RECT rc;
+                SendMessage(hTabControl, TCM_ADJUSTRECT, TRUE, (LPARAM)&rc);
+                GetClientRect(hTabControl, &rc);
+                SetWindowPos(hEditor, NULL, 0, 0, rc.right - rc.left, rc.bottom - rc.top, SWP_NOZORDER);
+            }
+        }
+    }
 }
 
 // Инициализация консоли вывода
@@ -517,10 +564,10 @@ HWND InitDebuggerPanel(HWND hWndParent)
 
     return hDebugger;
 }
-Сборка начата в 23:13...
-1>------ Сборка начата: проект: САПР1.1, Конфигурация: Debug x64 ------
-1>САПР1.1.cpp
-1>LINK : fatal error LNK1104: не удается открыть файл "Msftedit.lib"
-1>Сборка проекта "САПР1.1.vcxproj" завершена с ошибкой.
-========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
-========== Сборка завершено в 23:13 и заняло 01,086 с ==========
+
+// Установка шрифтов для Rich Edit контролов
+void InitializeRichEditFonts(HWND hParent)
+{
+    // Можно добавить дополнительную настройку шрифтов или других параметров Rich Edit здесь
+}
+

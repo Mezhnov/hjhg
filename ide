@@ -1,90 +1,103 @@
 // main.cpp
 
 #include <windows.h>
-#include <windowsx.h>
 #include <gdiplus.h>
-#include <commctrl.h>
-#include <richedit.h>
+#include <wininet.h>
 #include <string>
 #include <vector>
+#include <chrono>
+#include <iomanip>
 #include <sstream>
+#include <locale>
+#include <codecvt>
+#include <windowsx.h>
+#include <mmsystem.h> // For PlaySound
+#include <CommCtrl.h> // For common controls
+#include <richedit.h> // For rich edit controls
+#include "resource.h" // Ensure you have this header for resource IDs
+#include <map>
+#include <functional>
+#include <cstdlib>
 
 #pragma comment(lib, "Gdiplus.lib")
+#pragma comment(lib, "Wininet.lib")
 #pragma comment(lib, "Comctl32.lib")
-#pragma comment(lib, "Msftedit.lib")
+#pragma comment(lib, "Msimg32.lib")
+#pragma comment(lib, "Imm32.lib")
+#pragma comment(lib, "Winmm.lib")
 
 using namespace Gdiplus;
 
-// Константы для разделителей (если используются)
-#define SPLITTER_WIDTH 5
-#define MIN_PANEL_WIDTH 150
-#define MIN_PANEL_HEIGHT 100
+// Global variables
+HINSTANCE hInst;
+LPCWSTR szWindowClass = L"MainWindowClass";
+LPCWSTR szTitle = L"Simple IDE";
 
-// Идентификаторы для пунктов меню
-#define ID_FILE_NEW      9001
-#define ID_FILE_OPEN     9002
-#define ID_FILE_SAVE     9003
-#define ID_FILE_EXIT     9004
-#define ID_HELP_ABOUT    9005
-
-// Идентификаторы кнопок панели инструментов
-#define IDT_RUN          1001
-#define IDT_DEBUG        1002
-#define IDT_BUILD        1003
-
-// Идентификаторы контролов
-#define IDC_TOOLBAR            101
-#define IDC_PROJECT_EXPLORER   102
-#define IDC_TAB_CONTROL        103
-#define IDC_OUTPUT_CONSOLE     104
-#define IDC_DEBUGGER_PANEL     105
-
-// Количество кнопок на панели инструментов
-#define NUM_TOOLBAR_BUTTONS 3
-
-// Глобальные переменные
-HINSTANCE hInstGlobal;
-ULONG_PTR gdiplusToken;
-
-// Объявления функций
+// Forward declarations
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 void InitializeGDIPlus();
 void ShutdownGDIPlus();
-void InitMainMenu(HWND hWnd);
-HWND InitToolbar(HWND hWnd);
-HWND CreateTabControl(HWND hParent);
-void AddNewTab(HWND hTab);
-void ResizeLayout(HWND hWnd, int width, int height);
-HWND InitOutputConsole(HWND hWndParent);
-HWND InitDebuggerPanel(HWND hWndParent);
-void InitializeRichEditFonts(HWND hParent);
+std::wstring ProcessCode(const std::wstring& code);
+void ApplySyntaxHighlighting(HWND hCodeEditor);
 
-// Точка входа
-int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
-                       _In_opt_ HINSTANCE hPrevInstance,
-                       _In_ LPWSTR    lpCmdLine,
-                       _In_ int       nCmdShow)
+// Interpreter Structures and Globals
+enum class ValueType {
+    NUMBER,
+    STRING
+};
+
+struct Value {
+    ValueType type;
+    double numberValue;
+    std::wstring stringValue;
+
+    Value() : type(ValueType::NUMBER), numberValue(0) {}
+    Value(double num) : type(ValueType::NUMBER), numberValue(num) {}
+    Value(std::wstring str) : type(ValueType::STRING), stringValue(str) {}
+};
+
+std::map<std::wstring, Value> variables;
+std::wstringstream outputStream;
+typedef Value(*FunctionPtr)(const std::vector<Value>&);
+std::map<std::wstring, FunctionPtr> functions;
+
+double toNumber(const Value& val)
 {
-    // Инициализация GDI+
+    if (val.type == ValueType::NUMBER)
+        return val.numberValue;
+    return 0;
+}
+
+void printFunction(const std::vector<Value>& args)
+{
+    for (const auto& arg : args)
+    {
+        if (arg.type == ValueType::NUMBER)
+            outputStream << arg.numberValue << L" ";
+        else if (arg.type == ValueType::STRING)
+            outputStream << arg.stringValue << L" ";
+    }
+    outputStream << L"\n";
+}
+
+void InitializeFunctions()
+{
+    functions[L"print"] = [](const std::vector<Value>& args) -> Value {
+        printFunction(args);
+        return Value();
+    };
+}
+
+int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
+                     _In_opt_ HINSTANCE hPrevInstance,
+                     _In_ LPWSTR    lpCmdLine,
+                     _In_ int       nCmdShow)
+{
+    hInst = hInstance;
+    // Initialize GDI+
     InitializeGDIPlus();
 
-    // Инициализация стандартных контролов
-    INITCOMMONCONTROLSEX icex;
-    icex.dwSize = sizeof(icex);
-    icex.dwICC = ICC_WIN95_CLASSES | ICC_TAB_CLASSES | ICC_TREEVIEW_CLASSES | ICC_BAR_CLASSES;
-    InitCommonControlsEx(&icex);
-
-    // Инициализация Rich Edit
-    if (!LoadLibrary(TEXT("Msftedit.dll"))) {
-        MessageBox(NULL, L"Не удалось загрузить Msftedit.dll", L"Ошибка", MB_ICONERROR);
-        ShutdownGDIPlus();
-        return 1;
-    }
-
-    // Регистрация класса окна
-    const wchar_t szWindowClass[] = L"MainWindowClass";
-    const wchar_t szTitle[] = L"Simple IDE";
-
+    // Register the window class
     WNDCLASSEX wcex;
     ZeroMemory(&wcex, sizeof(WNDCLASSEX));
 
@@ -97,30 +110,28 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     wcex.hIcon          = LoadIcon(NULL, IDI_APPLICATION);
     wcex.hCursor        = LoadCursor(NULL, IDC_ARROW);
     wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
-    wcex.lpszMenuName   = NULL; // Меню будет создано вручную
+    wcex.lpszMenuName   = NULL; // You can add menu resource here
     wcex.lpszClassName  = szWindowClass;
     wcex.hIconSm        = LoadIcon(NULL, IDI_APPLICATION);
 
     if (!RegisterClassEx(&wcex))
     {
         MessageBox(NULL,
-            L"Не удалось зарегистрировать класс окна!",
+            L"Call to RegisterClassEx failed!",
             szTitle,
-            MB_ICONERROR);
+            NULL);
 
         ShutdownGDIPlus();
         return 1;
     }
 
-    hInstGlobal = hInstance;
-
-    // Создание окна
+    // Create the window
     HWND hWnd = CreateWindow(
         szWindowClass,
         szTitle,
-        WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+        WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT,
-        1200, 800,
+        720, 600,
         NULL,
         NULL,
         hInstance,
@@ -130,161 +141,155 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     if (!hWnd)
     {
         MessageBox(NULL,
-            L"Не удалось создать окно!",
+            L"Call to CreateWindow failed!",
             szTitle,
-            MB_ICONERROR);
+            NULL);
 
         ShutdownGDIPlus();
         return 1;
     }
 
-    // Основной цикл сообщений
+    // Show the window
+    ShowWindow(hWnd, nCmdShow);
+    UpdateWindow(hWnd);
+
+    // Main message loop
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0))
     {
-        // Перевод и отправка сообщений
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
-    // Завершение работы с GDI+
+    // Shutdown GDI+
     ShutdownGDIPlus();
 
     return (int) msg.wParam;
 }
 
-// Инициализация GDI+
 void InitializeGDIPlus()
 {
     GdiplusStartupInput gdiplusStartupInput;
     GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
 }
 
-// Завершение работы с GDI+
 void ShutdownGDIPlus()
 {
     GdiplusShutdown(gdiplusToken);
 }
 
-// Процедура окна
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    static HWND hToolbar = NULL;
-    static HWND hProjectExplorer = NULL;
-    static HWND hTabControl = NULL;
-    static HWND hOutputConsole = NULL;
-    static HWND hDebuggerPanel = NULL;
+    static HWND hCodeEditor, hOutputWindow, hBuildButton;
 
     switch (message)
     {
     case WM_CREATE:
         {
-            // Инициализация меню
-            InitMainMenu(hWnd);
+            // Initialize common controls
+            INITCOMMONCONTROLSEX icex;
+            icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
+            icex.dwICC = ICC_WIN95_CLASSES;
+            InitCommonControlsEx(&icex);
 
-            // Инициализация панели инструментов
-            hToolbar = InitToolbar(hWnd);
+            // Initialize Rich Edit control
+            if (!LoadLibrary(L"Msftedit.dll"))
+            {
+                MessageBox(hWnd, L"Failed to load RichEdit library.", szTitle, MB_OK | MB_ICONERROR);
+            }
 
-            // Инициализация обозревателя проекта
-            hProjectExplorer = CreateWindowEx(0, WC_TREEVIEW, L"Project Explorer",
-                WS_CHILD | WS_VISIBLE | WS_BORDER | TVS_HASLINES | TVS_LINESATROOT | TVS_HASBUTTONS,
-                0, 40, 200, 600, hWnd, (HMENU)(INT_PTR)IDC_PROJECT_EXPLORER, hInstGlobal, NULL);
+            // Create Code Editor
+            hCodeEditor = CreateWindowEx(0, MSFTEDIT_CLASS, L"// Write your code here...",
+                WS_CHILD | WS_VISIBLE | WS_BORDER | ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | WS_VSCROLL,
+                10, 10, 560, 400,
+                hWnd, (HMENU)IDC_CODE_EDITOR, hInst, NULL);
 
-            // Инициализация таб-контрола для редактора кода
-            hTabControl = CreateTabControl(hWnd);
-            AddNewTab(hTabControl); // Добавление начальной вкладки
+            // Create Output Window
+            hOutputWindow = CreateWindowEx(0, MSFTEDIT_CLASS, L"// Output...",
+                WS_CHILD | WS_VISIBLE | WS_BORDER | ES_MULTILINE | ES_READONLY | WS_VSCROLL,
+                10, 420, 560, 150,
+                hWnd, (HMENU)IDC_OUTPUT_WINDOW, hInst, NULL);
 
-            // Инициализация консоли вывода
-            hOutputConsole = InitOutputConsole(hWnd);
+            // Create Build Button
+            hBuildButton = CreateWindow(L"BUTTON", L"Build",
+                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+                580, 10, 100, 30,
+                hWnd, (HMENU)IDC_BUILD_BUTTON, hInst, NULL);
 
-            // Инициализация панели отладки
-            hDebuggerPanel = InitDebuggerPanel(hWnd);
+            // Optionally, set font for better appearance
+            HFONT hFont = CreateFont(
+                16,                        // Height
+                0,                         // Width
+                0,                         // Escapement
+                0,                         // Orientation
+                FW_NORMAL,                 // Weight
+                FALSE,                     // Italic
+                FALSE,                     // Underline
+                FALSE,                     // Strikeout
+                DEFAULT_CHARSET,           // Charset
+                OUT_DEFAULT_PRECIS,        // OutPrecision
+                CLIP_DEFAULT_PRECIS,       // ClipPrecision
+                DEFAULT_QUALITY,           // Quality
+                DEFAULT_PITCH | FF_SWISS,  // PitchAndFamily
+                L"Consolas");              // Typeface
 
-            // Установка шрифтов для Rich Edit контролов
-            InitializeRichEditFonts(hWnd);
-        }
-        break;
-    case WM_SIZE:
-        {
-            int width = LOWORD(lParam);
-            int height = HIWORD(lParam);
-            ResizeLayout(hWnd, width, height);
+            SendMessage(hCodeEditor, WM_SETFONT, (WPARAM)hFont, TRUE);
+            SendMessage(hOutputWindow, WM_SETFONT, (WPARAM)hFont, TRUE);
         }
         break;
     case WM_COMMAND:
         {
             int wmId = LOWORD(wParam);
-            // Обработка выборов меню и панели инструментов
+            // Разобрать выбор согласно меню или controls:
             switch (wmId)
             {
-            case ID_FILE_NEW:
-                AddNewTab(hTabControl);
+            case IDM_ABOUT:
+                // Обработать команду "О программе"
+                MessageBox(hWnd, L"Simple IDE v1.0", L"About", MB_OK);
                 break;
-            case ID_FILE_OPEN:
-                {
-                    // Реализуйте функциональность открытия файла
-                    OPENFILENAME ofn;       // Структура открывающегося окна
-                    wchar_t szFileName[MAX_PATH] = L"";
-
-                    ZeroMemory(&ofn, sizeof(ofn));
-                    ofn.lStructSize = sizeof(ofn);
-                    ofn.hwndOwner = hWnd;
-                    ofn.lpstrFilter = L"Файлы C++ (*.cpp;*.h)\0*.cpp;*.h\0Все файлы (*.*)\0*.*\0";
-                    ofn.lpstrFile = szFileName;
-                    ofn.nMaxFile = MAX_PATH;
-                    ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
-                    ofn.lpstrDefExt = L"cpp";
-
-                    if (GetOpenFileName(&ofn))
-                    {
-                        // Здесь необходимо добавить код для чтения файла и отображения его в редакторе
-                        MessageBox(hWnd, L"Функциональность открытия файла не реализована.", L"Информация", MB_OK | MB_ICONINFORMATION);
-                    }
-                }
-                break;
-            case ID_FILE_SAVE:
-                {
-                    // Реализуйте функциональность сохранения файла
-                    MessageBox(hWnd, L"Функциональность сохранения файла не реализована.", L"Информация", MB_OK | MB_ICONINFORMATION);
-                }
-                break;
-            case ID_FILE_EXIT:
+            case IDM_EXIT:
                 DestroyWindow(hWnd);
                 break;
-            case ID_HELP_ABOUT:
-                MessageBox(hWnd, L"Simple IDE v1.0\nСоздано с использованием Win32 API.", L"О программе", MB_OK | MB_ICONINFORMATION);
-                break;
-            case IDT_RUN:
+            case IDC_BUILD_BUTTON:
                 {
-                    // Реализуйте функциональность запуска
-                    MessageBox(hWnd, L"Функциональность запуска не реализована.", L"Информация", MB_OK | MB_ICONINFORMATION);
-                }
-                break;
-            case IDT_DEBUG:
-                {
-                    // Реализуйте функциональность отладки
-                    MessageBox(hWnd, L"Функциональность отладки не реализована.", L"Информация", MB_OK | MB_ICONINFORMATION);
-                }
-                break;
-            case IDT_BUILD:
-                {
-                    // Реализуйте функциональность сборки
-                    MessageBox(hWnd, L"Функциональность сборки не реализована.", L"Информация", MB_OK | MB_ICONINFORMATION);
+                    // Get code from Code Editor
+                    int length = GetWindowTextLength(hCodeEditor);
+                    std::wstring code(length, L'\0');
+                    GetWindowText(hCodeEditor, &code[0], length + 1);
+
+                    // Process the code (parse and execute)
+                    std::wstring output = ProcessCode(code);
+
+                    // Set output to Output Window
+                    SetWindowText(hOutputWindow, output.c_str());
+
+                    // Apply syntax highlighting
+                    ApplySyntaxHighlighting(hCodeEditor);
                 }
                 break;
             default:
-                break;
+                return DefWindowProc(hWnd, message, wParam, lParam);
             }
         }
         break;
-    case WM_NOTIFY:
+    case WM_PAINT:
         {
-            // Обработка уведомлений от контролов при необходимости
-            LPNMHDR pnmh = (LPNMHDR)lParam;
-            if (pnmh->hwndFrom == hTabControl && pnmh->code == TCN_SELCHANGE)
-            {
-                // Обработка смены вкладки при необходимости
-            }
+            PAINTSTRUCT ps;
+            HDC hdc = BeginPaint(hWnd, &ps);
+
+            // Example of drawing text using GDI+
+            Graphics graphics(hdc);
+            FontFamily fontFamily(L"Arial");
+            Font font(&fontFamily, 24, FontStyleBold, UnitPixel);
+            SolidBrush brush(Color(255, 0, 0, 255));
+
+            graphics.DrawString(L"Welcome to Simple IDE",
+                -1,
+                &font,
+                PointF(580.0f, 60.0f),
+                &brush);
+
+            EndPaint(hWnd, &ps);
         }
         break;
     case WM_DESTROY:
@@ -298,276 +303,258 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
-// Инициализация основного меню
-void InitMainMenu(HWND hWnd)
+// Interpreter Implementation
+std::wstring ProcessCode(const std::wstring& code)
 {
-    HMENU hMenubar = CreateMenu();
+    variables.clear();
+    outputStream.str(L"");
+    InitializeFunctions();
 
-    // Меню "Файл"
-    HMENU hFile = CreateMenu();
-    AppendMenu(hFile, MF_STRING, ID_FILE_NEW, L"&Новый");
-    AppendMenu(hFile, MF_STRING, ID_FILE_OPEN, L"&Открыть...");
-    AppendMenu(hFile, MF_STRING, ID_FILE_SAVE, L"&Сохранить");
-    AppendMenu(hFile, MF_SEPARATOR, 0, NULL);
-    AppendMenu(hFile, MF_STRING, ID_FILE_EXIT, L"&Выход");
-    AppendMenu(hMenubar, MF_POPUP, (UINT_PTR)hFile, L"&Файл");
+    std::wistringstream iss(code);
+    std::wstring line;
+    int lineNumber = 0;
 
-    // Меню "Правка" (заполнитель)
-    HMENU hEdit = CreateMenu();
-    AppendMenu(hEdit, MF_STRING, 0, L"&Отменить");
-    AppendMenu(hEdit, MF_STRING, 0, L"&Вернуть");
-    AppendMenu(hEdit, MF_SEPARATOR, 0, NULL);
-    AppendMenu(hEdit, MF_STRING, 0, L"&Вырезать");
-    AppendMenu(hEdit, MF_STRING, 0, L"&Копировать");
-    AppendMenu(hEdit, MF_STRING, 0, L"&Вставить");
-    AppendMenu(hMenubar, MF_POPUP, (UINT_PTR)hEdit, L"&Правка");
+    // Simple stack for control flow
+    std::vector<std::wstring> controlStack;
 
-    // Меню "Справка"
-    HMENU hHelp = CreateMenu();
-    AppendMenu(hHelp, MF_STRING, ID_HELP_ABOUT, L"&О программе");
-    AppendMenu(hMenubar, MF_POPUP, (UINT_PTR)hHelp, L"&Справка");
-
-    SetMenu(hWnd, hMenubar);
-}
-
-// Инициализация панели инструментов
-HWND InitToolbar(HWND hWnd)
-{
-    // Создание панели инструментов
-    HWND hToolbar = CreateWindowEx(0, TOOLBARCLASSNAME, NULL,
-        WS_CHILD | WS_VISIBLE | TBSTYLE_TOOLTIPS | TBSTYLE_WRAPABLE | CCS_TOP | CCS_NORESIZE | CCS_NODIVIDER,
-        0, 0, 0, 0, hWnd, (HMENU)(INT_PTR)IDC_TOOLBAR, hInstGlobal, NULL);
-
-    if (!hToolbar)
+    while (std::getline(iss, line))
     {
-        MessageBox(hWnd, L"Не удалось создать панель инструментов.", L"Ошибка", MB_ICONERROR);
-        return NULL;
-    }
+        lineNumber++;
+        // Trim whitespace
+        size_t start = line.find_first_not_of(L" \t");
+        if (start == std::wstring::npos) continue; // Empty line
+        line = line.substr(start);
 
-    // Отправка сообщения TB_BUTTONSTRUCTSIZE для совместимости
-    SendMessage(hToolbar, TB_BUTTONSTRUCTSIZE, (WPARAM)sizeof(TBBUTTON), 0);
+        // Handle comments
+        if (line.substr(0, 2) == L"//") continue;
 
-    // Создание списка изображений для кнопок панели инструментов
-    HIMAGELIST hImageList = ImageList_Create(16, 16, ILC_COLOR32 | ILC_MASK, NUM_TOOLBAR_BUTTONS, 0);
+        // Tokenize the line
+        std::wistringstream lineStream(line);
+        std::wstring token;
+        lineStream >> token;
 
-    // Загрузка стандартных иконок в качестве заполнителей
-    HICON hIconRun = LoadIcon(NULL, IDI_INFORMATION);    // Иконка для "Run"
-    HICON hIconDebug = LoadIcon(NULL, IDI_WARNING);     // Иконка для "Debug"
-    HICON hIconBuild = LoadIcon(NULL, IDI_APPLICATION); // Иконка для "Build"
-
-    ImageList_AddIcon(hImageList, hIconRun);
-    ImageList_AddIcon(hImageList, hIconDebug);
-    ImageList_AddIcon(hImageList, hIconBuild);
-
-    SendMessage(hToolbar, TB_SETIMAGELIST, 0, (LPARAM)hImageList);
-
-    // Определение кнопок панели инструментов
-    TBBUTTON tbb[NUM_TOOLBAR_BUTTONS] = {0};
-
-    // Кнопка "Run"
-    tbb[0].iBitmap = 0;
-    tbb[0].idCommand = IDT_RUN;
-    tbb[0].fsState = TBSTATE_ENABLED;
-    tbb[0].fsStyle = BTNS_BUTTON;
-    tbb[0].iString = (INT_PTR)L"Run";
-
-    // Кнопка "Debug"
-    tbb[1].iBitmap = 1;
-    tbb[1].idCommand = IDT_DEBUG;
-    tbb[1].fsState = TBSTATE_ENABLED;
-    tbb[1].fsStyle = BTNS_BUTTON;
-    tbb[1].iString = (INT_PTR)L"Debug";
-
-    // Кнопка "Build"
-    tbb[2].iBitmap = 2;
-    tbb[2].idCommand = IDT_BUILD;
-    tbb[2].fsState = TBSTATE_ENABLED;
-    tbb[2].fsStyle = BTNS_BUTTON;
-    tbb[2].iString = (INT_PTR)L"Build";
-
-    // Добавление кнопок на панель инструментов
-    SendMessage(hToolbar, TB_ADDBUTTONS, (WPARAM)NUM_TOOLBAR_BUTTONS, (LPARAM)&tbb);
-
-    // Включение двойной буферизации для плавной перерисовки
-    SendMessage(hToolbar, TB_SETEXTENDEDSTYLE, 0, TBSTYLE_EX_DOUBLEBUFFER);
-
-    return hToolbar;
-}
-
-// Создание таб-контрола
-HWND CreateTabControl(HWND hParent)
-{
-    HWND hTab = CreateWindowEx(0, WC_TABCONTROL, NULL,
-        WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | TCS_TABS,
-        200, 40, 800, 500, hParent, (HMENU)(INT_PTR)IDC_TAB_CONTROL, hInstGlobal, NULL);
-
-    if (!hTab)
-    {
-        MessageBox(hParent, L"Не удалось создать таб-контрол.", L"Ошибка", MB_ICONERROR);
-        return NULL;
-    }
-
-    return hTab;
-}
-
-// Добавление новой вкладки в таб-контрол
-void AddNewTab(HWND hTab)
-{
-    if (!hTab) return;
-
-    TCITEM tie;
-    tie.mask = TCIF_TEXT;
-    static int tabCount = 1;
-    std::wstring tabName = L"Файл" + std::to_wstring(tabCount++) + L".cpp";
-    tie.pszText = const_cast<LPWSTR>(tabName.c_str());
-
-    int index = TabCtrl_InsertItem(hTab, TabCtrl_GetItemCount(hTab), &tie);
-
-    // Создание Rich Edit контрола для редактора кода внутри вкладки
-    HWND hEditor = CreateWindowEx(WS_EX_CLIENTEDGE, MSFTEDIT_CLASS, NULL,
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN | WS_VSCROLL,
-        0, 0, 0, 0, hTab, (HMENU)(INT_PTR)(2000 + index), hInstGlobal, NULL);
-
-    if (!hEditor)
-    {
-        MessageBox(hTab, L"Не удалось создать редактор кода.", L"Ошибка", MB_ICONERROR);
-        return;
-    }
-
-    // Установка шрифта для редактора
-    LOGFONT lf = {0};
-    lf.lfHeight = 16;
-    lf.lfWeight = FW_NORMAL;
-    wcscpy_s(lf.lfFaceName, L"Consolas");
-    HFONT hFont = CreateFontIndirect(&lf);
-    SendMessage(hEditor, WM_SETFONT, (WPARAM)hFont, TRUE);
-}
-
-// Обработка изменения размера и расположения контролов
-void ResizeLayout(HWND hWnd, int width, int height)
-{
-    // Предполагаемая высота панели инструментов
-    int toolbarHeight = 30;
-
-    // Изменение размера панели инструментов
-    HWND hToolbar = GetDlgItem(hWnd, IDC_TOOLBAR);
-    if (hToolbar)
-    {
-        SetWindowPos(hToolbar, NULL, 0, 0, width, toolbarHeight, SWP_NOZORDER);
-    }
-
-    // Изменение размера обозревателя проекта
-    HWND hProjectExplorer = GetDlgItem(hWnd, IDC_PROJECT_EXPLORER);
-    if (hProjectExplorer)
-    {
-        SetWindowPos(hProjectExplorer, NULL, 0, toolbarHeight, 200, height - toolbarHeight - 200, SWP_NOZORDER);
-    }
-
-    // Изменение размера таб-контрола
-    HWND hTabControl = GetDlgItem(hWnd, IDC_TAB_CONTROL);
-    if (hTabControl)
-    {
-        SetWindowPos(hTabControl, NULL, 200, toolbarHeight, width - 200 - 300, height - toolbarHeight - 200, SWP_NOZORDER);
-    }
-
-    // Изменение размера консоли вывода
-    HWND hOutputConsole = GetDlgItem(hWnd, IDC_OUTPUT_CONSOLE);
-    if (hOutputConsole)
-    {
-        SetWindowPos(hOutputConsole, NULL, 200, height - 200, width - 200 - 300, 200, SWP_NOZORDER);
-    }
-
-    // Изменение размера панели отладки
-    HWND hDebuggerPanel = GetDlgItem(hWnd, IDC_DEBUGGER_PANEL);
-    if (hDebuggerPanel)
-    {
-        SetWindowPos(hDebuggerPanel, NULL, width - 300, toolbarHeight, 300, height - toolbarHeight - 200, SWP_NOZORDER);
-    }
-
-    // Изменение размеров Rich Edit контролов внутри таб-контрола
-    if (hTabControl)
-    {
-        int tabCount = TabCtrl_GetItemCount(hTabControl);
-        for (int i = 0; i < tabCount; ++i)
+        if (token == L"let")
         {
-            HWND hEditor = GetDlgItem(hTabControl, 2000 + i);
-            if (hEditor)
+            // Variable declaration: let varName = expression
+            std::wstring varName;
+            lineStream >> varName;
+            lineStream >> token; // Should be '='
+            if (token != L"=")
             {
-                RECT rc;
-                SendMessage(hTabControl, TCM_ADJUSTRECT, TRUE, (LPARAM)&rc);
-                GetClientRect(hTabControl, &rc);
-                SetWindowPos(hEditor, NULL, 0, 0, rc.right - rc.left, rc.bottom - rc.top, SWP_NOZORDER);
+                outputStream << L"Syntax error at line " << lineNumber << L": Expected '='\n";
+                continue;
             }
+
+            // Read the expression (for simplicity, assume it's a number or a variable)
+            std::wstring expr;
+            lineStream >> expr;
+            Value val;
+            try
+            {
+                double num = std::stod(expr);
+                val = Value(num);
+            }
+            catch (...)
+            {
+                // It's a variable
+                if (variables.find(expr) != variables.end())
+                {
+                    val = variables[expr];
+                }
+                else
+                {
+                    outputStream << L"Undefined variable '" << expr << L"' at line " << lineNumber << L"\n";
+                    continue;
+                }
+            }
+
+            variables[varName] = val;
+        }
+        else if (token == L"function")
+        {
+            // Function declaration
+            std::wstring funcName;
+            lineStream >> funcName;
+            // Skip to 'begin'
+            while (lineStream >> token && token != L"begin");
+            if (token != L"begin")
+            {
+                outputStream << L"Syntax error at line " << lineNumber << L": Expected 'begin'\n";
+                continue;
+            }
+            controlStack.push_back(L"function");
+            // For simplicity, assume function body is empty or predefined
+        }
+        else if (token == L"endfunction")
+        {
+            if (controlStack.empty() || controlStack.back() != L"function")
+            {
+                outputStream << L"Syntax error at line " << lineNumber << L": Unexpected 'endfunction'\n";
+                continue;
+            }
+            controlStack.pop_back();
+        }
+        else if (token == L"if")
+        {
+            // If statement: if var1 < var2 then
+            std::wstring left, op, right, thenToken;
+            lineStream >> left >> op >> right >> thenToken;
+            if (thenToken != L"then")
+            {
+                outputStream << L"Syntax error at line " << lineNumber << L": Expected 'then'\n";
+                continue;
+            }
+
+            bool condition = false;
+            // Evaluate condition (very basic)
+            if (variables.find(left) != variables.end() && variables.find(right) != variables.end())
+            {
+                double leftVal = toNumber(variables[left]);
+                double rightVal = toNumber(variables[right]);
+                if (op == L"<")
+                    condition = (leftVal < rightVal);
+                else if (op == L">")
+                    condition = (leftVal > rightVal);
+                else if (op == L"==")
+                    condition = (leftVal == rightVal);
+                // Add more operators as needed
+            }
+
+            // For simplicity, skip lines until 'endif' if condition is false
+            if (!condition)
+            {
+                while (std::getline(iss, line))
+                {
+                    lineNumber++;
+                    size_t pos = line.find(L"endif");
+                    if (pos != std::wstring::npos)
+                        break;
+                }
+            }
+        }
+        else if (token == L"else")
+        {
+            // Similarly, handle else by skipping or executing
+            // Placeholder: do nothing
+        }
+        else if (token == L"endif")
+        {
+            // End of if statement
+        }
+        else if (token == L"repeat")
+        {
+            // Placeholder for loop handling
+            // Implementing loops requires maintaining loop state
+        }
+        else if (token == L"until")
+        {
+            // Placeholder for loop termination condition
+        }
+        else if (token == L"print")
+        {
+            // Handle print statement
+            std::vector<Value> args;
+            std::wstring arg;
+            while (lineStream >> arg)
+            {
+                // If arg starts with a quote, it's a string
+                if (!arg.empty() && arg.front() == L'\"')
+                {
+                    // Read until the closing quote
+                    std::wstring str = arg.substr(1);
+                    while (!str.empty() && str.back() != L'\"' && lineStream >> arg)
+                    {
+                        str += L" " + arg;
+                    }
+                    if (!str.empty() && str.back() == L'\"')
+                        str.pop_back();
+                    args.emplace_back(str);
+                }
+                else
+                {
+                    // It's a variable or a number
+                    try
+                    {
+                        double num = std::stod(arg);
+                        args.emplace_back(num);
+                    }
+                    catch (...)
+                    {
+                        if (variables.find(arg) != variables.end())
+                        {
+                            args.emplace_back(variables[arg]);
+                        }
+                        else
+                        {
+                            outputStream << L"Undefined variable '" << arg << L"' at line " << lineNumber << L"\n";
+                        }
+                    }
+                }
+            }
+
+            if (functions.find(L"print") != functions.end())
+            {
+                functions[L"print"](args);
+            }
+        }
+        else
+        {
+            // Handle other statements or function calls
+            // Placeholder: ignore or implement function calls
+        }
+    }
+
+    return outputStream.str();
+}
+
+void ApplySyntaxHighlighting(HWND hCodeEditor)
+{
+    // Define keywords
+    std::vector<std::wstring> keywords = { 
+        L"let", L"function", L"begin", L"endfunction", 
+        L"if", L"then", L"else", L"endif", 
+        L"repeat", L"until", L"print" 
+    };
+
+    // Get the entire text
+    int length = GetWindowTextLength(hCodeEditor);
+    std::wstring content(length, L'\0');
+    GetWindowText(hCodeEditor, &content[0], length + 1);
+
+    // Set default character format
+    CHARFORMAT2 cf;
+    ZeroMemory(&cf, sizeof(CHARFORMAT2));
+    cf.cbSize = sizeof(CHARFORMAT2);
+    cf.dwMask = CFM_COLOR;
+    cf.crTextColor = RGB(0, 0, 0); // Black
+    SendMessage(hCodeEditor, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cf);
+
+    // Highlight keywords
+    for (const auto& keyword : keywords)
+    {
+        size_t pos = 0;
+        while ((pos = content.find(keyword, pos)) != std::wstring::npos)
+        {
+            // Check word boundaries
+            bool startBoundary = (pos == 0) || !iswalpha(content[pos - 1]);
+            bool endBoundary = ((pos + keyword.length()) >= content.length()) || !iswalpha(content[pos + keyword.length()]);
+            if (startBoundary && endBoundary)
+            {
+                // Select the keyword
+                CHARRANGE cr;
+                cr.cpMin = pos;
+                cr.cpMax = pos + keyword.length();
+                SendMessage(hCodeEditor, EM_EXSETSEL, 0, (LPARAM)&cr);
+
+                // Set the keyword color
+                CHARFORMAT2 cfKeyword;
+                ZeroMemory(&cfKeyword, sizeof(CHARFORMAT2));
+                cfKeyword.cbSize = sizeof(CHARFORMAT2);
+                cfKeyword.dwMask = CFM_COLOR;
+                cfKeyword.crTextColor = RGB(0, 0, 255); // Blue
+                SendMessage(hCodeEditor, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cfKeyword);
+            }
+            pos += keyword.length();
         }
     }
 }
-
-// Инициализация консоли вывода
-HWND InitOutputConsole(HWND hWndParent)
-{
-    HWND hOutput = CreateWindowEx(WS_EX_CLIENTEDGE, MSFTEDIT_CLASS, NULL,
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL,
-        200, 600, 800, 200, hWndParent, (HMENU)(INT_PTR)IDC_OUTPUT_CONSOLE, hInstGlobal, NULL);
-
-    if (!hOutput)
-    {
-        MessageBox(hWndParent, L"Не удалось создать консоль вывода.", L"Ошибка", MB_ICONERROR);
-        return NULL;
-    }
-
-    // Установка шрифта для консоли
-    LOGFONT lf = {0};
-    lf.lfHeight = 14;
-    lf.lfWeight = FW_NORMAL;
-    wcscpy_s(lf.lfFaceName, L"Consolas");
-    HFONT hFont = CreateFontIndirect(&lf);
-    SendMessage(hOutput, WM_SETFONT, (WPARAM)hFont, TRUE);
-
-    // Настройка Rich Edit
-    SendMessage(hOutput, EM_SETBKGNDCOLOR, 0, (LPARAM)RGB(0, 0, 0));
-    SendMessage(hOutput, EM_SETLIMITTEXT, (WPARAM)0, 0); // Без ограничений на текст
-
-    // Установка цвета текста на белый для видимости
-    CHARFORMAT2 cf;
-    ZeroMemory(&cf, sizeof(cf));
-    cf.cbSize = sizeof(cf);
-    cf.dwMask = CFM_COLOR;
-    cf.crTextColor = RGB(255, 255, 255);
-    SendMessage(hOutput, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cf);
-
-    return hOutput;
-}
-
-// Инициализация панели отладки
-HWND InitDebuggerPanel(HWND hWndParent)
-{
-    HWND hDebugger = CreateWindowEx(WS_EX_CLIENTEDGE, MSFTEDIT_CLASS, L"Debugger Panel",
-        WS_CHILD | WS_VISIBLE | WS_BORDER | ES_MULTILINE | ES_READONLY | WS_VSCROLL,
-        900, 40, 200, 500, hWndParent, (HMENU)(INT_PTR)IDC_DEBUGGER_PANEL, hInstGlobal, NULL);
-
-    if (!hDebugger)
-    {
-        MessageBox(hWndParent, L"Не удалось создать панель отладки.", L"Ошибка", MB_ICONERROR);
-        return NULL;
-    }
-
-    // Установка шрифта для панели отладки
-    LOGFONT lf = {0};
-    lf.lfHeight = 12;
-    lf.lfWeight = FW_NORMAL;
-    wcscpy_s(lf.lfFaceName, L"Consolas");
-    HFONT hFont = CreateFontIndirect(&lf);
-    SendMessage(hDebugger, WM_SETFONT, (WPARAM)hFont, TRUE);
-
-    // Добавление текста-заполнителя
-    SetWindowText(hDebugger, L"Debugger Panel\nНе реализовано.");
-
-    return hDebugger;
-}
-
-// Установка шрифтов для Rich Edit контролов
-void InitializeRichEditFonts(HWND hParent)
-{
-    // Можно добавить дополнительную настройку шрифтов или других параметров Rich Edit здесь
-}
-

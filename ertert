@@ -1,0 +1,666 @@
+// NovaScriptIDE.cpp
+#define UNICODE
+#include <windows.h>
+#include <gdiplus.h>
+#include <wininet.h>
+#include <string>
+#include <vector>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
+#include <locale>
+#include <codecvt>
+#include <windowsx.h>
+#include <mmsystem.h> // For PlaySound
+#include <CommCtrl.h> // For common controls
+#include <richedit.h> // For Rich Edit controls
+#include <map>        // For tracking edit controls
+#include <algorithm>  // For std::find_if
+
+#pragma comment(lib, "gdiplus.lib")
+#pragma comment(lib, "wininet.lib")
+#pragma comment(lib, "winmm.lib") // Link with winmm.lib for PlaySound
+#pragma comment(lib, "comctl32.lib") // Link with comctl32.lib for common controls
+#pragma comment(lib, "Msftedit.lib") // Link with Msftedit.lib for Rich Edit controls
+
+using namespace Gdiplus;
+
+// Resource Identifiers
+#define ID_MENU_FILE_NEW        1
+#define ID_MENU_FILE_OPEN       2
+#define ID_MENU_FILE_SAVE       3
+#define ID_MENU_FILE_SAVEAS     4
+#define ID_MENU_FILE_EXIT       5
+#define ID_MENU_EDIT_UNDO       6
+#define ID_MENU_EDIT_REDO       7
+#define ID_MENU_EDIT_CUT        8
+#define ID_MENU_EDIT_COPY       9
+#define ID_MENU_EDIT_PASTE      10
+#define ID_MENU_HELP_ABOUT      11
+#define ID_BUILD_COMPILE        16
+#define ID_BUILD_RUN            17
+#define ID_EDIT_FIND            14
+#define ID_EDIT_REPLACE         15
+
+// Global Variables
+HINSTANCE hInst;
+HWND hMainWnd;
+HWND hEdit;
+ULONG_PTR gdiplusToken;
+std::wstring currentFilePath = L"";
+
+// Function Declarations
+LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+bool InitGDIPlus();
+void ShutdownGDIPlus();
+bool InitCommonControlsExWrapper();
+bool LoadRichEdit();
+bool CreateMainWindow();
+bool CreateMenus(HWND);
+void HandleFileNew();
+void HandleFileOpen();
+void HandleFileSave();
+void HandleFileSaveAs();
+void HandleEditUndo();
+void HandleEditRedo();
+void HandleEditCut();
+void HandleEditCopy();
+void HandleEditPaste();
+void HandleHelpAbout();
+void HandleBuildCompile();
+void HandleBuildRun();
+std::wstring GetOpenFilePath(HWND hwnd);
+std::wstring GetSaveFilePath(HWND hwnd);
+std::wstring GetWindowTitle(const std::wstring& filename);
+bool ExecuteNovaScript(const std::wstring& scriptPath);
+void HighlightSyntax();
+
+// Entry Point
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
+{
+    // Initialize GDI+
+    if (!InitGDIPlus()) {
+        MessageBox(NULL, L"Не удалось инициализировать GDI+.", L"Ошибка", MB_ICONERROR);
+        return 0;
+    }
+
+    // Initialize Common Controls
+    if (!InitCommonControlsExWrapper()) {
+        MessageBox(NULL, L"Не удалось инициализировать общие контролы.", L"Ошибка", MB_ICONERROR);
+        ShutdownGDIPlus();
+        return 0;
+    }
+
+    // Load Rich Edit library
+    if (!LoadRichEdit()) {
+        MessageBox(NULL, L"Не удалось загрузить Rich Edit контрол.", L"Ошибка", MB_ICONERROR);
+        ShutdownGDIPlus();
+        return 0;
+    }
+
+    // Store instance handle in global variable
+    hInst = hInstance;
+
+    // Create Main Window
+    if (!CreateMainWindow()) {
+        MessageBox(NULL, L"Не удалось создать главное окно.", L"Ошибка", MB_ICONERROR);
+        ShutdownGDIPlus();
+        return 0;
+    }
+
+    // Show the window
+    ShowWindow(hMainWnd, nCmdShow);
+    UpdateWindow(hMainWnd);
+
+    // Message Loop
+    MSG msg = { };
+    while (GetMessage(&msg, NULL, 0, 0))
+    {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    // Shutdown GDI+
+    ShutdownGDIPlus();
+
+    return 0;
+}
+
+// Initialize GDI+
+bool InitGDIPlus()
+{
+    GdiplusStartupInput gdiPlusStartupInput;
+    return GdiplusStartup(&gdiplusToken, &gdiPlusStartupInput, NULL) == Ok;
+}
+
+// Shutdown GDI+
+void ShutdownGDIPlus()
+{
+    GdiplusShutdown(gdiplusToken);
+}
+
+// Initialize Common Controls
+bool InitCommonControlsExWrapper()
+{
+    INITCOMMONCONTROLSEX icex;
+    icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
+    icex.dwICC = ICC_WIN95_CLASSES;
+    return InitCommonControlsEx(&icex);
+}
+
+// Load Rich Edit Control
+bool LoadRichEdit()
+{
+    HMODULE hMod = LoadLibrary(L"Msftedit.dll");
+    return hMod != NULL;
+}
+
+// Create Main Window
+bool CreateMainWindow()
+{
+    // Register Window Class
+    const wchar_t CLASS_NAME[]  = L"NovaScript IDE Window Class";
+
+    WNDCLASS wc = { };
+    wc.lpfnWndProc   = WndProc;
+    wc.hInstance     = hInst;
+    wc.lpszClassName = CLASS_NAME;
+    wc.hCursor       = LoadCursor(NULL, IDC_ARROW);
+    wc.hIcon         = LoadIcon(NULL, IDI_APPLICATION);
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
+
+    if (!RegisterClass(&wc)) {
+        return false;
+    }
+
+    // Create Window
+    hMainWnd = CreateWindowEx(
+        0,                              // Optional window styles.
+        CLASS_NAME,                     // Window class
+        L"NovaScript IDE",             // Window text
+        WS_OVERLAPPEDWINDOW,            // Window style
+
+        // Size and position
+        CW_USEDEFAULT, CW_USEDEFAULT, 1200, 800,
+
+        NULL,       // Parent window    
+        NULL,       // Menu
+        hInst,  // Instance handle
+        NULL        // Additional application data
+        );
+
+    if (hMainWnd == NULL) {
+        return false;
+    }
+
+    // Create Menus
+    if (!CreateMenus(hMainWnd)) {
+        return false;
+    }
+
+    // Create Edit Control
+    hEdit = CreateWindowEx(
+        0, 
+        L"RICHEDIT50W", // Rich Edit Control
+        NULL, 
+        WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL,
+        0, 0, 0, 0, 
+        hMainWnd, 
+        (HMENU)NULL, 
+        hInst, 
+        NULL
+        );
+
+    if (hEdit == NULL) {
+        return false;
+    }
+
+    // Set font for Edit Control
+    CHARFORMAT2 cf;
+    ZeroMemory(&cf, sizeof(CHARFORMAT2));
+    cf.cbSize = sizeof(CHARFORMAT2);
+    cf.dwMask = CFM_FACE | CFM_SIZE;
+    cf.yHeight = 200; // 10 points
+    wcscpy_s(cf.szFaceName, L"Consolas");
+    SendMessage(hEdit, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cf);
+
+    // Enable Undo
+    SendMessage(hEdit, EM_SETUNDOLIMIT, (WPARAM)1000, 0);
+
+    // Set focus to Edit Control
+    SetFocus(hEdit);
+
+    return true;
+}
+
+// Create Menus
+bool CreateMenus(HWND hwnd)
+{
+    HMENU hMenubar = CreateMenu();
+    if (!hMenubar) return false;
+
+    // File Menu
+    HMENU hFileMenu = CreateMenu();
+    AppendMenu(hFileMenu, MF_STRING, ID_MENU_FILE_NEW, L"Создать\tCtrl+N");
+    AppendMenu(hFileMenu, MF_STRING, ID_MENU_FILE_OPEN, L"Открыть...\tCtrl+O");
+    AppendMenu(hFileMenu, MF_STRING, ID_MENU_FILE_SAVE, L"Сохранить\tCtrl+S");
+    AppendMenu(hFileMenu, MF_STRING, ID_MENU_FILE_SAVEAS, L"Сохранить как...");
+    AppendMenu(hFileMenu, MF_SEPARATOR, 0, NULL);
+    AppendMenu(hFileMenu, MF_STRING, ID_MENU_FILE_EXIT, L"Выход\tAlt+F4");
+
+    // Edit Menu
+    HMENU hEditMenu = CreateMenu();
+    AppendMenu(hEditMenu, MF_STRING, ID_MENU_EDIT_UNDO, L"Отменить\tCtrl+Z");
+    AppendMenu(hEditMenu, MF_STRING, ID_MENU_EDIT_REDO, L"Повторить\tCtrl+Y");
+    AppendMenu(hEditMenu, MF_SEPARATOR, 0, NULL);
+    AppendMenu(hEditMenu, MF_STRING, ID_MENU_EDIT_CUT, L"Вырезать\tCtrl+X");
+    AppendMenu(hEditMenu, MF_STRING, ID_MENU_EDIT_COPY, L"Копировать\tCtrl+C");
+    AppendMenu(hEditMenu, MF_STRING, ID_MENU_EDIT_PASTE, L"Вставить\tCtrl+V");
+    AppendMenu(hEditMenu, MF_SEPARATOR, 0, NULL);
+    AppendMenu(hEditMenu, MF_STRING, ID_EDIT_FIND, L"Найти\tCtrl+F");
+    AppendMenu(hEditMenu, MF_STRING, ID_EDIT_REPLACE, L"Заменить\tCtrl+H");
+
+    // Build Menu
+    HMENU hBuildMenu = CreateMenu();
+    AppendMenu(hBuildMenu, MF_STRING, ID_BUILD_COMPILE, L"Компилировать\tF7");
+    AppendMenu(hBuildMenu, MF_STRING, ID_BUILD_RUN, L"Запустить\tF5");
+
+    // Help Menu
+    HMENU hHelpMenu = CreateMenu();
+    AppendMenu(hHelpMenu, MF_STRING, ID_MENU_HELP_ABOUT, L"О программе...");
+
+    // Append to Menubar
+    AppendMenu(hMenubar, MF_POPUP, (UINT_PTR)hFileMenu, L"Файл");
+    AppendMenu(hMenubar, MF_POPUP, (UINT_PTR)hEditMenu, L"Правка");
+    AppendMenu(hMenubar, MF_POPUP, (UINT_PTR)hBuildMenu, L"Сборка");
+    AppendMenu(hMenubar, MF_POPUP, (UINT_PTR)hHelpMenu, L"Справка");
+
+    // Set Menubar to Window
+    SetMenu(hwnd, hMenubar);
+
+    return true;
+}
+
+// Handle File New
+void HandleFileNew()
+{
+    SendMessage(hEdit, WM_SETTEXT, 0, (LPARAM)L"");
+    currentFilePath = L"";
+    // Update window title
+    std::wstring title = GetWindowTitle(currentFilePath);
+    SetWindowText(hMainWnd, title.c_str());
+}
+
+// Handle File Open
+void HandleFileOpen()
+{
+    std::wstring filePath = GetOpenFilePath(hMainWnd);
+    if (!filePath.empty()) {
+        // TODO: Реализовать функцию LoadFileIntoEditor
+        // LoadFileIntoEditor(filePath);
+        // Для демонстрации, загрузим пустой текст
+        SendMessage(hEdit, WM_SETTEXT, 0, (LPARAM)L"");
+        // Update window title
+        std::wstring title = GetWindowTitle(filePath);
+        SetWindowText(hMainWnd, title.c_str());
+    }
+}
+
+// Handle File Save
+void HandleFileSave()
+{
+    if (currentFilePath.empty()) {
+        HandleFileSaveAs();
+    }
+    else {
+        // TODO: Реализовать функцию SaveEditorContentToFile
+        // if (SaveEditorContentToFile(currentFilePath)) {
+            MessageBox(hMainWnd, L"Файл успешно сохранён.", L"Сохранение", MB_OK | MB_ICONINFORMATION);
+        // }
+    }
+}
+
+// Handle File Save As
+void HandleFileSaveAs()
+{
+    std::wstring filePath = GetSaveFilePath(hMainWnd);
+    if (!filePath.empty()) {
+        // TODO: Реализовать функцию SaveEditorContentToFile
+        // if (SaveEditorContentToFile(filePath)) {
+            currentFilePath = filePath;
+            // Update window title
+            std::wstring title = GetWindowTitle(filePath);
+            SetWindowText(hMainWnd, title.c_str());
+            MessageBox(hMainWnd, L"Файл успешно сохранён.", L"Сохранение", MB_OK | MB_ICONINFORMATION);
+        // }
+    }
+}
+
+// Handle Edit Undo
+void HandleEditUndo()
+{
+    SendMessage(hEdit, EM_UNDO, 0, 0);
+}
+
+// Handle Edit Redo
+void HandleEditRedo()
+{
+    // Rich Edit 5.0 doesn't support redo directly
+    // Implement a redo stack if necessary
+    // Placeholder for redo functionality
+    MessageBox(hMainWnd, L"Повторное действие не поддерживается.", L"Повторить", MB_OK | MB_ICONINFORMATION);
+}
+
+// Handle Edit Cut
+void HandleEditCut()
+{
+    SendMessage(hEdit, EM_CUT, 0, 0);
+}
+
+// Handle Edit Copy
+void HandleEditCopy()
+{
+    SendMessage(hEdit, EM_COPY, 0, 0);
+}
+
+// Handle Edit Paste
+void HandleEditPaste()
+{
+    SendMessage(hEdit, EM_PASTE, 0, 0);
+}
+
+// Handle Help About
+void HandleHelpAbout()
+{
+    MessageBox(hMainWnd, L"NovaScript IDE\nВерсия 1.0\nРазработано в 2023 году.", L"О программе", MB_OK | MB_ICONINFORMATION);
+}
+
+// Handle Build Compile
+void HandleBuildCompile()
+{
+    // Реализуйте компиляцию кода NovaScript
+    // Пример простоты: сохранить файл и показать сообщение
+    if (currentFilePath.empty()) {
+        HandleFileSaveAs();
+    }
+
+    if (!currentFilePath.empty()) {
+        // TODO: Реализовать функцию SaveEditorContentToFile
+        // if (SaveEditorContentToFile(currentFilePath)) {
+            // Выполнить компиляцию
+            // Например, вызвать внешний компилятор
+            std::wstring compileMessage = L"Компиляция файла: " + currentFilePath;
+            MessageBox(hMainWnd, compileMessage.c_str(), L"Компиляция", MB_OK | MB_ICONINFORMATION);
+            // Можно использовать CreateProcess для запуска компилятора
+        // }
+    }
+}
+
+// Handle Build Run
+void HandleBuildRun()
+{
+    if (currentFilePath.empty()) {
+        MessageBox(hMainWnd, L"Сохраните файл перед выполнением.", L"Выполнение", MB_OK | MB_ICONWARNING);
+        return;
+    }
+
+    // Выполнить скрипт
+    ExecuteNovaScript(currentFilePath);
+}
+
+// Get Open File Path
+std::wstring GetOpenFilePath(HWND hwnd)
+{
+    OPENFILENAME ofn;       // common dialog box structure
+    wchar_t szFile[MAX_PATH] = {0};       // buffer for file name
+
+    ZeroMemory(&ofn, sizeof(ofn));
+
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = hwnd;
+    ofn.lpstrTitle = L"Открыть файл";
+    ofn.lpstrFilter = L"NovaScript Files (*.novascript)\0*.novascript\0All Files (*.*)\0*.*\0";
+    ofn.lpstrFile = szFile;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+    ofn.lpstrDefExt = L"novascript";
+
+    if (GetOpenFileName(&ofn) == TRUE) {
+        return std::wstring(ofn.lpstrFile);
+    }
+
+    return L"";
+}
+
+// Get Save File Path
+std::wstring GetSaveFilePath(HWND hwnd)
+{
+    OPENFILENAME ofn;       // common dialog box structure
+    wchar_t szFile[MAX_PATH] = {0};       // buffer for file name
+
+    ZeroMemory(&ofn, sizeof(ofn));
+
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = hwnd;
+    ofn.lpstrTitle = L"Сохранить файл как";
+    ofn.lpstrFilter = L"NovaScript Files (*.novascript)\0*.novascript\0All Files (*.*)\0*.*\0";
+    ofn.lpstrFile = szFile;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.Flags = OFN_PATHMUSTEXIST;
+    ofn.lpstrDefExt = L"novascript";
+
+    if (GetSaveFileName(&ofn) == TRUE) {
+        return std::wstring(ofn.lpstrFile);
+    }
+
+    return L"";
+}
+
+// Get Window Title based on file name
+std::wstring GetWindowTitle(const std::wstring& filename)
+{
+    if (filename.empty()) {
+        return L"NovaScript IDE - Без имени.novascript";
+    }
+    else {
+        // Extract file name from path
+        size_t pos = filename.find_last_of(L"\\/");
+        std::wstring name = (pos != std::wstring::npos) ? filename.substr(pos + 1) : filename;
+        return L"NovaScript IDE - " + name;
+    }
+}
+
+// Execute NovaScript (Placeholder)
+bool ExecuteNovaScript(const std::wstring& scriptPath)
+{
+    // Реализуйте выполнение скрипта NovaScript
+    // Это может включать вызов внешнего интерпретатора или внедрение скриптового движка
+
+    // Например, запуск внешнего процесса
+    STARTUPINFOW si = { sizeof(si) };
+    PROCESS_INFORMATION pi;
+    std::wstring command = L"MyNovaScriptInterpreter.exe \"" + scriptPath + L"\"";
+
+    if (CreateProcessW(NULL, &command[0], NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
+    {
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+        MessageBox(hMainWnd, L"Скрипт запущен.", L"Выполнение", MB_OK | MB_ICONINFORMATION);
+        return true;
+    }
+    else
+    {
+        MessageBox(hMainWnd, L"Не удалось запустить интерпретатор.", L"Ошибка", MB_OK | MB_ICONERROR);
+        return false;
+    }
+}
+
+// Highlight Syntax (Placeholder)
+void HighlightSyntax()
+{
+    // Реализуйте синтаксическое выделение для NovaScript
+    // Это может включать парсинг текста и применение форматов к ключевым словам, строкам и комментариям
+    // Используйте Rich Edit сообщения EM_SETCHARFORMAT с CFM_COLOR и CFM_BOLD
+
+    // Пример выделения ключевого слова "fun" красным цветом
+    CHARFORMAT2 cf;
+    ZeroMemory(&cf, sizeof(CHARFORMAT2));
+    cf.cbSize = sizeof(CHARFORMAT2);
+    cf.dwMask = CFM_COLOR | CFM_BOLD;
+    cf.dwEffects = CFE_BOLD;
+    cf.crTextColor = RGB(255, 0, 0); // Красный цвет
+
+    // Получить текст из редактора
+    int textLength = GetWindowTextLength(hEdit);
+    std::wstring text(textLength + 1, L'\0');
+    GetWindowText(hEdit, &text[0], textLength + 1);
+
+    // Искать ключевые слова и применять форматирование
+    std::wstring keyword = L"fun";
+    size_t pos = 0;
+    while ((pos = text.find(keyword, pos)) != std::wstring::npos) {
+        // Установить выделение
+        CHARRANGE cr;
+        cr.cpMin = pos;
+        cr.cpMax = pos + keyword.length();
+        SendMessage(hEdit, EM_EXSETSEL, 0, (LPARAM)&cr);
+        // Применить формат
+        SendMessage(hEdit, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
+        pos += keyword.length();
+    }
+
+    // Сбросить выделение
+    CHARRANGE cr = { 0, 0 };
+    SendMessage(hEdit, EM_EXSETSEL, 0, (LPARAM)&cr);
+}
+
+// Window Procedure
+LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+    switch (uMsg)
+    {
+    case WM_COMMAND:
+        switch (LOWORD(wParam))
+        {
+        case ID_MENU_FILE_NEW:
+            HandleFileNew();
+            break;
+        case ID_MENU_FILE_OPEN:
+            HandleFileOpen();
+            break;
+        case ID_MENU_FILE_SAVE:
+            HandleFileSave();
+            break;
+        case ID_MENU_FILE_SAVEAS:
+            HandleFileSaveAs();
+            break;
+        case ID_MENU_FILE_EXIT:
+            PostMessage(hwnd, WM_CLOSE, 0, 0);
+            break;
+        case ID_MENU_EDIT_UNDO:
+            HandleEditUndo();
+            break;
+        case ID_MENU_EDIT_REDO:
+            HandleEditRedo();
+            break;
+        case ID_MENU_EDIT_CUT:
+            HandleEditCut();
+            break;
+        case ID_MENU_EDIT_COPY:
+            HandleEditCopy();
+            break;
+        case ID_MENU_EDIT_PASTE:
+            HandleEditPaste();
+            break;
+        case ID_MENU_HELP_ABOUT:
+            HandleHelpAbout();
+            break;
+        case ID_BUILD_COMPILE:
+            HandleBuildCompile();
+            break;
+        case ID_BUILD_RUN:
+            HandleBuildRun();
+            break;
+        default:
+            break;
+        }
+        break;
+    case WM_SIZE:
+        {
+            RECT rcClient;
+            GetClientRect(hwnd, &rcClient);
+            // Adjust edit control size
+            SetWindowPos(hEdit, NULL, 0, 0, rcClient.right, rcClient.bottom, SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+        break;
+    case WM_PAINT:
+        {
+            PAINTSTRUCT ps;
+            HDC hdc = BeginPaint(hwnd, &ps);
+
+            // Optional: Выделение синтаксиса при каждом перерисовывании
+            HighlightSyntax();
+
+            EndPaint(hwnd, &ps);
+        }
+        break;
+    case WM_KEYDOWN:
+        {
+            // Горячие клавиши
+            if ((GetKeyState(VK_CONTROL) & 0x8000))
+            {
+                switch (wParam)
+                {
+                case 'N':
+                    HandleFileNew();
+                    break;
+                case 'O':
+                    HandleFileOpen();
+                    break;
+                case 'S':
+                    HandleFileSave();
+                    break;
+                case 'Z':
+                    HandleEditUndo();
+                    break;
+                case 'Y':
+                    HandleEditRedo();
+                    break;
+                case 'F':
+                    // Дополнительные функции
+                    break;
+                default:
+                    break;
+                }
+            }
+            else
+            {
+                // Обработка функциональных клавиш, например, F5, F7
+                switch (wParam)
+                {
+                case VK_F5:
+                    HandleBuildRun();
+                    break;
+                case VK_F7:
+                    HandleBuildCompile();
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+        break;
+    case WM_CLOSE:
+        if (MessageBox(hwnd, L"Вы уверены, что хотите выйти?", L"Выход", MB_YESNO | MB_ICONQUESTION) == IDYES)
+        {
+            DestroyWindow(hwnd);
+        }
+        break;
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+    default:
+        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }
+    return 0;
+}

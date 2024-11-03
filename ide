@@ -2,275 +2,195 @@
 
 #include <windows.h>
 #include <gdiplus.h>
+#include <wininet.h>
 #include <string>
 #include <vector>
-#include <CommCtrl.h>
-#include <richedit.h>
-#include "resource.h"
+#include <chrono>
+#include <iomanip>
+#include <sstream>
+#include <locale>
+#include <codecvt>
+#include <windowsx.h>
+#include <mmsystem.h> // For PlaySound
+#include <CommCtrl.h> // For common controls
+#include <richedit.h> // For rich edit controls
+#include "resource.h" // Ensure you have this header for resource IDs
 
 #pragma comment(lib, "Gdiplus.lib")
+#pragma comment(lib, "Wininet.lib")
 #pragma comment(lib, "Comctl32.lib")
+#pragma comment(lib, "Msimg32.lib")
+#pragma comment(lib, "Imm32.lib")
+#pragma comment(lib, "Winmm.lib")
 
 using namespace Gdiplus;
-
-// Constants for control IDs
-#define ID_TOOLBAR 1001
-#define ID_TABCONTROL 1002
-#define ID_EXPLORER 1003
-#define ID_OUTPUT 1004
-#define ID_STATUSBAR 1005
-
-ULONG_PTR gdiplusToken;
 
 // Global variables
 HINSTANCE hInst;
 LPCWSTR szWindowClass = L"MainWindowClass";
-LPCWSTR szTitle = L"Custom IDE";
+LPCWSTR szTitle = L"Simple IDE";
 
-// Function declarations
+// Forward declarations
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 void InitializeGDIPlus();
 void ShutdownGDIPlus();
-HWND CreateToolbar(HWND);
-HWND CreateTabControl(HWND);
-HWND CreateExplorerPanel(HWND);
-HWND CreateOutputPanel(HWND);
-HWND CreateStatusBar(HWND);
 
-// Entry point
+ULONG_PTR gdiplusToken;
+
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
-                     _In_opt_ HINSTANCE hPrevInstance,
-                     _In_ LPWSTR    lpCmdLine,
-                     _In_ int       nCmdShow)
+    _In_opt_ HINSTANCE hPrevInstance,
+    _In_ LPWSTR    lpCmdLine,
+    _In_ int       nCmdShow)
 {
+    // Initialize GDI+
     InitializeGDIPlus();
-    hInst = hInstance;
 
-    // Initialize common controls
-    INITCOMMONCONTROLSEX icex;
-    icex.dwSize = sizeof(icex);
-    icex.dwICC = ICC_WIN95_CLASSES | ICC_TAB_CLASSES | ICC_TREEVIEW_CLASSES | ICC_BAR_CLASSES;
-    InitCommonControlsEx(&icex);
-
-    // Register window class
+    // Register the window class
     WNDCLASSEX wcex;
     ZeroMemory(&wcex, sizeof(WNDCLASSEX));
+
     wcex.cbSize = sizeof(WNDCLASSEX);
     wcex.style = CS_HREDRAW | CS_VREDRAW;
     wcex.lpfnWndProc = WndProc;
+    wcex.cbClsExtra = 0;
+    wcex.cbWndExtra = 0;
     wcex.hInstance = hInstance;
-    wcex.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-    wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPLICATION));
+    wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
     wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wcex.lpszMenuName = NULL; // You can add menu resource here
     wcex.lpszClassName = szWindowClass;
+    wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_APPLICATION));
 
-    if (!RegisterClassEx(&wcex)) {
-        MessageBox(NULL, L"Failed to register window class!", szTitle, MB_ICONERROR);
+    if (!RegisterClassEx(&wcex))
+    {
+        MessageBox(NULL,
+            L"Call to RegisterClassEx failed!",
+            szTitle,
+            NULL);
+
         ShutdownGDIPlus();
         return 1;
     }
 
-    // Create main window
-    HWND hWnd = CreateWindow(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-                             CW_USEDEFAULT, CW_USEDEFAULT, 1200, 800,
-                             nullptr, nullptr, hInstance, nullptr);
+    // Create the window
+    HWND hWnd = CreateWindow(
+        szWindowClass,
+        szTitle,
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT,
+        800, 600,
+        NULL,
+        NULL,
+        hInstance,
+        NULL
+    );
 
-    if (!hWnd) {
-        MessageBox(NULL, L"Failed to create window!", szTitle, MB_ICONERROR);
+    if (!hWnd)
+    {
+        MessageBox(NULL,
+            L"Call to CreateWindow failed!",
+            szTitle,
+            NULL);
+
         ShutdownGDIPlus();
         return 1;
     }
 
+    // Show the window
     ShowWindow(hWnd, nCmdShow);
     UpdateWindow(hWnd);
 
-    // Message loop
+    // Main message loop
     MSG msg;
-    while (GetMessage(&msg, nullptr, 0, 0)) {
+    while (GetMessage(&msg, NULL, 0, 0))
+    {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
+    // Shutdown GDI+
     ShutdownGDIPlus();
-    return (int) msg.wParam;
+
+    return (int)msg.wParam;
 }
 
-void InitializeGDIPlus() {
+void InitializeGDIPlus()
+{
     GdiplusStartupInput gdiplusStartupInput;
     GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
 }
 
-void ShutdownGDIPlus() {
+void ShutdownGDIPlus()
+{
     GdiplusShutdown(gdiplusToken);
 }
 
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
-    static HWND hToolbar, hTab, hExplorer, hOutput, hStatus;
-    switch (message) {
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
     case WM_CREATE:
+    {
+        // Initialize common controls
+        INITCOMMONCONTROLSEX icex;
+        icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
+        icex.dwICC = ICC_WIN95_CLASSES;
+        InitCommonControlsEx(&icex);
+
+        // Initialize Rich Edit control
+        if (!LoadLibrary(L"Msftedit.dll"))
         {
-            // Create Toolbar
-            hToolbar = CreateToolbar(hWnd);
-
-            // Create Tab Control
-            hTab = CreateTabControl(hWnd);
-            SendMessage(hTab, TM_INSERTITEM, 0, (LPARAM)L"Untitled1");
-
-            // Create Explorer Panel
-            hExplorer = CreateExplorerPanel(hWnd);
-
-            // Create Output Panel
-            hOutput = CreateOutputPanel(hWnd);
-
-            // Create Status Bar
-            hStatus = CreateStatusBar(hWnd);
+            MessageBox(hWnd, L"Failed to load RichEdit library.", szTitle, MB_OK | MB_ICONERROR);
         }
-        break;
-    case WM_COMMAND:
-        {
-            switch (LOWORD(wParam)) {
-                case ID_FILE_NEW:
-                    // Handle New File
-                    MessageBox(hWnd, L"New File Clicked", L"Toolbar", MB_OK);
-                    break;
-                case ID_FILE_OPEN:
-                    // Handle Open File
-                    MessageBox(hWnd, L"Open File Clicked", L"Toolbar", MB_OK);
-                    break;
-                case ID_FILE_SAVE:
-                    // Handle Save File
-                    MessageBox(hWnd, L"Save File Clicked", L"Toolbar", MB_OK);
-                    break;
-                case ID_FILE_EXIT:
-                    DestroyWindow(hWnd);
-                    break;
-                // Add more case handlers as needed
-                default:
-                    break;
-            }
-        }
-        break;
-    case WM_SIZE:
-        {
-            RECT rcClient;
-            GetClientRect(hWnd, &rcClient);
-            int toolbarHeight = 30;
-            int explorerWidth = 200;
-            int statusHeight = 20;
+    }
+    break;
+    case WM_PAINT:
+    {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hWnd, &ps);
 
-            // Resize Toolbar
-            MoveWindow(hToolbar, 0, 0, rcClient.right, toolbarHeight, TRUE);
+        // Example of drawing text using GDI+
+        Graphics graphics(hdc);
+        FontFamily fontFamily(L"Arial");
+        Font font(&fontFamily, 24, FontStyleBold, UnitPixel);
+        SolidBrush brush(Color(255, 0, 0, 255));
 
-            // Resize Explorer Panel
-            MoveWindow(hExplorer, 0, toolbarHeight, explorerWidth, rcClient.bottom - toolbarHeight - statusHeight, TRUE);
+        graphics.DrawString(L"Welcome to Simple IDE",
+            -1,
+            &font,
+            PointF(10.0f, 10.0f),
+            &brush);
 
-            // Resize Output Panel
-            MoveWindow(hOutput, explorerWidth + 10, toolbarHeight, rcClient.right - explorerWidth - 20, 150, TRUE);
-
-            // Resize Tab Control
-            MoveWindow(hTab, explorerWidth + 10, toolbarHeight + 160, rcClient.right - explorerWidth - 20, rcClient.bottom - toolbarHeight - 170 - statusHeight, TRUE);
-
-            // Resize Status Bar
-            MoveWindow(hStatus, 0, rcClient.bottom - statusHeight, rcClient.right, statusHeight, TRUE);
-        }
-        break;
+        EndPaint(hWnd, &ps);
+    }
+    break;
     case WM_DESTROY:
         PostQuitMessage(0);
         break;
+    case WM_COMMAND:
+        // Обработка команд меню или других контролов
+    {
+        int wmId = LOWORD(wParam);
+        // Разобрать выбор согласно меню:
+        switch (wmId)
+        {
+        case IDM_ABOUT:
+            // Обработать команду "О программе"
+            MessageBox(hWnd, L"Simple IDE v1.0", L"About", MB_OK);
+            break;
+        case IDM_EXIT:
+            DestroyWindow(hWnd);
+            break;
+        default:
+            return DefWindowProc(hWnd, message, wParam, lParam);
+        }
+    }
+    break;
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
+        break;
     }
+
     return 0;
-}
-
-HWND CreateToolbar(HWND hWnd) {
-    HWND hToolbar = CreateWindowEx(0, TOOLBARCLASSNAME, NULL,
-        WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | TBSTYLE_TOOLTIPS,
-        0, 0, 0, 0, hWnd, (HMENU)ID_TOOLBAR, hInst, NULL);
-
-    SendMessage(hToolbar, TB_BUTTONSTRUCTSIZE, (WPARAM)sizeof(TBBUTTON), 0);
-
-    // Define toolbar buttons
-    TBBUTTON tbButtons[] = {
-        // New
-        { MAKELONG(STD_FILENEW, 0), ID_FILE_NEW, TBSTATE_ENABLED, BTNS_BUTTON, {0}, 0, (INT_PTR)L"New" },
-        // Open
-        { MAKELONG(STD_FILEOPEN, 1), ID_FILE_OPEN, TBSTATE_ENABLED, BTNS_BUTTON, {0}, 0, (INT_PTR)L"Open" },
-        // Save
-        { MAKELONG(STD_FILESAVE, 2), ID_FILE_SAVE, TBSTATE_ENABLED, BTNS_BUTTON, {0}, 0, (INT_PTR)L"Save" },
-        // Separator
-        { 0, 0, TBSTATE_ENABLED, BTNS_SEP, {0}, 0, 0 },
-        // Exit
-        { 0, ID_FILE_EXIT, TBSTATE_ENABLED, BTNS_BUTTON, {0}, 0, (INT_PTR)L"Exit" },
-    };
-
-    // Add buttons to toolbar
-    for (int i = 0; i < sizeof(tbButtons)/sizeof(TBBUTTON); ++i) {
-        SendMessage(hToolbar, TB_ADDBUTTONS, 1, (LPARAM)&tbButtons[i]);
-    }
-
-    // Autosize toolbar
-    SendMessage(hToolbar, TB_AUTOSIZE, 0, 0);
-
-    return hToolbar;
-}
-
-HWND CreateTabControl(HWND hWnd) {
-    HWND hTab = CreateWindow(WC_TABCONTROL, L"",
-        WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE,
-        0, 0, 100, 100, hWnd, (HMENU)ID_TABCONTROL, hInst, NULL);
-
-    return hTab;
-}
-
-HWND CreateExplorerPanel(HWND hWnd) {
-    HWND hTree = CreateWindowEx(WS_EX_CLIENTEDGE, WC_TREEVIEW, L"Project",
-        WS_CHILD | WS_VISIBLE | WS_BORDER | TVS_HASLINES | TVS_LINESATROOT | TVS_HASBUTTONS,
-        0, 0, 200, 600, hWnd, (HMENU)ID_EXPLORER, hInst, NULL);
-
-    // Insert root item
-    TVINSERTSTRUCT tvInsert;
-    tvInsert.hParent = NULL;
-    tvInsert.hInsertAfter = TVI_FIRST;
-    tvInsert.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE;
-    tvInsert.item.pszText = L"Project";
-    tvInsert.item.iImage = 0;
-    tvInsert.item.iSelectedImage = 0;
-    HTREEITEM hRoot = TreeView_InsertItem(hTree, &tvInsert);
-
-    // Insert child items
-    tvInsert.hParent = hRoot;
-    tvInsert.item.pszText = L"main.cpp";
-    TreeView_InsertItem(hTree, &tvInsert);
-
-    tvInsert.item.pszText = L"resource.h";
-    TreeView_InsertItem(hTree, &tvInsert);
-
-    TreeView_Expand(hTree, hRoot, TVE_EXPAND);
-
-    return hTree;
-}
-
-HWND CreateOutputPanel(HWND hWnd) {
-    HWND hStatic = CreateWindowW(L"Static", L"Console Output",
-        WS_CHILD | WS_VISIBLE | WS_BORDER | SS_LEFT,
-        200, 0, 980, 20, hWnd, NULL, hInst, NULL);
-
-    // Create Edit control for output
-    HWND hEdit = CreateWindowEx(WS_EX_CLIENTEDGE, L"EDIT", L"",
-        WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
-        200, 25, 980, 125, hWnd, (HMENU)ID_OUTPUT, hInst, NULL);
-
-    return hEdit;
-}
-
-HWND CreateStatusBar(HWND hWnd) {
-    HWND hStatus = CreateWindowEx(0, STATUSCLASSNAME, NULL,
-        WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP,
-        0, 0, 100, 20, hWnd, (HMENU)ID_STATUSBAR, hInst, NULL);
-
-    // Set initial text
-    SendMessage(hStatus, SB_SETTEXT, 0, (LPARAM)L"Line: 1, Column: 1");
-
-    return hStatus;
 }

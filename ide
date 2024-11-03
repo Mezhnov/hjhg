@@ -15,31 +15,38 @@
 
 using namespace Gdiplus;
 
-// Constants for splitters
+// Константы для разделителей (если используются)
 #define SPLITTER_WIDTH 5
 #define MIN_PANEL_WIDTH 150
 #define MIN_PANEL_HEIGHT 100
 
-// IDs for menu items
+// Идентификаторы для пунктов меню
 #define ID_FILE_NEW      9001
 #define ID_FILE_OPEN     9002
 #define ID_FILE_SAVE     9003
 #define ID_FILE_EXIT     9004
 #define ID_HELP_ABOUT    9005
 
-// Toolbar button IDs
+// Идентификаторы кнопок панели инструментов
 #define IDT_RUN          1001
 #define IDT_DEBUG        1002
 #define IDT_BUILD        1003
 
-// Toolbar button count
+// Идентификаторы контролов
+#define IDC_TOOLBAR            101
+#define IDC_PROJECT_EXPLORER   102
+#define IDC_TAB_CONTROL        103
+#define IDC_OUTPUT_CONSOLE     104
+#define IDC_DEBUGGER_PANEL     105
+
+// Количество кнопок на панели инструментов
 #define NUM_TOOLBAR_BUTTONS 3
 
-// Global variables
+// Глобальные переменные
 HINSTANCE hInstGlobal;
 ULONG_PTR gdiplusToken;
 
-// Forward declarations
+// Объявления функций
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 void InitializeGDIPlus();
 void ShutdownGDIPlus();
@@ -51,29 +58,29 @@ void ResizeLayout(HWND hWnd, int width, int height);
 HWND InitOutputConsole(HWND hWndParent);
 HWND InitDebuggerPanel(HWND hWndParent);
 
-// Entry point
+// Точка входа
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                        _In_opt_ HINSTANCE hPrevInstance,
                        _In_ LPWSTR    lpCmdLine,
                        _In_ int       nCmdShow)
 {
-    // Initialize GDI+
+    // Инициализация GDI+
     InitializeGDIPlus();
 
-    // Initialize common controls
+    // Инициализация стандартных контролов
     INITCOMMONCONTROLSEX icex;
     icex.dwSize = sizeof(icex);
     icex.dwICC = ICC_WIN95_CLASSES | ICC_TAB_CLASSES | ICC_TREEVIEW_CLASSES | ICC_BAR_CLASSES;
     InitCommonControlsEx(&icex);
 
-    // Initialize Rich Edit
+    // Инициализация Rich Edit
     if (!LoadLibrary(TEXT("Msftedit.dll"))) {
-        MessageBox(NULL, L"Could not load Msftedit.dll", L"Error", MB_ICONERROR);
+        MessageBox(NULL, L"Не удалось загрузить Msftedit.dll", L"Ошибка", MB_ICONERROR);
         ShutdownGDIPlus();
         return 1;
     }
 
-    // Register the window class
+    // Регистрация класса окна
     const wchar_t szWindowClass[] = L"MainWindowClass";
     const wchar_t szTitle[] = L"Simple IDE";
 
@@ -89,14 +96,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     wcex.hIcon          = LoadIcon(NULL, IDI_APPLICATION);
     wcex.hCursor        = LoadCursor(NULL, IDC_ARROW);
     wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
-    wcex.lpszMenuName   = NULL; // Menu will be created manually
+    wcex.lpszMenuName   = NULL; // Меню будет создано вручную
     wcex.lpszClassName  = szWindowClass;
     wcex.hIconSm        = LoadIcon(NULL, IDI_APPLICATION);
 
     if (!RegisterClassEx(&wcex))
     {
         MessageBox(NULL,
-            L"Call to RegisterClassEx failed!",
+            L"Не удалось зарегистрировать класс окна!",
             szTitle,
             MB_ICONERROR);
 
@@ -106,7 +113,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     hInstGlobal = hInstance;
 
-    // Create the window
+    // Создание окна
     HWND hWnd = CreateWindow(
         szWindowClass,
         szTitle,
@@ -122,7 +129,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     if (!hWnd)
     {
         MessageBox(NULL,
-            L"Call to CreateWindow failed!",
+            L"Не удалось создать окно!",
             szTitle,
             MB_ICONERROR);
 
@@ -130,35 +137,35 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         return 1;
     }
 
-    // Main message loop
+    // Основной цикл сообщений
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0))
     {
-        // Translate and dispatch messages
+        // Перевод и отправка сообщений
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
-    // Shutdown GDI+
+    // Завершение работы с GDI+
     ShutdownGDIPlus();
 
     return (int) msg.wParam;
 }
 
-// Initialize GDI+
+// Инициализация GDI+
 void InitializeGDIPlus()
 {
     GdiplusStartupInput gdiplusStartupInput;
     GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
 }
 
-// Shutdown GDI+
+// Завершение работы с GDI+
 void ShutdownGDIPlus()
 {
     GdiplusShutdown(gdiplusToken);
 }
 
-// Window Procedure
+// Процедура окна
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     static HWND hToolbar = NULL;
@@ -171,25 +178,25 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
     case WM_CREATE:
         {
-            // Initialize Menu
+            // Инициализация меню
             InitMainMenu(hWnd);
 
-            // Initialize Toolbar
+            // Инициализация панели инструментов
             hToolbar = InitToolbar(hWnd);
 
-            // Initialize Project Explorer
+            // Инициализация обозревателя проекта
             hProjectExplorer = CreateWindowEx(0, WC_TREEVIEW, L"Project Explorer",
                 WS_CHILD | WS_VISIBLE | WS_BORDER | TVS_HASLINES | TVS_LINESATROOT | TVS_HASBUTTONS,
-                0, 40, 200, 600, hWnd, (HMENU)102, hInstGlobal, NULL);
+                0, 40, 200, 600, hWnd, (HMENU)(INT_PTR)IDC_PROJECT_EXPLORER, hInstGlobal, NULL);
 
-            // Initialize Tab Control for Code Editor
+            // Инициализация таб-контрола для редактора кода
             hTabControl = CreateTabControl(hWnd);
-            AddNewTab(hTabControl); // Add initial tab
+            AddNewTab(hTabControl); // Добавление начальной вкладки
 
-            // Initialize Output Console
+            // Инициализация консоли вывода
             hOutputConsole = InitOutputConsole(hWnd);
 
-            // Initialize Debugger Panel
+            // Инициализация панели отладки
             hDebuggerPanel = InitDebuggerPanel(hWnd);
         }
         break;
@@ -203,37 +210,37 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_COMMAND:
         {
             int wmId = LOWORD(wParam);
-            // Parse the menu and toolbar selections:
+            // Обработка выборов меню и панели инструментов
             switch (wmId)
             {
             case ID_FILE_NEW:
                 AddNewTab(hTabControl);
                 break;
             case ID_FILE_OPEN:
-                // Implement file open functionality
-                MessageBox(hWnd, L"Open File functionality not implemented.", L"Info", MB_OK | MB_ICONINFORMATION);
+                // Реализуйте функциональность открытия файла
+                MessageBox(hWnd, L"Функциональность открытия файла не реализована.", L"Информация", MB_OK | MB_ICONINFORMATION);
                 break;
             case ID_FILE_SAVE:
-                // Implement file save functionality
-                MessageBox(hWnd, L"Save File functionality not implemented.", L"Info", MB_OK | MB_ICONINFORMATION);
+                // Реализуйте функциональность сохранения файла
+                MessageBox(hWnd, L"Функциональность сохранения файла не реализована.", L"Информация", MB_OK | MB_ICONINFORMATION);
                 break;
             case ID_FILE_EXIT:
                 DestroyWindow(hWnd);
                 break;
             case ID_HELP_ABOUT:
-                MessageBox(hWnd, L"Simple IDE v1.0\nCreated with Win32 API.", L"About", MB_OK | MB_ICONINFORMATION);
+                MessageBox(hWnd, L"Simple IDE v1.0\nСоздано с использованием Win32 API.", L"О программе", MB_OK | MB_ICONINFORMATION);
                 break;
             case IDT_RUN:
-                // Implement run functionality
-                MessageBox(hWnd, L"Run functionality not implemented.", L"Info", MB_OK | MB_ICONINFORMATION);
+                // Реализуйте функциональность запуска
+                MessageBox(hWnd, L"Функциональность запуска не реализована.", L"Информация", MB_OK | MB_ICONINFORMATION);
                 break;
             case IDT_DEBUG:
-                // Implement debug functionality
-                MessageBox(hWnd, L"Debug functionality not implemented.", L"Info", MB_OK | MB_ICONINFORMATION);
+                // Реализуйте функциональность отладки
+                MessageBox(hWnd, L"Функциональность отладки не реализована.", L"Информация", MB_OK | MB_ICONINFORMATION);
                 break;
             case IDT_BUILD:
-                // Implement build functionality
-                MessageBox(hWnd, L"Build functionality not implemented.", L"Info", MB_OK | MB_ICONINFORMATION);
+                // Реализуйте функциональность сборки
+                MessageBox(hWnd, L"Функциональность сборки не реализована.", L"Информация", MB_OK | MB_ICONINFORMATION);
                 break;
             default:
                 break;
@@ -242,11 +249,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     case WM_NOTIFY:
         {
-            // Handle notifications from controls if needed
+            // Обработка уведомлений от контролов при необходимости
             LPNMHDR pnmh = (LPNMHDR)lParam;
             if (pnmh->hwndFrom == hTabControl && pnmh->code == TCN_SELCHANGE)
             {
-                // Handle tab selection change if needed
+                // Обработка смены вкладки при необходимости
             }
         }
         break;
@@ -261,63 +268,62 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
-// Initialize the main menu
+// Инициализация основного меню
 void InitMainMenu(HWND hWnd)
 {
     HMENU hMenubar = CreateMenu();
 
-    // File Menu
+    // Меню "Файл"
     HMENU hFile = CreateMenu();
-    AppendMenu(hFile, MF_STRING, ID_FILE_NEW, L"&New");
-    AppendMenu(hFile, MF_STRING, ID_FILE_OPEN, L"&Open...");
-    AppendMenu(hFile, MF_STRING, ID_FILE_SAVE, L"&Save");
+    AppendMenu(hFile, MF_STRING, ID_FILE_NEW, L"&Новый");
+    AppendMenu(hFile, MF_STRING, ID_FILE_OPEN, L"&Открыть...");
+    AppendMenu(hFile, MF_STRING, ID_FILE_SAVE, L"&Сохранить");
     AppendMenu(hFile, MF_SEPARATOR, 0, NULL);
-    AppendMenu(hFile, MF_STRING, ID_FILE_EXIT, L"E&xit");
-    AppendMenu(hMenubar, MF_POPUP, (UINT_PTR)hFile, L"&File");
+    AppendMenu(hFile, MF_STRING, ID_FILE_EXIT, L"&Выход");
+    AppendMenu(hMenubar, MF_POPUP, (UINT_PTR)hFile, L"&Файл");
 
-    // Edit Menu (Placeholder)
+    // Меню "Правка" (заполнитель)
     HMENU hEdit = CreateMenu();
-    AppendMenu(hEdit, MF_STRING, 0, L"&Undo");
-    AppendMenu(hEdit, MF_STRING, 0, L"&Redo");
+    AppendMenu(hEdit, MF_STRING, 0, L"&Отменить");
+    AppendMenu(hEdit, MF_STRING, 0, L"&Вернуть");
     AppendMenu(hEdit, MF_SEPARATOR, 0, NULL);
-    AppendMenu(hEdit, MF_STRING, 0, L"C&ut");
-    AppendMenu(hEdit, MF_STRING, 0, L"&Copy");
-    AppendMenu(hEdit, MF_STRING, 0, L"&Paste");
-    AppendMenu(hMenubar, MF_POPUP, (UINT_PTR)hEdit, L"&Edit");
+    AppendMenu(hEdit, MF_STRING, 0, L"&Вырезать");
+    AppendMenu(hEdit, MF_STRING, 0, L"&Копировать");
+    AppendMenu(hEdit, MF_STRING, 0, L"&Вставить");
+    AppendMenu(hMenubar, MF_POPUP, (UINT_PTR)hEdit, L"&Правка");
 
-    // Help Menu
+    // Меню "Справка"
     HMENU hHelp = CreateMenu();
-    AppendMenu(hHelp, MF_STRING, ID_HELP_ABOUT, L"&About");
-    AppendMenu(hMenubar, MF_POPUP, (UINT_PTR)hHelp, L"&Help");
+    AppendMenu(hHelp, MF_STRING, ID_HELP_ABOUT, L"&О программе");
+    AppendMenu(hMenubar, MF_POPUP, (UINT_PTR)hHelp, L"&Справка");
 
     SetMenu(hWnd, hMenubar);
 }
 
-// Initialize the toolbar
+// Инициализация панели инструментов
 HWND InitToolbar(HWND hWnd)
 {
-    // Create toolbar
+    // Создание панели инструментов
     HWND hToolbar = CreateWindowEx(0, TOOLBARCLASSNAME, NULL,
-        WS_CHILD | WS_VISIBLE | TBSTYLE_TOOLBAR | CCS_TOP | CCS_NORESIZE | CCS_NODIVIDER,
-        0, 0, 0, 0, hWnd, (HMENU)101, hInstGlobal, NULL);
+        WS_CHILD | WS_VISIBLE | TBSTYLE_TOOLTIPS | TBSTYLE_WRAPABLE | CCS_TOP | CCS_NORESIZE | CCS_NODIVIDER,
+        0, 0, 0, 0, hWnd, (HMENU)(INT_PTR)IDC_TOOLBAR, hInstGlobal, NULL);
 
     if (!hToolbar)
     {
-        MessageBox(hWnd, L"Failed to create toolbar.", L"Error", MB_ICONERROR);
+        MessageBox(hWnd, L"Не удалось создать панель инструментов.", L"Ошибка", MB_ICONERROR);
         return NULL;
     }
 
-    // Send the TB_BUTTONSTRUCTSIZE message, which is required for
-    // backward compatibility.
+    // Отправка сообщения TB_BUTTONSTRUCTSIZE для совместимости
     SendMessage(hToolbar, TB_BUTTONSTRUCTSIZE, (WPARAM)sizeof(TBBUTTON), 0);
 
-    // Create image list for toolbar buttons
+    // Создание списка изображений для кнопок панели инструментов
     HIMAGELIST hImageList = ImageList_Create(16, 16, ILC_COLOR32 | ILC_MASK, NUM_TOOLBAR_BUTTONS, 0);
 
-    // Load standard icons as placeholders
-    HICON hIconRun = LoadIcon(NULL, IDI_INFORMATION);    // Placeholder icon
-    HICON hIconDebug = LoadIcon(NULL, IDI_WARNING);     // Placeholder icon
-    HICON hIconBuild = LoadIcon(NULL, IDI_APPLICATION); // Placeholder icon
+    // Загрузка стандартных иконок в качестве заполнителей
+    HICON hIconRun = LoadIcon(NULL, IDI_INFORMATION);    // Иконка для "Run"
+    HICON hIconDebug = LoadIcon(NULL, IDI_WARNING);     // Иконка для "Debug"
+    HICON hIconBuild = LoadIcon(NULL, IDI_APPLICATION); // Иконка для "Build"
 
     ImageList_AddIcon(hImageList, hIconRun);
     ImageList_AddIcon(hImageList, hIconDebug);
@@ -325,56 +331,56 @@ HWND InitToolbar(HWND hWnd)
 
     SendMessage(hToolbar, TB_SETIMAGELIST, 0, (LPARAM)hImageList);
 
-    // Define toolbar buttons
+    // Определение кнопок панели инструментов
     TBBUTTON tbb[NUM_TOOLBAR_BUTTONS] = {0};
 
-    // Run Button
+    // Кнопка "Run"
     tbb[0].iBitmap = 0;
     tbb[0].idCommand = IDT_RUN;
     tbb[0].fsState = TBSTATE_ENABLED;
     tbb[0].fsStyle = BTNS_BUTTON;
     tbb[0].iString = (INT_PTR)L"Run";
 
-    // Debug Button
+    // Кнопка "Debug"
     tbb[1].iBitmap = 1;
     tbb[1].idCommand = IDT_DEBUG;
     tbb[1].fsState = TBSTATE_ENABLED;
     tbb[1].fsStyle = BTNS_BUTTON;
     tbb[1].iString = (INT_PTR)L"Debug";
 
-    // Build Button
+    // Кнопка "Build"
     tbb[2].iBitmap = 2;
     tbb[2].idCommand = IDT_BUILD;
     tbb[2].fsState = TBSTATE_ENABLED;
     tbb[2].fsStyle = BTNS_BUTTON;
     tbb[2].iString = (INT_PTR)L"Build";
 
-    // Add buttons to the toolbar
+    // Добавление кнопок на панель инструментов
     SendMessage(hToolbar, TB_ADDBUTTONS, (WPARAM)NUM_TOOLBAR_BUTTONS, (LPARAM)&tbb);
 
-    // Enable tooltips
-    SendMessage(hToolbar, TB_SETEXTENDEDSTYLE, 0, TBSTYLE_EX_TOOLTIPS);
+    // Включение двойной буферизации для плавной перерисовки
+    SendMessage(hToolbar, TB_SETEXTENDEDSTYLE, 0, TBSTYLE_EX_DOUBLEBUFFER);
 
     return hToolbar;
 }
 
-// Create a Tab Control
+// Создание таб-контрола
 HWND CreateTabControl(HWND hParent)
 {
     HWND hTab = CreateWindowEx(0, WC_TABCONTROL, NULL,
-        WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | TCS_MULTILINE,
-        200, 40, 800, 500, hParent, (HMENU)103, hInstGlobal, NULL);
+        WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | TCS_MULTILINE | TCS_TABS,
+        200, 40, 800, 500, hParent, (HMENU)(INT_PTR)IDC_TAB_CONTROL, hInstGlobal, NULL);
 
     if (!hTab)
     {
-        MessageBox(hParent, L"Failed to create Tab Control.", L"Error", MB_ICONERROR);
+        MessageBox(hParent, L"Не удалось создать таб-контрол.", L"Ошибка", MB_ICONERROR);
         return NULL;
     }
 
     return hTab;
 }
 
-// Add a new tab to the Tab Control
+// Добавление новой вкладки в таб-контрол
 void AddNewTab(HWND hTab)
 {
     if (!hTab) return;
@@ -382,23 +388,23 @@ void AddNewTab(HWND hTab)
     TCITEM tie;
     tie.mask = TCIF_TEXT;
     static int tabCount = 1;
-    std::wstring tabName = L"File" + std::to_wstring(tabCount++) + L".cpp";
+    std::wstring tabName = L"Файл" + std::to_wstring(tabCount++) + L".cpp";
     tie.pszText = const_cast<LPWSTR>(tabName.c_str());
 
     int index = TabCtrl_InsertItem(hTab, TabCtrl_GetItemCount(hTab), &tie);
 
-    // Create a Rich Edit control for the code editor within the tab
+    // Создание Rich Edit контрола для редактора кода внутри вкладки
     HWND hEditor = CreateWindowEx(WS_EX_CLIENTEDGE, MSFTEDIT_CLASS, NULL,
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN | WS_VSCROLL,
-        0, 0, 0, 0, hTab, (HMENU)(2000 + index), hInstGlobal, NULL);
+        0, 0, 0, 0, hTab, (HMENU)(INT_PTR)(2000 + index), hInstGlobal, NULL);
 
     if (!hEditor)
     {
-        MessageBox(hTab, L"Failed to create Code Editor.", L"Error", MB_ICONERROR);
+        MessageBox(hTab, L"Не удалось создать редактор кода.", L"Ошибка", MB_ICONERROR);
         return;
     }
 
-    // Set font for the editor
+    // Установка шрифта для редактора
     LOGFONT lf = {0};
     lf.lfHeight = 16;
     lf.lfWeight = FW_NORMAL;
@@ -407,92 +413,62 @@ void AddNewTab(HWND hTab)
     SendMessage(hEditor, WM_SETFONT, (WPARAM)hFont, TRUE);
 }
 
-// Resize and arrange the layout
+// Обработка изменения размера и расположения контролов
 void ResizeLayout(HWND hWnd, int width, int height)
 {
-    // Assuming the toolbar height is 30 and menu height is included in window size
+    // Предполагаемая высота панели инструментов
     int toolbarHeight = 30;
 
-    // Resize toolbar
-    HWND hToolbar = FindWindowEx(hWnd, NULL, TOOLBARCLASSNAME, NULL);
+    // Изменение размера панели инструментов
+    HWND hToolbar = GetDlgItem(hWnd, IDC_TOOLBAR);
     if (hToolbar)
     {
         SetWindowPos(hToolbar, NULL, 0, 0, width, toolbarHeight, SWP_NOZORDER);
     }
 
-    // Resize Project Explorer
-    if (hToolbar) // Ensure toolbar was found
+    // Изменение размера обозревателя проекта
+    HWND hProjectExplorer = GetDlgItem(hWnd, IDC_PROJECT_EXPLORER);
+    if (hProjectExplorer)
     {
-        HWND hProjectExplorer = FindWindowEx(hWnd, NULL, WC_TREEVIEW, NULL);
-        if (hProjectExplorer)
-        {
-            SetWindowPos(hProjectExplorer, NULL, 0, toolbarHeight, 200, height - toolbarHeight - 200, SWP_NOZORDER);
-        }
+        SetWindowPos(hProjectExplorer, NULL, 0, toolbarHeight, 200, height - toolbarHeight - 200, SWP_NOZORDER);
+    }
 
-        // Resize Tab Control
-        HWND hTabControl = FindWindowEx(hWnd, NULL, WC_TABCONTROL, NULL);
-        if (hTabControl)
-        {
-            SetWindowPos(hTabControl, NULL, 200, toolbarHeight, width - 200 - 300, height - toolbarHeight - 200, SWP_NOZORDER);
-        }
+    // Изменение размера таб-контрола
+    HWND hTabControl = GetDlgItem(hWnd, IDC_TAB_CONTROL);
+    if (hTabControl)
+    {
+        SetWindowPos(hTabControl, NULL, 200, toolbarHeight, width - 200 - 300, height - toolbarHeight - 200, SWP_NOZORDER);
+    }
 
-        // Resize Output Console
-        HWND hOutputConsole = FindWindowEx(hWnd, NULL, MSFTEDIT_CLASS, NULL);
-        if (hOutputConsole)
-        {
-            SetWindowPos(hOutputConsole, NULL, 200, height - 200, width - 200 - 300, 200, SWP_NOZORDER);
-        }
+    // Изменение размера консоли вывода
+    HWND hOutputConsole = GetDlgItem(hWnd, IDC_OUTPUT_CONSOLE);
+    if (hOutputConsole)
+    {
+        SetWindowPos(hOutputConsole, NULL, 200, height - 200, width - 200 - 300, 200, SWP_NOZORDER);
+    }
 
-        // Resize Debugger Panel
-        HWND hDebuggerPanel = FindWindowEx(hWnd, NULL, MSFTEDIT_CLASS, NULL);
-        if (hDebuggerPanel)
-        {
-            // Adjust the search to find the correct debugger panel
-            // Since multiple MSFTEDIT_CLASS exist, you might need to set a unique identifier or use other methods
-            // For simplicity, we'll assume it's the last one created
-            hDebuggerPanel = NULL;
-            HWND hChild = GetWindow(hWnd, GW_CHILD);
-            while (hChild)
-            {
-                if (GetClassName(hChild, NULL, 0) == 0)
-                {
-                    hChild = GetNextWindow(hChild, GW_HWNDNEXT);
-                    continue;
-                }
-
-                wchar_t className[256];
-                GetClassName(hChild, className, 256);
-                if (wcscmp(className, MSFTEDIT_CLASS) == 0)
-                {
-                    // Assuming the first MSFTEDIT_CLASS is Output Console, the second is Debugger Panel
-                    hDebuggerPanel = GetNextWindow(hChild, GW_HWNDNEXT);
-                    break;
-                }
-                hChild = GetNextWindow(hChild, GW_HWNDNEXT);
-            }
-
-            if (hDebuggerPanel)
-            {
-                SetWindowPos(hDebuggerPanel, NULL, width - 300, toolbarHeight, 300, height - toolbarHeight - 200, SWP_NOZORDER);
-            }
-        }
+    // Изменение размера панели отладки
+    HWND hDebuggerPanel = GetDlgItem(hWnd, IDC_DEBUGGER_PANEL);
+    if (hDebuggerPanel)
+    {
+        SetWindowPos(hDebuggerPanel, NULL, width - 300, toolbarHeight, 300, height - toolbarHeight - 200, SWP_NOZORDER);
     }
 }
 
-// Initialize the Output Console
+// Инициализация консоли вывода
 HWND InitOutputConsole(HWND hWndParent)
 {
     HWND hOutput = CreateWindowEx(WS_EX_CLIENTEDGE, MSFTEDIT_CLASS, NULL,
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL,
-        200, 600, 800, 200, hWndParent, (HMENU)104, hInstGlobal, NULL);
+        200, 600, 800, 200, hWndParent, (HMENU)(INT_PTR)IDC_OUTPUT_CONSOLE, hInstGlobal, NULL);
 
     if (!hOutput)
     {
-        MessageBox(hWndParent, L"Failed to create Output Console.", L"Error", MB_ICONERROR);
+        MessageBox(hWndParent, L"Не удалось создать консоль вывода.", L"Ошибка", MB_ICONERROR);
         return NULL;
     }
 
-    // Set font for the console
+    // Установка шрифта для консоли
     LOGFONT lf = {0};
     lf.lfHeight = 14;
     lf.lfWeight = FW_NORMAL;
@@ -500,11 +476,11 @@ HWND InitOutputConsole(HWND hWndParent)
     HFONT hFont = CreateFontIndirect(&lf);
     SendMessage(hOutput, WM_SETFONT, (WPARAM)hFont, TRUE);
 
-    // Initialize Rich Edit (if needed)
+    // Настройка Rich Edit
     SendMessage(hOutput, EM_SETBKGNDCOLOR, 0, (LPARAM)RGB(0, 0, 0));
-    SendMessage(hOutput, EM_SETLIMITTEXT, (WPARAM)0, 0); // No text limit
+    SendMessage(hOutput, EM_SETLIMITTEXT, (WPARAM)0, 0); // Без ограничений на текст
 
-    // Set text color to white for visibility
+    // Установка цвета текста на белый для видимости
     CHARFORMAT2 cf;
     ZeroMemory(&cf, sizeof(cf));
     cf.cbSize = sizeof(cf);
@@ -515,20 +491,20 @@ HWND InitOutputConsole(HWND hWndParent)
     return hOutput;
 }
 
-// Initialize the Debugger Panel
+// Инициализация панели отладки
 HWND InitDebuggerPanel(HWND hWndParent)
 {
     HWND hDebugger = CreateWindowEx(WS_EX_CLIENTEDGE, MSFTEDIT_CLASS, L"Debugger Panel",
         WS_CHILD | WS_VISIBLE | WS_BORDER | ES_MULTILINE | ES_READONLY | WS_VSCROLL,
-        1000, 40, 200, 500, hWndParent, (HMENU)105, hInstGlobal, NULL);
+        900, 40, 200, 500, hWndParent, (HMENU)(INT_PTR)IDC_DEBUGGER_PANEL, hInstGlobal, NULL);
 
     if (!hDebugger)
     {
-        MessageBox(hWndParent, L"Failed to create Debugger Panel.", L"Error", MB_ICONERROR);
+        MessageBox(hWndParent, L"Не удалось создать панель отладки.", L"Ошибка", MB_ICONERROR);
         return NULL;
     }
 
-    // Set font for the debugger panel
+    // Установка шрифта для панели отладки
     LOGFONT lf = {0};
     lf.lfHeight = 12;
     lf.lfWeight = FW_NORMAL;
@@ -536,22 +512,8 @@ HWND InitDebuggerPanel(HWND hWndParent)
     HFONT hFont = CreateFontIndirect(&lf);
     SendMessage(hDebugger, WM_SETFONT, (WPARAM)hFont, TRUE);
 
-    // Add some placeholder text
-    SetWindowText(hDebugger, L"Debugger Panel\nNot Implemented.");
+    // Добавление текста-заполнителя
+    SetWindowText(hDebugger, L"Debugger Panel\nНе реализовано.");
 
     return hDebugger;
 }
-Сборка начата в 22:45...
-1>------ Сборка начата: проект: САПР1.1, Конфигурация: Debug x64 ------
-1>САПР1.1.cpp
-1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(301,33): error C2065: TBSTYLE_TOOLBAR: необъявленный идентификатор
-1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(300,21): error C2660: CreateWindowExW: функция не принимает 11 аргументов
-1>    C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\um\winuser.h(4437,1):
-1>     см. объявление "CreateWindowExW"
-1>    C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(300,21):
-1>    при попытке сопоставить список аргументов "(int, const wchar_t [16], int, int, int, int, int, HWND, HMENU, HINSTANCE, int)"
-1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(356,51): error C2065: TBSTYLE_EX_TOOLTIPS: необъявленный идентификатор
-1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(393,27): warning C4312: приведение типов: преобразование из "int" в "HMENU" большего размера
-1>Сборка проекта "САПР1.1.vcxproj" завершена с ошибкой.
-========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
-========== Сборка завершено в 22:45 и заняло 00,735 с ==========

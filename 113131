@@ -287,6 +287,329 @@ BOOL RefreshWiFiList(HWND hListBox)
 
     return TRUE;
 }
+Сборка начата в 10:46...
+1>------ Сборка начата: проект: Проверка проекта, Конфигурация: Debug x64 ------
+1>Проверка проекта.cpp
+1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(167,43): error C2065: IDD_DIALOG1: необъявленный идентификатор
+1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(176,47): error C2065: IDC_BUTTON_OK: необъявленный идентификатор
+1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(177,50): error C2065: IDC_EDIT_PASSWORD: необъявленный идентификатор
+1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(181,52): error C2065: IDC_BUTTON_CANCEL: необъявленный идентификатор
+1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,30): error C2665: "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string": ни одна перегруженная функция не может преобразовать все типы аргументов
+1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xstring(1327,5):
+1>    может быть "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(std::initializer_list<_Elem>,const _Alloc &)"
+1>        with
+1>        [
+1>            _Elem=wchar_t,
+1>            _Alloc=std::allocator<wchar_t>
+1>        ]
+1>        C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,30):
+1>        "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(std::initializer_list<_Elem>,const _Alloc &)": невозможно преобразовать аргумент 1 из "UCHAR [32]" в "std::initializer_list<_Elem>"
+1>        with
+1>        [
+1>            _Elem=wchar_t,
+1>            _Alloc=std::allocator<wchar_t>
+1>        ]
+1>        and
+1>        [
+1>            _Elem=wchar_t
+1>        ]
+1>            C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>            "std::initializer_list<_Elem>::initializer_list": ни одна перегруженная функция не может преобразовать все типы аргументов
+1>        with
+1>        [
+1>            _Elem=wchar_t
+1>        ]
+1>                C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\initializer_list(51,1):
+1>                может быть "std::initializer_list<_Elem>::initializer_list(std::initializer_list<_Elem> &&)"
+1>        with
+1>        [
+1>            _Elem=wchar_t
+1>        ]
+1>                    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>                    "std::initializer_list<_Elem>::initializer_list(std::initializer_list<_Elem> &&)": невозможно преобразовать аргумент 1 из "UCHAR [32]" в "std::initializer_list<_Elem> &&"
+1>        with
+1>        [
+1>            _Elem=wchar_t
+1>        ]
+1>                        C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>                        Причина: невозможно преобразовать "UCHAR [32]" в "std::initializer_list<_Elem>"
+1>        with
+1>        [
+1>            _Elem=wchar_t
+1>        ]
+1>                        C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>                        Для преобразования требуется второй оператор пользовательского преобразования или конструктор
+1>                C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\initializer_list(51,1):
+1>                или       "std::initializer_list<_Elem>::initializer_list(const std::initializer_list<_Elem> &)"
+1>        with
+1>        [
+1>            _Elem=wchar_t
+1>        ]
+1>                    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>                    "std::initializer_list<_Elem>::initializer_list(const std::initializer_list<_Elem> &)": невозможно преобразовать аргумент 1 из "UCHAR [32]" в "const std::initializer_list<_Elem> &"
+1>        with
+1>        [
+1>            _Elem=wchar_t
+1>        ]
+1>                        C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>                        Причина: невозможно преобразовать "UCHAR [32]" в "const std::initializer_list<_Elem>"
+1>        with
+1>        [
+1>            _Elem=wchar_t
+1>        ]
+1>                        C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>                        Для преобразования требуется второй оператор пользовательского преобразования или конструктор
+1>                C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>                при попытке сопоставить список аргументов "(UCHAR [32])"
+1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xstring(1014,5):
+1>    или       "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>> &&,const _Alloc &) noexcept(<expr>)"
+1>        with
+1>        [
+1>            _Alloc=std::allocator<wchar_t>
+1>        ]
+1>        C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,30):
+1>        "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>> &&,const _Alloc &) noexcept(<expr>)": невозможно преобразовать аргумент 1 из "UCHAR [32]" в "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>> &&"
+1>        with
+1>        [
+1>            _Alloc=std::allocator<wchar_t>
+1>        ]
+1>            C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>            Причина: невозможно преобразовать "UCHAR [32]" в "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>"
+1>            C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>            "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string": ни одна перегруженная функция не может преобразовать все типы аргументов
+1>                C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xstring(749,5):
+1>                может быть "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(const _Elem *const )"
+1>        with
+1>        [
+1>            _Elem=wchar_t
+1>        ]
+1>                    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>                    "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(const _Elem *const )": невозможно преобразовать аргумент 1 из "UCHAR [32]" в "const _Elem *const "
+1>        with
+1>        [
+1>            _Elem=wchar_t
+1>        ]
+1>                        C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>                        Типы, на которые указывают указатели, не связаны; для преобразования требуется reinterpret_cast, приведение в стиле С или приведение в стиле функции в круглых скобках
+1>                C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xstring(1327,5):
+1>                или       "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(std::initializer_list<_Elem>,const _Alloc &)"
+1>        with
+1>        [
+1>            _Elem=wchar_t,
+1>            _Alloc=std::allocator<wchar_t>
+1>        ]
+1>                    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>                    "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(std::initializer_list<_Elem>,const _Alloc &)": невозможно преобразовать аргумент 1 из "UCHAR [32]" в "std::initializer_list<_Elem>"
+1>        with
+1>        [
+1>            _Elem=wchar_t,
+1>            _Alloc=std::allocator<wchar_t>
+1>        ]
+1>        and
+1>        [
+1>            _Elem=wchar_t
+1>        ]
+1>                        C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>                        Для преобразования требуется второй оператор пользовательского преобразования или конструктор
+1>                C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xstring(779,5):
+1>                или       "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(_Iter,_Iter,const _Alloc &)"
+1>        with
+1>        [
+1>            _Alloc=std::allocator<wchar_t>
+1>        ]
+1>                C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>                при попытке сопоставить список аргументов "(UCHAR [32])"
+1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xstring(765,5):
+1>    или       "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(const unsigned __int64,const _Elem)"
+1>        with
+1>        [
+1>            _Elem=wchar_t
+1>        ]
+1>        C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,30):
+1>        "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(const unsigned __int64,const _Elem)": невозможно преобразовать аргумент 1 из "UCHAR [32]" в "const unsigned __int64"
+1>        with
+1>        [
+1>            _Elem=wchar_t
+1>        ]
+1>            C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>            Не существует контекста, в котором такое преобразование возможно
+1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xstring(756,5):
+1>    или       "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(const _Elem *const ,const _Alloc &)"
+1>        with
+1>        [
+1>            _Elem=wchar_t,
+1>            _Alloc=std::allocator<wchar_t>
+1>        ]
+1>        C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,30):
+1>        "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(const _Elem *const ,const _Alloc &)": невозможно преобразовать аргумент 1 из "UCHAR [32]" в "const _Elem *const "
+1>        with
+1>        [
+1>            _Elem=wchar_t,
+1>            _Alloc=std::allocator<wchar_t>
+1>        ]
+1>        and
+1>        [
+1>            _Elem=wchar_t
+1>        ]
+1>            C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>            Типы, на которые указывают указатели, не связаны; для преобразования требуется reinterpret_cast, приведение в стиле С или приведение в стиле функции в круглых скобках
+1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xstring(735,5):
+1>    или       "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(const _Elem *const ,const unsigned __int64)"
+1>        with
+1>        [
+1>            _Elem=wchar_t
+1>        ]
+1>        C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,30):
+1>        "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(const _Elem *const ,const unsigned __int64)": невозможно преобразовать аргумент 1 из "UCHAR [32]" в "const _Elem *const "
+1>        with
+1>        [
+1>            _Elem=wchar_t
+1>        ]
+1>            C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>            Типы, на которые указывают указатели, не связаны; для преобразования требуется reinterpret_cast, приведение в стиле С или приведение в стиле функции в круглых скобках
+1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xstring(707,5):
+1>    или       "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(const std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>> &,const unsigned __int64,const _Alloc &)"
+1>        with
+1>        [
+1>            _Alloc=std::allocator<wchar_t>
+1>        ]
+1>        C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,30):
+1>        "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(const std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>> &,const unsigned __int64,const _Alloc &)": невозможно преобразовать аргумент 1 из "UCHAR [32]" в "const std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>> &"
+1>        with
+1>        [
+1>            _Alloc=std::allocator<wchar_t>
+1>        ]
+1>            C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>            Причина: невозможно преобразовать "UCHAR [32]" в "const std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>"
+1>            C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>            "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string": ни одна перегруженная функция не может преобразовать все типы аргументов
+1>                C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xstring(749,5):
+1>                может быть "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(const _Elem *const )"
+1>        with
+1>        [
+1>            _Elem=wchar_t
+1>        ]
+1>                    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>                    "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(const _Elem *const )": невозможно преобразовать аргумент 1 из "UCHAR [32]" в "const _Elem *const "
+1>        with
+1>        [
+1>            _Elem=wchar_t
+1>        ]
+1>                        C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>                        Типы, на которые указывают указатели, не связаны; для преобразования требуется reinterpret_cast, приведение в стиле С или приведение в стиле функции в круглых скобках
+1>                C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xstring(1327,5):
+1>                или       "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(std::initializer_list<_Elem>,const _Alloc &)"
+1>        with
+1>        [
+1>            _Elem=wchar_t,
+1>            _Alloc=std::allocator<wchar_t>
+1>        ]
+1>                    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>                    "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(std::initializer_list<_Elem>,const _Alloc &)": невозможно преобразовать аргумент 1 из "UCHAR [32]" в "std::initializer_list<_Elem>"
+1>        with
+1>        [
+1>            _Elem=wchar_t,
+1>            _Alloc=std::allocator<wchar_t>
+1>        ]
+1>        and
+1>        [
+1>            _Elem=wchar_t
+1>        ]
+1>                        C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>                        Для преобразования требуется второй оператор пользовательского преобразования или конструктор
+1>                C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xstring(779,5):
+1>                или       "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(_Iter,_Iter,const _Alloc &)"
+1>        with
+1>        [
+1>            _Alloc=std::allocator<wchar_t>
+1>        ]
+1>                C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>                при попытке сопоставить список аргументов "(UCHAR [32])"
+1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xstring(702,5):
+1>    или       "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(const std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>> &,const _Alloc &)"
+1>        with
+1>        [
+1>            _Alloc=std::allocator<wchar_t>
+1>        ]
+1>        C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,30):
+1>        "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(const std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>> &,const _Alloc &)": невозможно преобразовать аргумент 1 из "UCHAR [32]" в "const std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>> &"
+1>        with
+1>        [
+1>            _Alloc=std::allocator<wchar_t>
+1>        ]
+1>            C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>            Причина: невозможно преобразовать "UCHAR [32]" в "const std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>"
+1>            C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>            "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string": ни одна перегруженная функция не может преобразовать все типы аргументов
+1>                C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xstring(749,5):
+1>                может быть "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(const _Elem *const )"
+1>        with
+1>        [
+1>            _Elem=wchar_t
+1>        ]
+1>                    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>                    "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(const _Elem *const )": невозможно преобразовать аргумент 1 из "UCHAR [32]" в "const _Elem *const "
+1>        with
+1>        [
+1>            _Elem=wchar_t
+1>        ]
+1>                        C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>                        Типы, на которые указывают указатели, не связаны; для преобразования требуется reinterpret_cast, приведение в стиле С или приведение в стиле функции в круглых скобках
+1>                C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xstring(1327,5):
+1>                или       "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(std::initializer_list<_Elem>,const _Alloc &)"
+1>        with
+1>        [
+1>            _Elem=wchar_t,
+1>            _Alloc=std::allocator<wchar_t>
+1>        ]
+1>                    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>                    "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(std::initializer_list<_Elem>,const _Alloc &)": невозможно преобразовать аргумент 1 из "UCHAR [32]" в "std::initializer_list<_Elem>"
+1>        with
+1>        [
+1>            _Elem=wchar_t,
+1>            _Alloc=std::allocator<wchar_t>
+1>        ]
+1>        and
+1>        [
+1>            _Elem=wchar_t
+1>        ]
+1>                        C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>                        Для преобразования требуется второй оператор пользовательского преобразования или конструктор
+1>                C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xstring(779,5):
+1>                или       "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(_Iter,_Iter,const _Alloc &)"
+1>        with
+1>        [
+1>            _Alloc=std::allocator<wchar_t>
+1>        ]
+1>                C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,51):
+1>                при попытке сопоставить список аргументов "(UCHAR [32])"
+1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xstring(779,5):
+1>    или       "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(_Iter,_Iter,const _Alloc &)"
+1>        with
+1>        [
+1>            _Alloc=std::allocator<wchar_t>
+1>        ]
+1>        C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,30):
+1>        "std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(_Iter,_Iter,const _Alloc &)": в шаблон параметр "_Iter" неоднозначен
+1>        with
+1>        [
+1>            _Alloc=std::allocator<wchar_t>
+1>        ]
+1>            C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,30):
+1>            может быть "ULONG"
+1>            C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,30):
+1>            или       "UCHAR *"
+1>        C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,30):
+1>        'std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::basic_string(_Iter,_Iter,const _Alloc &)': не удалось вывести аргумент шаблон для '_Iter' из 'ULONG'
+1>        with
+1>        [
+1>            _Alloc=std::allocator<wchar_t>
+1>        ]
+1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(268,30):
+1>    при попытке сопоставить список аргументов "(UCHAR [32], ULONG)"
+1>Сборка проекта "Проверка проекта.vcxproj" завершена с ошибкой.
+========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
+========== Сборка завершено в 10:46 и заняло 00,654 с ==========
 
 // Функция подключения к выбранной Wi-Fi сети (не реализована)
 BOOL ConnectToWiFi(const std::wstring& ssid, const std::wstring& password)

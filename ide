@@ -1,0 +1,196 @@
+// main.cpp
+
+#include <windows.h>
+#include <gdiplus.h>
+#include <wininet.h>
+#include <string>
+#include <vector>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
+#include <locale>
+#include <codecvt>
+#include <windowsx.h>
+#include <mmsystem.h> // For PlaySound
+#include <CommCtrl.h> // For common controls
+#include <richedit.h> // For rich edit controls
+#include "resource.h" // Ensure you have this header for resource IDs
+
+#pragma comment(lib, "Gdiplus.lib")
+#pragma comment(lib, "Wininet.lib")
+#pragma comment(lib, "Comctl32.lib")
+#pragma comment(lib, "Msimg32.lib")
+#pragma comment(lib, "Imm32.lib")
+#pragma comment(lib, "Winmm.lib")
+
+using namespace Gdiplus;
+
+// Global variables
+HINSTANCE hInst;
+LPCWSTR szWindowClass = L"MainWindowClass";
+LPCWSTR szTitle = L"Simple IDE";
+
+// Forward declarations
+LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+void InitializeGDIPlus();
+void ShutdownGDIPlus();
+
+ULONG_PTR gdiplusToken;
+
+int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
+                     _In_opt_ HINSTANCE hPrevInstance,
+                     _In_ LPWSTR    lpCmdLine,
+                     _In_ int       nCmdShow)
+{
+    // Initialize GDI+
+    InitializeGDIPlus();
+
+    // Register the window class
+    WNDCLASSEX wcex;
+    ZeroMemory(&wcex, sizeof(WNDCLASSEX));
+
+    wcex.cbSize = sizeof(WNDCLASSEX);
+    wcex.style          = CS_HREDRAW | CS_VREDRAW;
+    wcex.lpfnWndProc    = WndProc;
+    wcex.cbClsExtra     = 0;
+    wcex.cbWndExtra     = 0;
+    wcex.hInstance      = hInstance;
+    wcex.hIcon          = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPLICATION));
+    wcex.hCursor        = LoadCursor(NULL, IDC_ARROW);
+    wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
+    wcex.lpszMenuName   = NULL; // You can add menu resource here
+    wcex.lpszClassName  = szWindowClass;
+    wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_APPLICATION));
+
+    if (!RegisterClassEx(&wcex))
+    {
+        MessageBox(NULL,
+            L"Call to RegisterClassEx failed!",
+            szTitle,
+            NULL);
+
+        ShutdownGDIPlus();
+        return 1;
+    }
+
+    // Create the window
+    HWND hWnd = CreateWindow(
+        szWindowClass,
+        szTitle,
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT,
+        800, 600,
+        NULL,
+        NULL,
+        hInstance,
+        NULL
+    );
+
+    if (!hWnd)
+    {
+        MessageBox(NULL,
+            L"Call to CreateWindow failed!",
+            szTitle,
+            NULL);
+
+        ShutdownGDIPlus();
+        return 1;
+    }
+
+    // Show the window
+    ShowWindow(hWnd, nCmdShow);
+    UpdateWindow(hWnd);
+
+    // Main message loop
+    MSG msg;
+    while (GetMessage(&msg, NULL, 0, 0))
+    {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    // Shutdown GDI+
+    ShutdownGDIPlus();
+
+    return (int) msg.wParam;
+}
+
+void InitializeGDIPlus()
+{
+    GdiplusStartupInput gdiplusStartupInput;
+    GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
+}
+
+void ShutdownGDIPlus()
+{
+    GdiplusShutdown(gdiplusToken);
+}
+
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
+    case WM_CREATE:
+        {
+            // Initialize common controls
+            INITCOMMONCONTROLSEX icex;
+            icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
+            icex.dwICC = ICC_WIN95_CLASSES;
+            InitCommonControlsEx(&icex);
+
+            // Initialize Rich Edit control
+            if (!LoadLibrary(L"Msftedit.dll"))
+            {
+                MessageBox(hWnd, L"Failed to load RichEdit library.", szTitle, MB_OK | MB_ICONERROR);
+            }
+        }
+        break;
+    case WM_PAINT:
+        {
+            PAINTSTRUCT ps;
+            HDC hdc = BeginPaint(hWnd, &ps);
+
+            // Example of drawing text using GDI+
+            Graphics graphics(hdc);
+            FontFamily fontFamily(L"Arial");
+            Font font(&fontFamily, 24, FontStyleBold, UnitPixel);
+            SolidBrush brush(Color(255, 0, 0, 255));
+
+            graphics.DrawString(L"Welcome to Simple IDE",
+                -1,
+                &font,
+                PointF(10.0f, 10.0f),
+                &brush);
+
+            EndPaint(hWnd, &ps);
+        }
+        break;
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+    case WM_COMMAND:
+        // Обработка команд меню или других контролов
+        {
+            int wmId = LOWORD(wParam);
+            // Разобрать выбор согласно меню:
+            switch (wmId)
+            {
+            case IDM_ABOUT:
+                // Обработать команду "О программе"
+                MessageBox(hWnd, L"Simple IDE v1.0", L"About", MB_OK);
+                break;
+            case IDM_EXIT:
+                DestroyWindow(hWnd);
+                break;
+            default:
+                return DefWindowProc(hWnd, message, wParam, lParam);
+            }
+        }
+        break;
+    default:
+        return DefWindowProc(hWnd, message, wParam, lParam);
+        break;
+    }
+
+    return 0;
+}

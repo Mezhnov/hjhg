@@ -541,3 +541,17 @@ HWND InitDebuggerPanel(HWND hWndParent)
 
     return hDebugger;
 }
+Сборка начата в 22:45...
+1>------ Сборка начата: проект: САПР1.1, Конфигурация: Debug x64 ------
+1>САПР1.1.cpp
+1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(301,33): error C2065: TBSTYLE_TOOLBAR: необъявленный идентификатор
+1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(300,21): error C2660: CreateWindowExW: функция не принимает 11 аргументов
+1>    C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\um\winuser.h(4437,1):
+1>     см. объявление "CreateWindowExW"
+1>    C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(300,21):
+1>    при попытке сопоставить список аргументов "(int, const wchar_t [16], int, int, int, int, int, HWND, HMENU, HINSTANCE, int)"
+1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(356,51): error C2065: TBSTYLE_EX_TOOLTIPS: необъявленный идентификатор
+1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(393,27): warning C4312: приведение типов: преобразование из "int" в "HMENU" большего размера
+1>Сборка проекта "САПР1.1.vcxproj" завершена с ошибкой.
+========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
+========== Сборка завершено в 22:45 и заняло 00,735 с ==========

@@ -468,3 +468,45 @@ HWND InitCodeEditor(HWND hWndParent)
 
     return hEditor;
 }
+Сборка начата в 22:31...
+1>------ Сборка начата: проект: САПР1.1, Конфигурация: Debug x64 ------
+1>САПР1.1.cpp
+1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(182,43): error C2440: =: невозможно преобразовать "void" в "HWND"
+1>    C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(182,43):
+1>    Выражение, имеющее тип void, нельзя преобразовать в другой тип
+1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(185,43): error C2440: =: невозможно преобразовать "void" в "HWND"
+1>    C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(185,43):
+1>    Выражение, имеющее тип void, нельзя преобразовать в другой тип
+1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(243,10): error C2065: WM_SIZECHILD: необъявленный идентификатор
+1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(243,10): error C2131: выражение не определяется константой
+1>    C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(243,10):
+1>    обнаружено неконстантное (под)выражение
+1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(243,10): error C2051: значение выражения для варианта выбора не является константой
+1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(291,33): error C2065: TBSTYLE_TOOLBAR: необъявленный идентификатор
+1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(290,21): error C2660: CreateWindowExW: функция не принимает 11 аргументов
+1>    C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\um\winuser.h(4437,1):
+1>     см. объявление "CreateWindowExW"
+1>    C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(290,21):
+1>    при попытке сопоставить список аргументов "(int, const wchar_t [16], int, int, int, int, int, HWND, HMENU, HINSTANCE, int)"
+1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(357,78): error C2065: ES_SCROLL: необъявленный идентификатор
+1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(358,27): warning C4312: приведение типов: преобразование из "int" в "HMENU" большего размера
+1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(356,20): error C2660: CreateWindowExW: функция не принимает 11 аргументов
+1>    C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\um\winuser.h(4437,1):
+1>     см. объявление "CreateWindowExW"
+1>    C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(356,20):
+1>    при попытке сопоставить список аргументов "(long, const wchar_t [12], int, int, int, int, int, HWND, HMENU, HINSTANCE, int)"
+1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(412,6): error C2556: HWND InitOutputConsole(HWND): перегруженная функция отличается от "void InitOutputConsole(HWND)" только возвращаемым типом
+1>    C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(48,6):
+1>     см. объявление "InitOutputConsole"
+1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(412,6): error C2040: InitOutputConsole: "HWND (HWND)" отличается по уровням косвенного обращения от "void (HWND)"
+1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(434,6): error C2556: HWND InitDebuggerPanel(HWND): перегруженная функция отличается от "void InitDebuggerPanel(HWND)" только возвращаемым типом
+1>    C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(49,6):
+1>     см. объявление "InitDebuggerPanel"
+1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(434,6): error C2040: InitDebuggerPanel: "HWND (HWND)" отличается по уровням косвенного обращения от "void (HWND)"
+1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(455,6): error C2556: HWND InitCodeEditor(HWND): перегруженная функция отличается от "void InitCodeEditor(HWND)" только возвращаемым типом
+1>    C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(47,6):
+1>     см. объявление "InitCodeEditor"
+1>C:\Users\User\source\repos\САПР1.1\САПР1.1\САПР1.1.cpp(455,6): error C2040: InitCodeEditor: "HWND (HWND)" отличается по уровням косвенного обращения от "void (HWND)"
+1>Сборка проекта "САПР1.1.vcxproj" завершена с ошибкой.
+========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
+========== Сборка завершено в 22:31 и заняло 00,643 с ==========

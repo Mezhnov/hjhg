@@ -1,34 +1,157 @@
-// resource.h
-#define IDM_NEW    1001
-#define IDM_OPEN   1002
-#define IDM_SAVE   1003
-#define IDM_EXIT   1004
-#define IDM_ABOUT  1005
+// main.cpp
 
-#define IDR_MENU1  2001
-#define IDR_TOOLBAR1 2002
-
-#define IDC_EDIT   3001
-
-// resource.rc
-#include "resource.h"
 #include <windows.h>
+#include <gdiplus.h>
+#include <string>
+#include <vector>
+#include <CommCtrl.h>
+#include <richedit.h>
+#include "resource.h"
 
-// Меню
-IDR_MENU1 MENU
-BEGIN
-    POPUP "&Файл"
-    BEGIN
-        MENUITEM "&Новый\tCtrl+N", IDM_NEW
-        MENUITEM "&Открыть\tCtrl+O", IDM_OPEN
-        MENUITEM "&Сохранить\tCtrl+S", IDM_SAVE
-        MENUITEM "В&ыход\tAlt+F4", IDM_EXIT
-    END
-    POPUP "&Справка"
-    BEGIN
-        MENUITEM "&О программе", IDM_ABOUT
-    END
-END
+#pragma comment(lib, "Gdiplus.lib")
+#pragma comment(lib, "Comctl32.lib")
 
-// Панель инструментов (пример без иконок)
-IDR_TOOLBAR1 BITMAP "toolbar.bmp"
+using namespace Gdiplus;
+
+// Global variables
+HINSTANCE hInst;
+LPCWSTR szWindowClass = L"MainWindowClass";
+LPCWSTR szTitle = L"Custom IDE";
+
+// Forward declarations
+LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+void InitializeGDIPlus();
+void ShutdownGDIPlus();
+void AddMenus(HWND);
+void AddControls(HWND);
+
+ULONG_PTR gdiplusToken;
+
+// Entry point
+int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
+                     _In_opt_ HINSTANCE hPrevInstance,
+                     _In_ LPWSTR    lpCmdLine,
+                     _In_ int       nCmdShow)
+{
+    InitializeGDIPlus();
+    hInst = hInstance;
+
+    WNDCLASSEX wcex;
+    ZeroMemory(&wcex, sizeof(WNDCLASSEX));
+    wcex.cbSize = sizeof(WNDCLASSEX);
+    wcex.style = CS_HREDRAW | CS_VREDRAW;
+    wcex.lpfnWndProc = WndProc;
+    wcex.hInstance = hInstance;
+    wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPLICATION));
+    wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wcex.lpszClassName = szWindowClass;
+
+    if (!RegisterClassEx(&wcex)) {
+        MessageBox(NULL, L"Failed to register window class!", szTitle, NULL);
+        ShutdownGDIPlus();
+        return 1;
+    }
+
+    HWND hWnd = CreateWindow(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
+                             CW_USEDEFAULT, CW_USEDEFAULT, 1000, 700,
+                             nullptr, nullptr, hInstance, nullptr);
+
+    if (!hWnd) {
+        MessageBox(NULL, L"Failed to create window!", szTitle, NULL);
+        ShutdownGDIPlus();
+        return 1;
+    }
+
+    ShowWindow(hWnd, nCmdShow);
+    UpdateWindow(hWnd);
+
+    MSG msg;
+    while (GetMessage(&msg, nullptr, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    ShutdownGDIPlus();
+    return (int) msg.wParam;
+}
+
+void InitializeGDIPlus() {
+    GdiplusStartupInput gdiplusStartupInput;
+    GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
+}
+
+void ShutdownGDIPlus() {
+    GdiplusShutdown(gdiplusToken);
+}
+
+// Function to create menu
+void AddMenus(HWND hWnd) {
+    HMENU hMenu = CreateMenu();
+    HMENU hFileMenu = CreateMenu();
+    HMENU hEditMenu = CreateMenu();
+    HMENU hViewMenu = CreateMenu();
+
+    AppendMenu(hFileMenu, MF_STRING, 1, L"New File");
+    AppendMenu(hFileMenu, MF_STRING, 2, L"Open File");
+    AppendMenu(hFileMenu, MF_STRING, 3, L"Save File");
+    AppendMenu(hFileMenu, MF_STRING, 4, L"Exit");
+
+    AppendMenu(hEditMenu, MF_STRING, 5, L"Undo");
+    AppendMenu(hEditMenu, MF_STRING, 6, L"Redo");
+
+    AppendMenu(hViewMenu, MF_STRING, 7, L"View Console");
+    AppendMenu(hViewMenu, MF_STRING, 8, L"View Explorer");
+
+    AppendMenu(hMenu, MF_POPUP, (UINT_PTR)hFileMenu, L"File");
+    AppendMenu(hMenu, MF_POPUP, (UINT_PTR)hEditMenu, L"Edit");
+    AppendMenu(hMenu, MF_POPUP, (UINT_PTR)hViewMenu, L"View");
+
+    SetMenu(hWnd, hMenu);
+}
+
+// Function to add controls
+void AddControls(HWND hWnd) {
+    CreateWindowEx(0, MSFTEDIT_CLASS, L"",
+        WS_CHILD | WS_VISIBLE | ES_MULTILINE | WS_VSCROLL | WS_HSCROLL,
+        10, 10, 600, 500, hWnd, NULL, hInst, NULL);
+
+    // Add other panels for structure
+    CreateWindowW(L"Static", L"Console Output",
+        WS_CHILD | WS_VISIBLE | WS_BORDER,
+        620, 10, 350, 300, hWnd, NULL, hInst, NULL);
+
+    CreateWindowW(L"Static", L"File Explorer",
+        WS_CHILD | WS_VISIBLE | WS_BORDER,
+        10, 520, 960, 130, hWnd, NULL, hInst, NULL);
+}
+
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
+    switch (message) {
+    case WM_CREATE:
+        {
+            INITCOMMONCONTROLSEX icex;
+            icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
+            icex.dwICC = ICC_WIN95_CLASSES;
+            InitCommonControlsEx(&icex);
+
+            LoadLibrary(L"Msftedit.dll");
+            AddMenus(hWnd);
+            AddControls(hWnd);
+        }
+        break;
+    case WM_COMMAND:
+        switch (LOWORD(wParam)) {
+            case 1: MessageBox(hWnd, L"New File Clicked", L"Menu", MB_OK); break;
+            case 4: DestroyWindow(hWnd); break;
+            // Other cases for menu actions
+        }
+        break;
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+    default:
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+    return 0;
+}

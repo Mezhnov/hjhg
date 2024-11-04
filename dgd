@@ -50,7 +50,7 @@ Image* batteryIcon = nullptr;
 Image* mypassIcon = nullptr; // Иконка меню Пуск
 Image* notification = nullptr;
 Image* office = nullptr;
-Image* newfolder= nullptr;
+Image* newfolder = nullptr;
 Image* search = nullptr;
 Image* browser = nullptr;
 
@@ -250,6 +250,12 @@ struct WindowData {
     HWND editControl = NULL; // Дескриптор текущего контрола редактирования
     bool isCreatingFolder = false; // Флаг для создания папки
 };
+
+// Прототипы дополнительных окон
+LRESULT CALLBACK ComputerWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK BrowserWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK FolderWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK OfficeWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 // Функция для создания контекстного меню
 void CreateContextMenu(HWND hwnd, int x, int y, size_t imageIndex, bool isOnImage) {
@@ -590,14 +596,57 @@ LRESULT CALLBACK FolderWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
     case WM_CREATE:
         {
             // Здесь можно добавить элементы управления для новой папки
-            // Для простоты добавим просто статический текст
-            CreateWindow(L"STATIC", L"Новая папка создана.",
+            // Например, текстовое поле для имени папки и кнопки
+            CreateWindow(L"STATIC", L"Введите имя новой папки:",
                 WS_CHILD | WS_VISIBLE,
                 10, 10, 200, 30,
                 hwnd,
                 NULL,
                 GetModuleHandle(NULL),
                 NULL);
+
+            CreateWindow(L"EDIT", L"",
+                WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
+                220, 10, 200, 25,
+                hwnd,
+                (HMENU)1,
+                GetModuleHandle(NULL),
+                NULL);
+
+            CreateWindow(L"BUTTON", L"Создать",
+                WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
+                430, 10, 100, 25,
+                hwnd,
+                (HMENU)2,
+                GetModuleHandle(NULL),
+                NULL);
+        }
+        return 0;
+
+    case WM_COMMAND:
+        {
+            switch (LOWORD(wParam)) {
+            case 2: { // Кнопка "Создать"
+                HWND hEdit = GetDlgItem(hwnd, 1);
+                wchar_t buffer[256];
+                GetWindowText(hEdit, buffer, 256);
+                std::wstring folderName(buffer);
+
+                if (!folderName.empty()) {
+                    MessageBox(hwnd, (L"Создана папка: " + folderName).c_str(), L"Папка", MB_OK);
+                    // Здесь можно добавить логику создания папки в системе или внутри приложения
+
+                    // Закрываем окно после создания папки
+                    DestroyWindow(hwnd);
+                }
+                else {
+                    MessageBox(hwnd, L"Имя папки не может быть пустым.", L"Ошибка", MB_OK | MB_ICONERROR);
+                }
+            }
+                break;
+            default:
+                break;
+            }
         }
         return 0;
 
@@ -787,7 +836,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         if (browser) {
             float iconSize = 42.0f; // Размер иконки
-            float iconY = static_cast<float>(windowRect.bottom - 40 + (40 - iconSize) / 2.0-2); // Вертикальное центрирование
+            float iconY = static_cast<float>(windowRect.bottom - 40 + (40 - iconSize) / 2.0 - 2); // Вертикальное центрирование
 
             float padding = 120.0f;
             float startMenuX = padding;
@@ -1118,7 +1167,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     return 0;
 }
 
-// Функции для регистрации дополнительных классов окон
+// Функция для регистрации дополнительных классов окон
 bool RegisterAdditionalWindowClasses(HINSTANCE hInstance) {
     // Регистрация класса окна "Этот компьютер"
     WNDCLASS wcComputer = {};
@@ -1264,311 +1313,3 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     GdiplusShutdown(gdiplusToken);
     return 0;
 }
-
-// Функции для создания окна "Этот компьютер"
-LRESULT CALLBACK ComputerWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    switch (uMsg) {
-    case WM_CREATE:
-        {
-            // Здесь можно добавить элементы управления, такие как ListView для отображения дисков
-            HWND hListView = CreateWindowEx(
-                0,
-                WC_LISTVIEW,
-                NULL,
-                WS_CHILD | WS_VISIBLE | LVS_REPORT | WS_BORDER,
-                10, 10, 760, 540,
-                hwnd,
-                (HMENU)1,
-                GetModuleHandle(NULL),
-                NULL
-            );
-
-            // Добавление колонок
-            LVCOLUMN lvColumn;
-            lvColumn.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
-            lvColumn.cx = 200;
-            lvColumn.pszText = const_cast<LPWSTR>(L"Имя");
-            ListView_InsertColumn(hListView, 0, &lvColumn);
-
-            lvColumn.cx = 100;
-            lvColumn.pszText = const_cast<LPWSTR>(L"Тип");
-            ListView_InsertColumn(hListView, 1, &lvColumn);
-
-            lvColumn.cx = 150;
-            lvColumn.pszText = const_cast<LPWSTR>(L"Размер");
-            ListView_InsertColumn(hListView, 2, &lvColumn);
-
-            // Пример добавления элементов
-            LVITEM lvItem;
-            ZeroMemory(&lvItem, sizeof(LVITEM));
-            lvItem.mask = LVIF_TEXT;
-            lvItem.iSubItem = 0;
-
-            lvItem.iItem = 0;
-            lvItem.pszText = const_cast<LPWSTR>(L"C:");
-            ListView_InsertItem(hListView, &lvItem);
-            ListView_SetItemText(hListView, 0, 1, const_cast<LPWSTR>(L"Диск"));
-            ListView_SetItemText(hListView, 0, 2, const_cast<LPWSTR>(L"100 ГБ"));
-
-            // Добавьте другие диски по необходимости
-        }
-        return 0;
-
-    case WM_PAINT:
-        {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hwnd, &ps);
-            // Здесь можно рисовать дополнительный контент, если необходимо
-            EndPaint(hwnd, &ps);
-        }
-        return 0;
-
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        return 0;
-
-    default:
-        return DefWindowProc(hwnd, uMsg, wParam, lParam);
-    }
-}
-
-// Функция для создания окна "Браузер"
-LRESULT CALLBACK BrowserWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    switch (uMsg) {
-    case WM_CREATE:
-        {
-            // Здесь можно добавить элементы управления, такие как WebBrowser
-            // Для простоты добавим просто статический текст
-            CreateWindow(L"STATIC", L"Браузер не реализован.",
-                WS_CHILD | WS_VISIBLE,
-                10, 10, 400, 30,
-                hwnd,
-                NULL,
-                GetModuleHandle(NULL),
-                NULL);
-        }
-        return 0;
-
-    case WM_PAINT:
-        {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hwnd, &ps);
-            // Здесь можно рисовать дополнительный контент, если необходимо
-            EndPaint(hwnd, &ps);
-        }
-        return 0;
-
-    case WM_DESTROY:
-        // Закрываем браузерное окно без выхода из приложения
-        DestroyWindow(hwnd);
-        return 0;
-
-    default:
-        return DefWindowProc(hwnd, uMsg, wParam, lParam);
-    }
-}
-
-// Функция для создания окна "Новая папка"
-LRESULT CALLBACK FolderWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    switch (uMsg) {
-    case WM_CREATE:
-        {
-            // Здесь можно добавить элементы управления для новой папки
-            // Например, текстовое поле для имени папки и кнопки
-            CreateWindow(L"STATIC", L"Введите имя новой папки:",
-                WS_CHILD | WS_VISIBLE,
-                10, 10, 200, 30,
-                hwnd,
-                NULL,
-                GetModuleHandle(NULL),
-                NULL);
-
-            CreateWindow(L"EDIT", L"",
-                WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
-                220, 10, 200, 25,
-                hwnd,
-                (HMENU)1,
-                GetModuleHandle(NULL),
-                NULL);
-
-            CreateWindow(L"BUTTON", L"Создать",
-                WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
-                430, 10, 100, 25,
-                hwnd,
-                (HMENU)2,
-                GetModuleHandle(NULL),
-                NULL);
-        }
-        return 0;
-
-    case WM_COMMAND:
-        {
-            switch (LOWORD(wParam)) {
-            case 2: { // Кнопка "Создать"
-                HWND hEdit = GetDlgItem(hwnd, 1);
-                wchar_t buffer[256];
-                GetWindowText(hEdit, buffer, 256);
-                std::wstring folderName(buffer);
-
-                if (!folderName.empty()) {
-                    MessageBox(hwnd, (L"Создана папка: " + folderName).c_str(), L"Папка", MB_OK);
-                    // Здесь можно добавить логику создания папки в системе или внутри приложения
-
-                    // Закрываем окно после создания папки
-                    DestroyWindow(hwnd);
-                }
-                else {
-                    MessageBox(hwnd, L"Имя папки не может быть пустым.", L"Ошибка", MB_OK | MB_ICONERROR);
-                }
-            }
-                break;
-            default:
-                break;
-            }
-        }
-        return 0;
-
-    case WM_PAINT:
-        {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hwnd, &ps);
-            // Здесь можно рисовать дополнительный контент, если необходимо
-            EndPaint(hwnd, &ps);
-        }
-        return 0;
-
-    case WM_DESTROY:
-        // Закрываем окно новой папки без выхода из приложения
-        DestroyWindow(hwnd);
-        return 0;
-
-    default:
-        return DefWindowProc(hwnd, uMsg, wParam, lParam);
-    }
-}
-
-// Функция для создания окна "Офис"
-LRESULT CALLBACK OfficeWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    switch (uMsg) {
-    case WM_CREATE:
-        {
-            // Здесь можно добавить элементы управления, связанные с офисными приложениями
-            // Для простоты добавим просто статический текст
-            CreateWindow(L"STATIC", L"Офисные приложения не реализованы.",
-                WS_CHILD | WS_VISIBLE,
-                10, 10, 300, 30,
-                hwnd,
-                NULL,
-                GetModuleHandle(NULL),
-                NULL);
-        }
-        return 0;
-
-    case WM_PAINT:
-        {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hwnd, &ps);
-            // Здесь можно рисовать дополнительный контент, если необходимо
-            EndPaint(hwnd, &ps);
-        }
-        return 0;
-
-    case WM_DESTROY:
-        // Закрываем офисное окно без выхода из приложения
-        DestroyWindow(hwnd);
-        return 0;
-
-    default:
-        return DefWindowProc(hwnd, uMsg, wParam, lParam);
-    }
-}
-
-// Функция для регистрации дополнительных классов окон
-bool RegisterAdditionalWindowClasses(HINSTANCE hInstance) {
-    // Регистрация класса окна "Этот компьютер"
-    WNDCLASS wcComputer = {};
-    wcComputer.lpfnWndProc = ComputerWndProc;
-    wcComputer.hInstance = hInstance;
-    wcComputer.lpszClassName = L"ComputerWindowClass";
-    wcComputer.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wcComputer.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-
-    if (!RegisterClass(&wcComputer)) {
-        MessageBox(NULL, L"Не удалось зарегистрировать класс окна 'Этот компьютер'.", L"Ошибка", MB_ICONERROR);
-        return false;
-    }
-
-    // Регистрация класса окна "Браузер"
-    WNDCLASS wcBrowser = {};
-    wcBrowser.lpfnWndProc = BrowserWndProc;
-    wcBrowser.hInstance = hInstance;
-    wcBrowser.lpszClassName = L"BrowserWindowClass";
-    wcBrowser.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wcBrowser.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-
-    if (!RegisterClass(&wcBrowser)) {
-        MessageBox(NULL, L"Не удалось зарегистрировать класс окна 'Браузер'.", L"Ошибка", MB_ICONERROR);
-        return false;
-    }
-
-    // Регистрация класса окна "Новая папка"
-    WNDCLASS wcFolder = {};
-    wcFolder.lpfnWndProc = FolderWndProc;
-    wcFolder.hInstance = hInstance;
-    wcFolder.lpszClassName = L"FolderWindowClass";
-    wcFolder.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wcFolder.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-
-    if (!RegisterClass(&wcFolder)) {
-        MessageBox(NULL, L"Не удалось зарегистрировать класс окна 'Новая папка'.", L"Ошибка", MB_ICONERROR);
-        return false;
-    }
-
-    // Регистрация класса окна "Офис"
-    WNDCLASS wcOffice = {};
-    wcOffice.lpfnWndProc = OfficeWndProc;
-    wcOffice.hInstance = hInstance;
-    wcOffice.lpszClassName = L"OfficeWindowClass";
-    wcOffice.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wcOffice.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-
-    if (!RegisterClass(&wcOffice)) {
-        MessageBox(NULL, L"Не удалось зарегистрировать класс окна 'Офис'.", L"Ошибка", MB_ICONERROR);
-        return false;
-    }
-
-    return true;
-}
-Сборка начата в 17:20...
-1>------ Сборка начата: проект: Проверка проекта, Конфигурация: Debug x64 ------
-1>Проверка проекта.cpp
-1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1269,18): error C2084: функция "LRESULT ComputerWndProc(HWND,UINT,WPARAM,LPARAM)" уже имеет текст реализации
-1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(485,18):
-1>    см. предыдущее определение "ComputerWndProc"
-1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1336,18): error C2084: функция "LRESULT BrowserWndProc(HWND,UINT,WPARAM,LPARAM)" уже имеет текст реализации
-1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(552,18):
-1>    см. предыдущее определение "BrowserWndProc"
-1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1372,18): error C2084: функция "LRESULT FolderWndProc(HWND,UINT,WPARAM,LPARAM)" уже имеет текст реализации
-1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(588,18):
-1>    см. предыдущее определение "FolderWndProc"
-1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1451,18): error C2084: функция "LRESULT OfficeWndProc(HWND,UINT,WPARAM,LPARAM)" уже имеет текст реализации
-1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(624,18):
-1>    см. предыдущее определение "OfficeWndProc"
-1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1487,6): error C2084: функция "bool RegisterAdditionalWindowClasses(HINSTANCE)" уже имеет текст реализации
-1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1122,6):
-1>    см. предыдущее определение "RegisterAdditionalWindowClasses"
-1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1490,30): error C2568: =: не удается разрешить перегрузку функции
-1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1490,30):
-1>    может быть "LRESULT ComputerWndProc(HWND,UINT,WPARAM,LPARAM)"
-1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1503,29): error C2568: =: не удается разрешить перегрузку функции
-1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1503,29):
-1>    может быть "LRESULT BrowserWndProc(HWND,UINT,WPARAM,LPARAM)"
-1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1516,28): error C2568: =: не удается разрешить перегрузку функции
-1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1516,28):
-1>    может быть "LRESULT FolderWndProc(HWND,UINT,WPARAM,LPARAM)"
-1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1529,28): error C2568: =: не удается разрешить перегрузку функции
-1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1529,28):
-1>    может быть "LRESULT OfficeWndProc(HWND,UINT,WPARAM,LPARAM)"
-1>Сборка проекта "Проверка проекта.vcxproj" завершена с ошибкой.
-========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
-========== Сборка завершено в 17:20 и заняло 01,210 с ==========

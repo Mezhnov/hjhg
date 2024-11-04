@@ -1539,3 +1539,36 @@ bool RegisterAdditionalWindowClasses(HINSTANCE hInstance) {
 
     return true;
 }
+Сборка начата в 17:20...
+1>------ Сборка начата: проект: Проверка проекта, Конфигурация: Debug x64 ------
+1>Проверка проекта.cpp
+1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1269,18): error C2084: функция "LRESULT ComputerWndProc(HWND,UINT,WPARAM,LPARAM)" уже имеет текст реализации
+1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(485,18):
+1>    см. предыдущее определение "ComputerWndProc"
+1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1336,18): error C2084: функция "LRESULT BrowserWndProc(HWND,UINT,WPARAM,LPARAM)" уже имеет текст реализации
+1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(552,18):
+1>    см. предыдущее определение "BrowserWndProc"
+1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1372,18): error C2084: функция "LRESULT FolderWndProc(HWND,UINT,WPARAM,LPARAM)" уже имеет текст реализации
+1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(588,18):
+1>    см. предыдущее определение "FolderWndProc"
+1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1451,18): error C2084: функция "LRESULT OfficeWndProc(HWND,UINT,WPARAM,LPARAM)" уже имеет текст реализации
+1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(624,18):
+1>    см. предыдущее определение "OfficeWndProc"
+1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1487,6): error C2084: функция "bool RegisterAdditionalWindowClasses(HINSTANCE)" уже имеет текст реализации
+1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1122,6):
+1>    см. предыдущее определение "RegisterAdditionalWindowClasses"
+1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1490,30): error C2568: =: не удается разрешить перегрузку функции
+1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1490,30):
+1>    может быть "LRESULT ComputerWndProc(HWND,UINT,WPARAM,LPARAM)"
+1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1503,29): error C2568: =: не удается разрешить перегрузку функции
+1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1503,29):
+1>    может быть "LRESULT BrowserWndProc(HWND,UINT,WPARAM,LPARAM)"
+1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1516,28): error C2568: =: не удается разрешить перегрузку функции
+1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1516,28):
+1>    может быть "LRESULT FolderWndProc(HWND,UINT,WPARAM,LPARAM)"
+1>C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1529,28): error C2568: =: не удается разрешить перегрузку функции
+1>    C:\Users\User\source\repos\Проверка проекта\Проверка проекта\Проверка проекта.cpp(1529,28):
+1>    может быть "LRESULT OfficeWndProc(HWND,UINT,WPARAM,LPARAM)"
+1>Сборка проекта "Проверка проекта.vcxproj" завершена с ошибкой.
+========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
+========== Сборка завершено в 17:20 и заняло 01,210 с ==========

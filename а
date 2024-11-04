@@ -5,32 +5,108 @@ import threading
 import logging
 import os
 from urllib.parse import urlparse
+from flask import Flask, request, render_template_string
+import time
 
-# Настройки сервера
-HOST = '0.0.0.0'  # Слушать на всех интерфейсах
+# =============================================================================
+# Configuration
+# =============================================================================
+
+# SMP Server Settings
+HOST = '0.0.0.0'  # Listen on all interfaces
 PORT = 8080
-BUFFER_SIZE = 4096  # Размер буфера для передачи данных
+BUFFER_SIZE = 4096  # Buffer size for data transfer
 
-# Настройка логирования
+# Logging Configuration
 logging.basicConfig(
     filename='smp_server.log',
     level=logging.INFO,
     format='%(asctime)s:%(levelname)s:%(message)s'
 )
 
-# Разрешенные домены и их корневые директории
-allowed_domains = {
+# Allowed Domains and Their Root Directories
+ALLOWED_DOMAINS = {
     'example.com': 'example',
     'test.com': 'test'
 }
 
+# Search Index (In-Memory)
+SEARCH_INDEX = []
+
+# =============================================================================
+# Utility Functions
+# =============================================================================
+
+def index_websites():
+    """
+    Scans the allowed domains and indexes their content for the search engine.
+    """
+    global SEARCH_INDEX
+    SEARCH_INDEX = []  # Reset index
+    for domain, root in ALLOWED_DOMAINS.items():
+        for root_dir, dirs, files in os.walk(root):
+            for file in files:
+                if file.endswith('.html') or file.endswith('.htm'):
+                    filepath = os.path.join(root_dir, file)
+                    try:
+                        with open(filepath, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                        title = extract_title(content)
+                        description = extract_description(content)
+                        thumbnail = find_thumbnail(root_dir)
+                        url_path = os.path.relpath(filepath, root_dir)
+                        url = f"smp://{domain}/{url_path}".replace("\\", "/")
+                        SEARCH_INDEX.append({
+                            'title': title,
+                            'description': description,
+                            'url': url,
+                            'thumbnail': thumbnail
+                        })
+                        logging.info(f"Indexed: {url}")
+                    except Exception as e:
+                        logging.error(f"Error indexing {filepath}: {e}")
+
+def extract_title(html_content):
+    """
+    Extracts the title from HTML content.
+    """
+    start = html_content.find('<title>')
+    end = html_content.find('</title>')
+    if start != -1 and end != -1:
+        return html_content[start + 7:end].strip()
+    return "No Title"
+
+def extract_description(html_content):
+    """
+    Extracts the meta description from HTML content.
+    """
+    start = html_content.find('<meta name="description" content="')
+    if start != -1:
+        start += len('<meta name="description" content="')
+        end = html_content.find('"', start)
+        if end != -1:
+            return html_content[start:end].strip()
+    return "No Description"
+
+def find_thumbnail(root_dir):
+    """
+    Finds a thumbnail image in the given directory.
+    """
+    for file in os.listdir(root_dir):
+        if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+            return f"{root_dir}/{file}"
+    return None
+
+# =============================================================================
+# SMP Server Implementation
+# =============================================================================
 
 def send_large_file(conn, filepath):
     """
-    Отправляет файл клиенту частями с соответствующими заголовками.
+    Sends a file to the client in chunks with appropriate headers.
     """
     if not os.path.exists(filepath):
-        logging.error(f"Файл не найден: {filepath}")
+        logging.error(f"File not found: {filepath}")
         message = "File not found"
         response = (
             f"SMP 1.0\n"
@@ -47,6 +123,8 @@ def send_large_file(conn, filepath):
         file_size = os.path.getsize(filepath)
         _, ext = os.path.splitext(filepath)
         ext = ext.lower()
+
+        # Determine Content-Type
         if ext in ['.html', '.htm']:
             content_type = 'text/html'
         elif ext == '.css':
@@ -62,7 +140,7 @@ def send_large_file(conn, filepath):
         else:
             content_type = 'application/octet-stream'
 
-        # Отправка заголовков
+        # Send Headers
         response_headers = (
             f"SMP 1.0\n"
             f"STATUS: OK\n"
@@ -70,19 +148,19 @@ def send_large_file(conn, filepath):
             f"CONTENT-LENGTH: {file_size}\n\n"
         )
         conn.send(response_headers.encode())
-        logging.info(f"Отправка файла: {filepath}")
+        logging.info(f"Sending file: {filepath}")
 
-        # Отправка файла частями
+        # Send File in Chunks
         with open(filepath, 'rb') as f:
             while True:
                 chunk = f.read(BUFFER_SIZE)
                 if not chunk:
                     break
                 conn.sendall(chunk)
-        logging.info(f"Файл отправлен: {filepath}")
+        logging.info(f"File sent: {filepath}")
 
     except Exception as e:
-        logging.error(f"Ошибка при отправке файла {filepath}: {e}")
+        logging.error(f"Error sending file {filepath}: {e}")
         message = f"Error sending file: {e}"
         response = (
             f"SMP 1.0\n"
@@ -94,96 +172,36 @@ def send_large_file(conn, filepath):
         )
         conn.sendall(response.encode())
 
-
 def handle_client(conn, addr):
     """
-    Обрабатывает подключения клиентов в отдельных потоках.
+    Handles client connections in separate threads.
     """
-    logging.info(f"Подключен клиент: {addr}")
+    logging.info(f"Client connected: {addr}")
+    try:
+        data = b""
+        while b"\n\n" not in data:
+            part = conn.recv(BUFFER_SIZE)
+            if not part:
+                raise ConnectionResetError("Client closed the connection")
+            data += part
 
-    # Удалена отправка начального сообщения
+        header_data, _, body = data.partition(b"\n\n")
+        headers = {}
+        for line in header_data.decode().split('\n'):
+            if ': ' in line:
+                key, value = line.split(': ', 1)
+                headers[key.strip().upper()] = value.strip()
 
-    while True:
-        try:
-            data = b""
-            while b"\n\n" not in data:
-                part = conn.recv(BUFFER_SIZE)
-                if not part:
-                    raise ConnectionResetError("Клиент закрыл соединение")
-                data += part
+        action = headers.get('ACTION')
+        resource = headers.get('RESOURCE')
 
-            header_data, _, body = data.partition(b"\n\n")
-            headers = {}
-            for line in header_data.decode().split('\n'):
-                if ': ' in line:
-                    key, value = line.split(': ', 1)
-                    headers[key.strip().upper()] = value.strip()
+        if action == 'GET' and resource:
+            parsed = urlparse('smp://' + resource)
+            domain = parsed.hostname
+            path = parsed.path.lstrip('/')
 
-            action = headers.get('ACTION')
-            resource = headers.get('RESOURCE')
-
-            if action == 'GET' and resource:
-                # Разбор ресурса для извлечения домена и пути
-                parsed = urlparse('smp://' + resource)  # Для использования urlparse
-                domain = parsed.hostname
-                path = parsed.path.lstrip('/')  # Удаление ведущего '/'
-
-                if domain not in allowed_domains:
-                    message = "Domain not allowed"
-                    response = (
-                        f"SMP 1.0\n"
-                        f"STATUS: ERROR\n"
-                        f"MESSAGE: {message}\n"
-                        f"CONTENT-TYPE: text/plain\n"
-                        f"CONTENT-LENGTH: {len(message)}\n\n"
-                        f"{message}"
-                    )
-                    conn.send(response.encode())
-                    logging.warning(f"Запрошен запрещенный домен: {domain}")
-                    continue
-
-                # Определение пути к файлу
-                domain_root = allowed_domains[domain]
-                file_path = os.path.join(domain_root, path) if path else os.path.join(domain_root, 'index.html')
-
-                # Предотвращение обхода директорий
-                real_file_path = os.path.realpath(file_path)
-                real_domain_root = os.path.realpath(domain_root)
-                if not real_file_path.startswith(real_domain_root):
-                    message = "Invalid resource path"
-                    response = (
-                        f"SMP 1.0\n"
-                        f"STATUS: ERROR\n"
-                        f"MESSAGE: {message}\n"
-                        f"CONTENT-TYPE: text/plain\n"
-                        f"CONTENT-LENGTH: {len(message)}\n\n"
-                        f"{message}"
-                    )
-                    conn.send(response.encode())
-                    logging.warning(f"Некорректный путь ресурса: {file_path}")
-                    continue
-
-                # Если путь указывает на директорию, отправить index.html
-                if os.path.isdir(file_path):
-                    file_path = os.path.join(file_path, 'index.html')
-                if os.path.exists(file_path):
-                    send_large_file(conn, file_path)
-                else:
-                    # Ресурс не найден
-                    message = "Resource not found"
-                    response = (
-                        f"SMP 1.0\n"
-                        f"STATUS: ERROR\n"
-                        f"MESSAGE: {message}\n"
-                        f"CONTENT-TYPE: text/plain\n"
-                        f"CONTENT-LENGTH: {len(message)}\n\n"
-                        f"{message}"
-                    )
-                    conn.send(response.encode())
-                    logging.warning(f"Ресурс не найден: {file_path}")
-
-            else:
-                message = "Invalid ACTION or missing RESOURCE"
+            if domain not in ALLOWED_DOMAINS:
+                message = "Domain not allowed"
                 response = (
                     f"SMP 1.0\n"
                     f"STATUS: ERROR\n"
@@ -193,33 +211,180 @@ def handle_client(conn, addr):
                     f"{message}"
                 )
                 conn.send(response.encode())
-                logging.warning(f"Некорректный запрос: ACTION={action}, RESOURCE={resource}")
+                logging.warning(f"Disallowed domain requested: {domain}")
+                return
 
-        except ConnectionResetError as e:
-            logging.info(f"Клиент {addr} отключился: {e}")
-            break
-        except Exception as e:
-            logging.error(f"Ошибка при обработке клиента {addr}: {e}")
-            break
+            domain_root = ALLOWED_DOMAINS[domain]
+            file_path = os.path.join(domain_root, path) if path else os.path.join(domain_root, 'index.html')
 
-    conn.close()
-    logging.info(f"Соединение с {addr} закрыто")
+            # Prevent Directory Traversal
+            real_file_path = os.path.realpath(file_path)
+            real_domain_root = os.path.realpath(domain_root)
+            if not real_file_path.startswith(real_domain_root):
+                message = "Invalid resource path"
+                response = (
+                    f"SMP 1.0\n"
+                    f"STATUS: ERROR\n"
+                    f"MESSAGE: {message}\n"
+                    f"CONTENT-TYPE: text/plain\n"
+                    f"CONTENT-LENGTH: {len(message)}\n\n"
+                    f"{message}"
+                )
+                conn.send(response.encode())
+                logging.warning(f"Invalid resource path requested: {file_path}")
+                return
 
+            if os.path.isdir(file_path):
+                file_path = os.path.join(file_path, 'index.html')
 
-def start_server():
+            if os.path.exists(file_path):
+                send_large_file(conn, file_path)
+            else:
+                message = "Resource not found"
+                response = (
+                    f"SMP 1.0\n"
+                    f"STATUS: ERROR\n"
+                    f"MESSAGE: {message}\n"
+                    f"CONTENT-TYPE: text/plain\n"
+                    f"CONTENT-LENGTH: {len(message)}\n\n"
+                    f"{message}"
+                )
+                conn.send(response.encode())
+                logging.warning(f"Resource not found: {file_path}")
+        else:
+            message = "Invalid ACTION or missing RESOURCE"
+            response = (
+                f"SMP 1.0\n"
+                f"STATUS: ERROR\n"
+                f"MESSAGE: {message}\n"
+                f"CONTENT-TYPE: text/plain\n"
+                f"CONTENT-LENGTH: {len(message)}\n\n"
+                f"{message}"
+            )
+            conn.send(response.encode())
+            logging.warning(f"Invalid request: ACTION={action}, RESOURCE={resource}")
+
+    except ConnectionResetError as e:
+        logging.info(f"Client {addr} disconnected: {e}")
+    except Exception as e:
+        logging.error(f"Error handling client {addr}: {e}")
+    finally:
+        conn.close()
+        logging.info(f"Connection closed: {addr}")
+
+def start_smp_server():
     """
-    Запускает SMP сервер для прослушивания входящих подключений.
+    Starts the SMP server to listen for incoming connections.
     """
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         server_socket.bind((HOST, PORT))
         server_socket.listen()
-        logging.info(f"SMP Server запущен на {HOST}:{PORT}")
+        logging.info(f"SMP Server started on {HOST}:{PORT}")
 
         while True:
             conn, addr = server_socket.accept()
             client_thread = threading.Thread(target=handle_client, args=(conn, addr), daemon=True)
             client_thread.start()
 
+# =============================================================================
+# Flask Search Engine Implementation
+# =============================================================================
+
+app = Flask(__name__)
+
+# HTML Template for Search Results
+SEARCH_RESULTS_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SMP Search Engine</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        .search-box { margin: 50px auto; text-align: center; }
+        .results { width: 80%%; margin: auto; }
+        .result { border-bottom: 1px solid #ccc; padding: 10px 0; }
+        .thumbnail { float: left; margin-right: 10px; }
+        .thumbnail img { width: 100px; height: auto; }
+        .title { font-size: 1.2em; margin-bottom: 5px; }
+        .description { clear: both; }
+    </style>
+</head>
+<body>
+    <div class="search-box">
+        <h1>SMP Search Engine</h1>
+        <form method="get" action="/search">
+            <input type="text" name="q" value="{{ query }}" size="50" placeholder="Search...">
+            <button type="submit">Search</button>
+        </form>
+    </div>
+    <div class="results">
+        {% for result in results %}
+            <div class="result">
+                {% if result.thumbnail %}
+                <div class="thumbnail">
+                    <img src="{{ url_for('static', filename=result.thumbnail) }}" alt="Thumbnail">
+                </div>
+                {% endif %}
+                <div class="content">
+                    <div class="title"><a href="{{ result.url }}">{{ result.title }}</a></div>
+                    <div class="description">{{ result.description }}</div>
+                </div>
+                <div style="clear: both;"></div>
+            </div>
+        {% endfor %}
+    </div>
+</body>
+</html>
+"""
+
+@app.route('/')
+def home():
+    return render_template_string(SEARCH_RESULTS_TEMPLATE, query='', results=[])
+
+@app.route('/search')
+def search():
+    query = request.args.get('q', '').strip().lower()
+    if not query:
+        return render_template_string(SEARCH_RESULTS_TEMPLATE, query='', results=[])
+
+    matching_results = []
+    for entry in SEARCH_INDEX:
+        if query in entry['title'].lower() or query in entry['description'].lower():
+            matching_results.append(entry)
+
+    return render_template_string(SEARCH_RESULTS_TEMPLATE, query=query, results=matching_results)
+
+def start_flask_app():
+    """
+    Starts the Flask web server for the search engine.
+    """
+    app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
+
+# =============================================================================
+# Main Execution
+# =============================================================================
+
+def main():
+    # Index Websites at Startup
+    index_websites()
+
+    # Start SMP Server in a Separate Thread
+    smp_thread = threading.Thread(target=start_smp_server, daemon=True)
+    smp_thread.start()
+    logging.info("SMP Server thread started.")
+
+    # Start Flask App
+    flask_thread = threading.Thread(target=start_flask_app, daemon=True)
+    flask_thread.start()
+    logging.info("Flask Search Engine thread started.")
+
+    # Keep the Main Thread Alive
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        logging.info("Shutting down server.")
 
 if __name__ == "__main__":
-    start_server()
+    main()

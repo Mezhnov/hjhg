@@ -1,368 +1,104 @@
-/* static/styles.css */
-body {
-    margin: 0;
-    padding: 0;
-    font-family: Arial, sans-serif;
-    background-color: #ffffff;
-}
+# indexer.py
 
-.search-container {
-    width: 60%;
-    margin: 0 auto;
-    padding-top: 30px;
-}
+import os
+from whoosh.index import create_in, open_dir
+from whoosh.fields import Schema, TEXT, ID, STORED
+from whoosh.qparser import MultifieldParser
+from bs4 import BeautifulSoup
+import nltk
+import re
+from nltk.stem.snowball import RussianStemmer
+from nltk.corpus import stopwords
 
-.logo img {
-    display: block;
-    margin: 0 auto;
-    width: 250px;
-    margin-bottom: 40px;
-}
+nltk.download('punkt')
+nltk.download('stopwords')
 
-.logo-small a img {
-    width: 120px;
-    vertical-align: middle;
-}
 
-.search-container form {
-    text-align: center;
-}
+class LocalHTMLIndexer:
+    def __init__(self, pages_dir, index_dir='indexdir'):
+        self.pages_dir = pages_dir
+        self.index_dir = index_dir
+        self.stemmer = RussianStemmer()
+        self.stop_words = set(stopwords.words('russian'))
 
-.search-container input[type="text"] {
-    width: 70%;
-    padding: 12px;
-    font-size: 18px;
-    border: 1px solid #dfe1e5;
-    border-radius: 24px;
-    outline: none;
-    transition: box-shadow 0.2s;
-}
+        if not os.path.exists(index_dir):
+            os.mkdir(index_dir)
+            self.schema = Schema(
+                path=ID(stored=True, unique=True),
+                title=TEXT(stored=True),
+                content=TEXT,
+                description=STORED,
+                logo=STORED
+            )
+            self.ix = create_in(index_dir, self.schema)
+            print(f"Создан новый индекс в {index_dir}")
+        else:
+            self.ix = open_dir(index_dir)
+            print(f"Открыт существующий индекс из {index_dir}")
 
-.search-container input[type="text"]:focus {
-    box-shadow: 0 0 5px rgba(66, 133, 244, 0.5);
-}
+    def clean_text(self, text):
+        tokens = nltk.word_tokenize(text.lower(), language='russian')
+        tokens = [re.sub(r'\W+', '', token) for token in tokens]
+        tokens = [token for token in tokens if token and token not in self.stop_words]
+        tokens = [self.stemmer.stem(token) for token in tokens]
+        return ' '.join(tokens)
 
-.search-container button {
-    padding: 12px 20px;
-    margin-left: -45px;
-    font-size: 18px;
-    border: none;
-    background-color: #4285f4;
-    color: #fff;
-    border-radius: 24px;
-    cursor: pointer;
-    outline: none;
-    transition: background-color 0.2s;
-}
+    def extract_description(self, text):
+        description = text.strip().replace('\n', ' ')
+        if len(description) > 200:
+            description = description[:200] + '...'
+        return description
 
-.search-container button:hover {
-    background-color: #357ae8;
-}
+    def extract_logo(self, soup, base_path):
+        icon_link = soup.find("link", rel=lambda r: r and "icon" in r.lower())
+        if icon_link and 'href' in icon_link.attrs:
+            logo_path = os.path.join(os.path.dirname(base_path), icon_link['href'])
+            if os.path.exists(logo_path):
+                # Копируем логотип в статическую папку
+                dest_dir = os.path.join('static', 'logos')
+                if not os.path.exists(dest_dir):
+                    os.makedirs(dest_dir)
+                logo_filename = os.path.basename(logo_path)
+                dest_path = os.path.join(dest_dir, logo_filename)
+                if not os.path.exists(dest_path):
+                    with open(logo_path, 'rb') as src_file:
+                        with open(dest_path, 'wb') as dest_file:
+                            dest_file.write(src_file.read())
+                return os.path.join('logos', logo_filename)
+        return None
 
-.results {
-    margin-top: 30px;
-}
+    def index(self):
+        writer = self.ix.writer()
+        for root, dirs, files in os.walk(self.pages_dir):
+            for file in files:
+                if file.endswith('.html') or file.endswith('.htm'):
+                    file_path = os.path.join(root, file)
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        soup = BeautifulSoup(f, 'html.parser')
+                        title_tag = soup.find('title')
+                        title = title_tag.get_text().strip() if title_tag else file
+                        text = soup.get_text()
+                        clean_content = self.clean_text(text)
+                        description = self.extract_description(text)
+                        logo_path = self.extract_logo(soup, file_path)
 
-.result {
-    margin-bottom: 30px;
-}
+                        relative_path = os.path.relpath(file_path, self.pages_dir)
+                        url = f"{relative_path.replace(os.sep, '/')}"
 
-.result h2 {
-    font-size: 20px;
-    margin: 0;
-}
+                        writer.update_document(
+                            path=url,
+                            title=title,
+                            content=clean_content,
+                            description=description,
+                            logo=logo_path
+                        )
+                        print(f"Indexed: {url}")
+        writer.commit()
+        print("Индексирование завершено.")
 
-.result h2 a {
-    text-decoration: none;
-    color: #1a0dab;
-}
 
-.result h2 a:hover {
-    text-decoration: underline;
-}
-
-.url {
-    font-size: 14px;
-    color: #006621;
-}
-
-.description {
-    font-size: 14px;
-    color: #545454;
-}
-
-@media (max-width: 768px) {
-    .search-container {
-        width: 90%;
-    }
-
-    .search-container input[type="text"] {
-        width: 100%;
-        margin-bottom: 10px;
-    }
-
-    .search-container button {
-        margin-left: 0;
-        width: 100%;
-    }
-
-    .logo img {
-        width: 200px;
-    }
-
-    .logo-small a img {
-        width: 100px;
-    }
-}
-.result-image {
-    max-width: 150px;
-    height: auto;
-    margin-top: 10px;
-}
-/* styles.css */
-body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 0;
-}
-
-.header {
-    display: flex;
-    align-items: center;
-    padding: 10px 20px;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-.logo img {
-    height: 40px;
-}
-
-.search-form {
-    flex-grow: 1;
-    margin-left: 20px;
-    position: relative;
-}
-
-.search-form input[type="text"] {
-    width: 100%;
-    padding: 10px 15px;
-    font-size: 16px;
-    border: 1px solid #dcdcdc;
-    border-radius: 4px;
-}
-
-.search-form button {
-    position: absolute;
-    right: 5px;
-    top: 5px;
-    bottom: 5px;
-    padding: 0 15px;
-    background-color: #4285F4;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.search-form button:hover {
-    background-color: #357AE8;
-}
-
-.results {
-    margin: 20px 40px;
-}
-
-.result {
-    margin-bottom: 20px;
-}
-
-.result h2 {
-    margin: 0 0 5px 0;
-    font-size: 18px;
-}
-
-.result .url {
-    color: green;
-    font-size: 14px;
-    margin-bottom: 5px;
-}
-
-.result .description {
-    color: #545454;
-    font-size: 14px;
-}
-/* styles.css */
-
-/* General Styles */
-body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 0;
-}
-
-.header {
-    display: flex;
-    align-items: center;
-    padding: 10px 20px;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-.logo img {
-    height: 40px;
-}
-
-.search-form {
-    flex-grow: 1;
-    margin-left: 20px;
-    position: relative;
-}
-
-.search-form input[type="text"] {
-    width: 100%;
-    padding: 10px 15px;
-    font-size: 16px;
-    border: 1px solid #dcdcdc;
-    border-radius: 4px;
-}
-
-.search-form button {
-    position: absolute;
-    right: 5px;
-    top: 5px;
-    bottom: 5px;
-    padding: 0 15px;
-    background-color: #4285F4;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.search-form button:hover {
-    background-color: #357AE8;
-}
-
-.results {
-    margin: 20px 40px;
-}
-
-.result {
-    display: flex;
-    align-items: flex-start;
-    margin-bottom: 20px;
-}
-
-.site-logo {
-    width: 32px;
-    height: 32px;
-    margin-right: 10px;
-}
-
-.site-logo img {
-    max-width: 100%;
-    max-height: 100%;
-}
-
-.result-content {
-    flex-grow: 1;
-}
-
-.result h2 {
-    margin: 0 0 5px 0;
-    font-size: 18px;
-}
-
-.result .url {
-    color: green;
-    font-size: 14px;
-    margin-bottom: 5px;
-}
-
-.result .description {
-    color: #545454;
-    font-size: 14px;
-}
-
-/* Optional: Style for default logo */
-.site-logo img[alt="Default Logo"] {
-    opacity: 0.5;
-}
-/* General Styles */
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #f4f6f8;
-    margin: 0;
-    padding: 20px;
-    color: #333;
-}
-
-/* Tabs Container */
-.tabs {
-    display: flex;
-    justify-content: flex-start;
-    border-bottom: 3px solid #dcdcdc;
-    margin-bottom: 20px;
-    padding-bottom: 8px;
-    box-shadow: inset 0 -2px 3px rgba(0, 0, 0, 0.05); /* Slight shadow for depth */
-}
-
-/* Tab Styling */
-.tab {
-    padding: 12px 25px;
-    font-size: 16px;
-    font-weight: 500;
-    color: #5f6368;
-    background-color: #f9fafb;
-    border: 1px solid #ddd;
-    border-bottom: none;
-    border-radius: 8px 8px 0 0;
-    margin-right: 10px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08); /* Soft shadow for elevated feel */
-}
-
-/* Active Tab */
-.tab.active {
-    background-color: #ffffff;
-    color: #202124;
-    border: 1px solid #dcdcdc;
-    border-bottom: 3px solid #4285F4; /* Highlight active with brand color */
-    box-shadow: none; /* Remove shadow to blend with content */
-}
-
-/* Hover Effect */
-.tab:hover {
-    background-color: #f1f3f4;
-    color: #202124;
-    border-color: #dcdcdc;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); /* Increase shadow on hover for focus */
-}
-
-/* Smooth Gradient Active Background */
-.tab.active {
-    background: linear-gradient(145deg, #ffffff 0%, #f1f3f4 100%);
-    color: #1a73e8;
-}
-
-/* Results Section Styling */
-.results {
-    margin-top: 20px;
-    padding: 20px;
-    background-color: #ffffff;
-    border-radius: 10px;
-    border: 1px solid #ddd;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
-}
-
-/* Responsive Adjustments */
-@media (max-width: 768px) {
-    .tab {
-        padding: 10px 15px;
-        font-size: 14px;
-    }
-
-    .tabs {
-        flex-wrap: wrap;
-    }
-}
+if __name__ == "__main__":
+    pages_directory = 'pages'  # Папка с HTML-файлами
+    index_directory = 'indexdir'
+    indexer = LocalHTMLIndexer(pages_directory, index_directory)
+    indexer.index()

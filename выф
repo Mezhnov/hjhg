@@ -1,13 +1,13 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <title>{% block title %}Поиск{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
-    {% block head %}{% endblock %}
-</head>
-<body>
-    {% block content %}{% endblock %}
-</body>
-</html>
+{% extends "base.html" %}
+
+{% block content %}
+<div class="search-container">
+    <div class="logo">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Логотип">
+    </div>
+    <form method="post">
+        <input type="text" name="query" placeholder="Введите запрос..." required autocomplete="off">
+        <button type="submit">Найти</button>
+    </form>
+</div>
+{% endblock %}

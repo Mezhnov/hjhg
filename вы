@@ -1,0 +1,16 @@
+# server.py
+from flask import Flask, render_template, jsonify
+
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    return "<h1>Добро пожаловать в наш браузер на PyQt5!</h1>"
+
+@app.route('/data')
+def data():
+    # Пример маршрута для отправки данных клиенту
+    return jsonify({"message": "Hello from Flask Server!"})
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)  # Убедитесь, что порт открыт для клиента

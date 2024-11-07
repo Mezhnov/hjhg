@@ -1,50 +1,47 @@
-# server.py
-
 import socket
 import threading
 import logging
 import os
 import json
-from urllib.parse import urlparse, parse_qs
+import re
+from urllib.parse import urlparse
 
-# Импортируем библиотеки для поиска
 from whoosh.index import open_dir, create_in
 from whoosh.qparser import MultifieldParser
 from whoosh.fields import Schema, TEXT, ID, STORED
 import nltk
 from nltk.stem.snowball import RussianStemmer
 from nltk.corpus import stopwords
-import re
 
-# Настройки сервера
-HOST = '0.0.0.0'  # Слушать на всех интерфейсах
+# Initialize NLTK resources
+nltk.download('punkt')
+nltk.download('stopwords')
+
+# Server settings
+HOST = '0.0.0.0'  # Listen on all interfaces
 PORT = 8080
-BUFFER_SIZE = 4096  # Размер буфера для передачи данных
+BUFFER_SIZE = 4096  # Buffer size for data transmission
 
-# Настройка логирования
+# Logging configuration
 logging.basicConfig(
     filename='smp_server.log',
     level=logging.INFO,
     format='%(asctime)s:%(levelname)s:%(message)s'
 )
 
-# Разрешенные домены и их корневые директории
+# Allowed domains and their root directories
 allowed_domains = {
     'example.com': 'example',
     'test.com': 'test',
-    'search.com': 'search'   # Добавляем домен для поисковой системы
+    'search.com': 'search'   # Domain for the search system
 }
 
-# Инициализация NLTK ресурсов
-nltk.download('punkt')
-nltk.download('stopwords')
-
-# Настройка поискового индекса
+# Initialize search index
 index_dir = 'indexdir'
 
 if not os.path.exists(index_dir):
     os.mkdir(index_dir)
-    # Определяем схему для индекса
+    # Define schema for the index
     schema = Schema(
         path=ID(stored=True, unique=True),
         title=TEXT(stored=True),
@@ -53,19 +50,18 @@ if not os.path.exists(index_dir):
         logo=STORED
     )
     ix = create_in(index_dir, schema)
-    logging.info(f"Создан новый индекс в директории: {index_dir}")
+    logging.info(f"Created new index in directory: {index_dir}")
 else:
     ix = open_dir(index_dir)
-    logging.info(f"Открыт существующий индекс из директории: {index_dir}")
+    logging.info(f"Opened existing index from directory: {index_dir}")
 
-# Настройка стеммера и стоп-слов
+# Setup stemmer and stop words
 stemmer = RussianStemmer()
 stop_words = set(stopwords.words('russian'))
 
-
 def send_response(conn, status, content_type, body):
     """
-    Отправляет ответ клиенту в формате SMP.
+    Sends a response to the client in SMP format.
     """
     content_length = len(body)
     response_headers = (
@@ -76,14 +72,13 @@ def send_response(conn, status, content_type, body):
     )
     try:
         conn.sendall(response_headers.encode() + body)
-        logging.info(f"Отправлен ответ: STATUS={status}, CONTENT-TYPE={content_type}, CONTENT-LENGTH={content_length}")
+        logging.info(f"Sent response: STATUS={status}, CONTENT-TYPE={content_type}, CONTENT-LENGTH={content_length}")
     except Exception as e:
-        logging.error(f"Ошибка при отправке ответа: {e}")
-
+        logging.error(f"Error sending response: {e}")
 
 def clean_query(query):
     """
-    Очищает и обрабатывает поисковый запрос.
+    Cleans and processes the search query.
     """
     tokens = nltk.word_tokenize(query.lower(), language='russian')
     tokens = [re.sub(r'\W+', '', token) for token in tokens]
@@ -91,10 +86,9 @@ def clean_query(query):
     tokens = [stemmer.stem(token) for token in tokens]
     return ' '.join(tokens)
 
-
 def handle_search(query):
     """
-    Выполняет поиск по индексу и возвращает результаты.
+    Performs a search on the index and returns the results.
     """
     clean_q = clean_query(query)
     parser = MultifieldParser(["title", "content"], schema=ix.schema)
@@ -106,16 +100,15 @@ def handle_search(query):
                 'title': r['title'],
                 'url': r['path'],
                 'description': r.get('description', ''),
-                'logo': r.get('logo', '')  # Путь к логотипу, если есть
+                'logo': r.get('logo', '')  # Path to logo if available
             }
             for r in results
         ]
     return hits
 
-
 def handle_search_action(headers):
     """
-    Обрабатывает поисковый запрос ACTION: SEARCH.
+    Handles the SEARCH ACTION in SMP.
     """
     query = headers.get('QUERY', '')
     if not query:
@@ -130,19 +123,33 @@ def handle_search_action(headers):
             'results': results
         }
     except Exception as e:
-        logging.error(f"Ошибка при поиске: {e}")
+        logging.error(f"Search error: {e}")
         return {
             'status': 'ERROR',
             'message': f"Search error: {e}"
         }
 
+def render_template(template_path, context):
+    """
+    Simple template renderer replacing {{ key }} with context values.
+    """
+    try:
+        with open(template_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        for key, value in context.items():
+            placeholder = f"{{{{ {key} }}}}"
+            content = content.replace(placeholder, str(value))
+        return content.encode('utf-8')
+    except Exception as e:
+        logging.error(f"Template rendering error: {e}")
+        return f"Error rendering template: {e}".encode('utf-8')
 
 def send_large_file(conn, filepath):
     """
-    Отправляет файл клиенту частями с соответствующими заголовками.
+    Sends a file to the client in chunks with appropriate headers.
     """
     if not os.path.exists(filepath):
-        logging.error(f"Файл не найден: {filepath}")
+        logging.error(f"File not found: {filepath}")
         message = "File not found"
         response = (
             f"SMP 1.0\n"
@@ -174,7 +181,7 @@ def send_large_file(conn, filepath):
         else:
             content_type = 'application/octet-stream'
 
-        # Отправка заголовков
+        # Send headers
         response_headers = (
             f"SMP 1.0\n"
             f"STATUS: OK\n"
@@ -182,19 +189,19 @@ def send_large_file(conn, filepath):
             f"CONTENT-LENGTH: {file_size}\n\n"
         )
         conn.send(response_headers.encode())
-        logging.info(f"Отправка файла: {filepath}")
+        logging.info(f"Sending file: {filepath}")
 
-        # Отправка файла частями
+        # Send file in chunks
         with open(filepath, 'rb') as f:
             while True:
                 chunk = f.read(BUFFER_SIZE)
                 if not chunk:
                     break
                 conn.sendall(chunk)
-        logging.info(f"Файл успешно отправлен: {filepath}")
+        logging.info(f"File sent successfully: {filepath}")
 
     except Exception as e:
-        logging.error(f"Ошибка при отправке файла {filepath}: {e}")
+        logging.error(f"Error sending file {filepath}: {e}")
         message = f"Error sending file: {e}"
         response = (
             f"SMP 1.0\n"
@@ -206,12 +213,11 @@ def send_large_file(conn, filepath):
         )
         conn.sendall(response.encode())
 
-
 def handle_client(conn, addr):
     """
-    Обрабатывает подключения клиентов в отдельных потоках.
+    Handles client connections in separate threads.
     """
-    logging.info(f"Подключен клиент: {addr}")
+    logging.info(f"Client connected: {addr}")
 
     while True:
         try:
@@ -219,7 +225,7 @@ def handle_client(conn, addr):
             while b"\n\n" not in data:
                 part = conn.recv(BUFFER_SIZE)
                 if not part:
-                    raise ConnectionResetError("Клиент закрыл соединение")
+                    raise ConnectionResetError("Client closed the connection")
                 data += part
 
             header_data, _, body = data.partition(b"\n\n")
@@ -233,10 +239,10 @@ def handle_client(conn, addr):
             resource = headers.get('RESOURCE')
 
             if action == 'GET' and resource:
-                # Разбор ресурса для извлечения домена и пути
-                parsed = urlparse('smp://' + resource)  # Для использования urlparse
+                # Parse the resource to extract domain and path
+                parsed = urlparse('smp://' + resource)  # For using urlparse
                 domain = parsed.hostname
-                path = parsed.path.lstrip('/')  # Удаление ведущего '/'
+                path = parsed.path.lstrip('/')  # Remove leading '/'
 
                 if domain not in allowed_domains:
                     message = "Domain not allowed"
@@ -249,14 +255,14 @@ def handle_client(conn, addr):
                         f"{message}"
                     )
                     conn.sendall(response.encode())
-                    logging.warning(f"Запрошен запрещенный домен: {domain}")
+                    logging.warning(f"Disallowed domain requested: {domain}")
                     continue
 
-                # Определение пути к файлу
+                # Determine the file path
                 domain_root = allowed_domains[domain]
                 file_path = os.path.join(domain_root, path) if path else os.path.join(domain_root, 'index.html')
 
-                # Предотвращение обхода директорий
+                # Prevent directory traversal
                 real_file_path = os.path.realpath(file_path)
                 real_domain_root = os.path.realpath(domain_root)
                 if not real_file_path.startswith(real_domain_root):
@@ -270,16 +276,16 @@ def handle_client(conn, addr):
                         f"{message}"
                     )
                     conn.sendall(response.encode())
-                    logging.warning(f"Некорректный путь ресурса: {file_path}")
+                    logging.warning(f"Invalid resource path: {file_path}")
                     continue
 
-                # Если путь указывает на директорию, отправить index.html
+                # If path points to a directory, serve index.html
                 if os.path.isdir(file_path):
                     file_path = os.path.join(file_path, 'index.html')
                     if os.path.exists(file_path):
                         send_large_file(conn, file_path)
+                        continue
                     else:
-                        # Ресурс не найден
                         message = "Resource not found"
                         response = (
                             f"SMP 1.0\n"
@@ -290,15 +296,84 @@ def handle_client(conn, addr):
                             f"{message}"
                         )
                         conn.sendall(response.encode())
-                        logging.warning(f"Ресурс не найден: {file_path}")
-                else:
-                    send_large_file(conn, file_path)
+                        logging.warning(f"Resource not found: {file_path}")
+                        continue
+
+                _, ext = os.path.splitext(file_path)
+                if domain == 'search.com':
+                    if path == '' or path == 'index.html':
+                        # Serve the search form
+                        send_large_file(conn, file_path)
+                        continue
+                    elif path == 'search':
+                        # Handle the search action
+                        if not body:
+                            message = "Missing body for search action."
+                            response = (
+                                f"SMP 1.0\n"
+                                f"STATUS: ERROR\n"
+                                f"MESSAGE: {message}\n"
+                                f"CONTENT-TYPE: text/plain\n"
+                                f"CONTENT-LENGTH: {len(message)}\n\n"
+                                f"{message}"
+                            )
+                            conn.sendall(response.encode())
+                            logging.warning(f"Search action without body from {addr}")
+                            continue
+
+                        # Parse form data
+                        form_data = {}
+                        for line in body.decode().split('&'):
+                            if '=' in line:
+                                key, value = line.split('=', 1)
+                                form_data[key] = value
+
+                        query = form_data.get('query', '')
+                        if not query:
+                            message = "Missing QUERY parameter."
+                            response = (
+                                f"SMP 1.0\n"
+                                f"STATUS: ERROR\n"
+                                f"MESSAGE: {message}\n"
+                                f"CONTENT-TYPE: text/plain\n"
+                                f"CONTENT-LENGTH: {len(message)}\n\n"
+                                f"{message}"
+                            )
+                            conn.sendall(response.encode())
+                            logging.warning(f"Search action with missing QUERY from {addr}")
+                            continue
+
+                        logging.info(f"Performing search for query: '{query}' from {addr}")
+                        search_results = handle_search(query)
+
+                        # Render results.html with search results
+                        context = {
+                            'query': query,
+                            'hits': search_results
+                        }
+                        results_content = render_template(os.path.join(domain_root, 'results.html'), context)
+                        send_response(conn, 'OK', 'text/html', results_content)
+                        logging.info(f"Sent search results to {addr}")
+                        continue
+
+                # Serve static or other files
+                send_large_file(conn, file_path)
 
             elif action == 'SEARCH':
-                # Обработка поискового запроса
-                query = headers.get('QUERY', '')
-                if not query:
-                    message = "Missing QUERY parameter."
+                # Handle SEARCH action
+                search_response = handle_search_action(headers)
+                if search_response['status'] == 'OK':
+                    response_body = json.dumps(search_response['results']).encode('utf-8')
+                    response_headers = (
+                        f"SMP 1.0\n"
+                        f"STATUS: OK\n"
+                        f"CONTENT-TYPE: application/json\n"
+                        f"CONTENT-LENGTH: {len(response_body)}\n\n"
+                    )
+                    conn.sendall(response_headers.encode() + response_body)
+                    logging.info(f"Sent JSON search results to {addr}")
+                else:
+                    message = search_response.get('message', 'Unknown error.')
                     response = (
                         f"SMP 1.0\n"
                         f"STATUS: ERROR\n"
@@ -308,21 +383,7 @@ def handle_client(conn, addr):
                         f"{message}"
                     )
                     conn.sendall(response.encode())
-                    logging.warning(f"Поисковый запрос без QUERY: {addr}")
-                    continue
-
-                logging.info(f"Выполняется поиск для запроса: '{query}' от клиента {addr}")
-                search_results = handle_search(query)
-
-                response_body = json.dumps(search_results).encode('utf-8')
-                response_headers = (
-                    f"SMP 1.0\n"
-                    f"STATUS: OK\n"
-                    f"CONTENT-TYPE: application/json\n"
-                    f"CONTENT-LENGTH: {len(response_body)}\n\n"
-                )
-                conn.sendall(response_headers.encode() + response_body)
-                logging.info(f"Отправлены результаты поиска клиенту {addr}")
+                    logging.warning(f"Search error for {addr}: {message}")
 
             else:
                 message = "Invalid ACTION or missing RESOURCE"
@@ -335,33 +396,31 @@ def handle_client(conn, addr):
                     f"{message}"
                 )
                 conn.sendall(response.encode())
-                logging.warning(f"Некорректный запрос: ACTION={action}, RESOURCE={resource}")
+                logging.warning(f"Invalid request: ACTION={action}, RESOURCE={resource}")
 
         except ConnectionResetError as e:
-            logging.info(f"Клиент {addr} отключился: {e}")
+            logging.info(f"Client {addr} disconnected: {e}")
             break
         except Exception as e:
-            logging.error(f"Ошибка при обработке клиента {addr}: {e}")
+            logging.error(f"Error handling client {addr}: {e}")
             break
 
     conn.close()
-    logging.info(f"Соединение с {addr} закрыто")
-
+    logging.info(f"Connection with {addr} closed")
 
 def start_server():
     """
-    Запускает SMP сервер для прослушивания входящих подключений.
+    Starts the SMP server to listen for incoming connections.
     """
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         server_socket.bind((HOST, PORT))
         server_socket.listen()
-        logging.info(f"SMP Server запущен на {HOST}:{PORT}")
+        logging.info(f"SMP Server started on {HOST}:{PORT}")
 
         while True:
             conn, addr = server_socket.accept()
             client_thread = threading.Thread(target=handle_client, args=(conn, addr), daemon=True)
             client_thread.start()
-
 
 if __name__ == "__main__":
     start_server()

@@ -5,7 +5,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def index():
-    return "<h1>Добро пожаловать в наш браузер на PyQt5!</h1>"
+    return render_template('index.html')  # Возвращаем HTML шаблон
 
 @app.route('/data')
 def data():
@@ -14,3 +14,31 @@ def data():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)  # Убедитесь, что порт открыт для клиента
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flask + PyQt5 Browser</title>
+</head>
+<body>
+    <h1>Добро пожаловать в наш браузер на PyQt5!</h1>
+    <button onclick="fetchData()">Получить данные с сервера</button>
+    <div id="serverData"></div>
+
+    <script>
+        // Функция для запроса данных с сервера
+        function fetchData() {
+            fetch('/data')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('serverData').innerText = data.message;
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                });
+        }
+    </script>
+</body>
+</html>

@@ -1,10 +1,173 @@
-from flask import Flask, render_template
+import socket
+import threading
+import logging
+import os
+from urllib.parse import urlparse
 
-app = Flask(__name__)
+# Настройки сервера
+HOST = '0.0.0.0'  # Слушать на всех интерфейсах
+PORT = 8080
+BUFFER_SIZE = 4096  # Размер буфера для передачи данных
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+# Настройка логирования
+logging.basicConfig(
+    filename='smp_server.log',
+    level=logging.INFO,
+    format='%(asctime)s:%(levelname)s:%(message)s'
+)
+
+# Разрешенные домены и их корневые директории
+allowed_domains = {
+    'example.com': 'flask_app',
+}
+
+def send_large_file(conn, filepath):
+    if not os.path.exists(filepath):
+        logging.error(f"Файл не найден: {filepath}")
+        message = "File not found"
+        response = (
+            f"SMP 1.0\n"
+            f"STATUS: ERROR\n"
+            f"MESSAGE: {message}\n"
+            f"CONTENT-TYPE: text/plain\n"
+            f"CONTENT-LENGTH: {len(message)}\n\n"
+            f"{message}"
+        )
+        conn.sendall(response.encode())
+        return
+
+    try:
+        file_size = os.path.getsize(filepath)
+        _, ext = os.path.splitext(filepath)
+        ext = ext.lower()
+        content_type = 'application/octet-stream'
+
+        # Отправка заголовков
+        response_headers = (
+            f"SMP 1.0\n"
+            f"STATUS: OK\n"
+            f"CONTENT-TYPE: {content_type}\n"
+            f"CONTENT-LENGTH: {file_size}\n\n"
+        )
+        conn.send(response_headers.encode())
+
+        # Отправка файла частями
+        with open(filepath, 'rb') as f:
+            while True:
+                chunk = f.read(BUFFER_SIZE)
+                if not chunk:
+                    break
+                conn.sendall(chunk)
+
+    except Exception as e:
+        logging.error(f"Ошибка при отправке файла {filepath}: {e}")
+        message = f"Error sending file: {e}"
+        response = (
+            f"SMP 1.0\n"
+            f"STATUS: ERROR\n"
+            f"MESSAGE: {message}\n"
+            f"CONTENT-TYPE: text/plain\n"
+            f"CONTENT-LENGTH: {len(message)}\n\n"
+            f"{message}"
+        )
+        conn.sendall(response.encode())
+
+def handle_client(conn, addr):
+    logging.info(f"Подключен клиент: {addr}")
+
+    while True:
+        try:
+            data = b""
+            while b"\n\n" not in data:
+                part = conn.recv(BUFFER_SIZE)
+                if not part:
+                    raise ConnectionResetError("Клиент закрыл соединение")
+                data += part
+
+            header_data, _, body = data.partition(b"\n\n")
+            headers = {}
+            for line in header_data.decode().split('\n'):
+                if ': ' in line:
+                    key, value = line.split(': ', 1)
+                    headers[key.strip().upper()] = value.strip()
+
+            action = headers.get('ACTION')
+            resource = headers.get('RESOURCE')
+
+            if action == 'GET' and resource:
+                parsed = urlparse('smp://' + resource)
+                domain = parsed.hostname
+                path = parsed.path.lstrip('/')
+
+                if domain not in allowed_domains:
+                    message = "Domain not allowed"
+                    response = (
+                        f"SMP 1.0\n"
+                        f"STATUS: ERROR\n"
+                        f"MESSAGE: {message}\n"
+                        f"CONTENT-TYPE: text/plain\n"
+                        f"CONTENT-LENGTH: {len(message)}\n\n"
+                        f"{message}"
+                    )
+                    conn.send(response.encode())
+                    logging.warning(f"Запрещенный домен: {domain}")
+                    continue
+
+                domain_root = allowed_domains[domain]
+                file_path = os.path.join(domain_root, path) if path else os.path.join(domain_root, 'index.html')
+
+                # Обработка запросов к файлам
+                if os.path.isdir(file_path):
+                    file_path = os.path.join(file_path, 'index.html')
+
+                if os.path.exists(file_path):
+                    send_large_file(conn, file_path)
+                else:
+                    message = "Resource not found"
+                    response = (
+                        f"SMP 1.0\n"
+                        f"STATUS: ERROR\n"
+                        f"MESSAGE: {message}\n"
+                        f"CONTENT-TYPE: text/plain\n"
+                        f"CONTENT-LENGTH: {len(message)}\n\n"
+                        f"{message}"
+                    )
+                    conn.send(response.encode())
+                    logging.warning(f"Ресурс не найден: {file_path}")
+
+            else:
+                message = "Invalid ACTION or missing RESOURCE"
+                response = (
+                    f"SMP 1.0\n"
+                    f"STATUS: ERROR\n"
+                    f"MESSAGE: {message}\n"
+                    f"CONTENT-TYPE: text/plain\n"
+                    f"CONTENT-LENGTH: {len(message)}\n\n"
+                    f"{message}"
+                )
+                conn.send(response.encode())
+                logging.warning(f"Некорректный запрос: ACTION={action}, RESOURCE={resource}")
+
+        except ConnectionResetError as e:
+            logging.info(f"Клиент {addr} отключился: {e}")
+            break
+        except Exception as e:
+            logging.error(f"Ошибка при обработке клиента {addr}: {e}")
+            break
+
+    conn.close()
+    logging.info(f"Соединение с {addr} закрыто")
+
+def start_server():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+        server_socket.bind((HOST, PORT))
+        server_socket.listen()
+        logging.info(f"SMP Server запущен на {HOST}:{PORT}")
+
+        while True:
+            conn, addr = server_socket.accept()
+            client_thread = threading.Thread(target=handle_client, args=(conn, addr), daemon=True)
+            client_thread.start()
 
 if __name__ == "__main__":
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    start_server()

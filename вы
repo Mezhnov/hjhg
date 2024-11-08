@@ -1,37 +1,14 @@
-import socket
-from flask import Flask, jsonify
-import threading
+<!-- pages/example.com/index.html -->
 
-app = Flask(__name__)
-
-@app.route('/')
-def index():
-    return jsonify({"message": "Привет от Flask через smp:// протокол"})
-
-def socket_server():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.bind(('0.0.0.0', 8888))
-    sock.listen(5)
-    print("Сокет-сервер запущен на порту 8888")
-
-    while True:
-        client, addr = sock.accept()
-        print(f"Соединение с {addr}")
-        data = client.recv(1024).decode('utf-8')
-
-        if data.startswith("smp://"):
-            response = app.test_client().get('/')  # Прямой запрос к Flask API
-            client.sendall(response.get_data())
-        else:
-            client.sendall("Некорректный запрос протокола smp://".encode('utf-8'))
-
-        client.close()
-
-# Запуск Flask и сокет-сервера
-if __name__ == '__main__':
-    # Используем threading для запуска Flask без сигналов
-    flask_thread = threading.Thread(target=lambda: app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5000))
-    flask_thread.start()
-
-    # Сокет-сервер работает в основном потоке
-    socket_server()
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Example Domain</title>
+    <link rel="icon" href="logo.png">
+</head>
+<body>
+    <h1>Добро пожаловать на Example Domain</h1>
+    <p>Это пример статической страницы для домена example.com.</p>
+</body>
+</html>

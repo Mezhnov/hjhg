@@ -1,28 +1,38 @@
 # flask_app.py
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, render_template
 from whoosh.index import open_dir
 from whoosh.qparser import MultifieldParser
+from whoosh.fields import TEXT, ID
+from whoosh.query import *
 import nltk
 from nltk.stem.snowball import RussianStemmer
 from nltk.corpus import stopwords
 import re
+import os
 
-# Инициализация NLTK
+# Initialize NLTK resources
 nltk.download('punkt')
 nltk.download('stopwords')
 
 app = Flask(__name__)
 
-# Настройки индекса
+# Path to the search index
 INDEX_DIR = 'indexdir'
+
+# Open the Whoosh index
+if not os.path.exists(INDEX_DIR):
+    raise Exception(f"Index directory '{INDEX_DIR}' does not exist. Please run 'indexer.py' first.")
 ix = open_dir(INDEX_DIR)
 
-# Настройки стеммера и стоп-слов
+# Initialize stemmer and stopwords
 stemmer = RussianStemmer()
 stop_words = set(stopwords.words('russian'))
 
 def clean_query(query):
+    """
+    Cleans and processes the search query.
+    """
     tokens = nltk.word_tokenize(query.lower(), language='russian')
     tokens = [re.sub(r'\W+', '', token) for token in tokens]
     tokens = [token for token in tokens if token and token not in stop_words]
@@ -33,7 +43,7 @@ def clean_query(query):
 def search():
     query = request.args.get('q', '')
     if not query:
-        return jsonify({'status': 'ERROR', 'message': 'Missing query parameter.'}), 400
+        return render_template('search.html', query=query, results=[], error="Пожалуйста, введите запрос для поиска.")
 
     try:
         clean_q = clean_query(query)
@@ -46,13 +56,21 @@ def search():
                     'title': r['title'],
                     'url': r['path'],
                     'description': r.get('description', ''),
-                    'logo': r.get('logo', '')  # Путь к логотипу, если есть
+                    'logo': r.get('logo', '')  # Path to logo if available
                 }
                 for r in results
             ]
-        return jsonify({'status': 'OK', 'results': hits}), 200
+        return render_template('search.html', query=query, results=hits, error=None)
     except Exception as e:
-        return jsonify({'status': 'ERROR', 'message': f'Search error: {e}'}), 500
+        return render_template('search.html', query=query, results=[], error=f"Ошибка при выполнении поиска: {e}")
+
+@app.route('/')
+def home():
+    """
+    Renders the search home page.
+    """
+    return render_template('search.html', query='', results=[], error=None)
 
 if __name__ == '__main__':
+    # Run Flask app on localhost with a different port to avoid conflict
     app.run(host='127.0.0.1', port=5000, debug=False)

@@ -1,14 +1,18 @@
-<!-- pages/example.com/index.html -->
+from flask import Flask, render_template, request
 
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <title>Example Domain</title>
-    <link rel="icon" href="logo.png">
-</head>
-<body>
-    <h1>Добро пожаловать на Example Domain</h1>
-    <p>Это пример статической страницы для домена example.com.</p>
-</body>
-</html>
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/button1', methods=['POST'])
+def button1():
+    return "Кнопка 1 была нажата!"
+
+@app.route('/button2', methods=['POST'])
+def button2():
+    return "Кнопка 2 была нажата!"
+
+if __name__ == '__main__':
+    app.run(debug=True)

@@ -1,18 +1,26 @@
-from flask import Flask, render_template, request
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Пример с кнопками</title>
+</head>
+<body>
+    <h1>Пример с кнопками</h1>
+    
+    <!-- Форма с кнопками -->
+    <form action="/button1" method="post">
+        <button type="submit">Нажми меня 1</button>
+    </form>
 
-app = Flask(__name__)
+    <form action="/button2" method="post">
+        <button type="submit">Нажми меня 2</button>
+    </form>
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+    <div>
+        <h2>Результат:</h2>
+        <p id="result"></p>
+    </div>
 
-@app.route('/button1', methods=['POST'])
-def button1():
-    return "Кнопка 1 была нажата!"
-
-@app.route('/button2', methods=['POST'])
-def button2():
-    return "Кнопка 2 была нажата!"
-
-if __name__ == '__main__':
-    app.run(debug=True)
+</body>
+</html>

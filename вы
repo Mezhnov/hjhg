@@ -3,24 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Пример с кнопками</title>
+    <title>Пример с кнопкой</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body>
-    <h1>Пример с кнопками</h1>
+    <h1>Пример с кнопкой</h1>
     
-    <!-- Форма с кнопками -->
-    <form action="/button1" method="post">
-        <button type="submit">Нажми меня 1</button>
-    </form>
-
-    <form action="/button2" method="post">
-        <button type="submit">Нажми меня 2</button>
-    </form>
+    <!-- Кнопка -->
+    <button id="btn1">Нажми меня</button>
 
     <div>
         <h2>Результат:</h2>
         <p id="result"></p>
     </div>
 
+    <script>
+        // Функция для отправки запроса на сервер
+        $('#btn1').click(function() {
+            $.post('/button1', function(data) {
+                // Отображаем ответ от сервера в элементе с id="result"
+                $('#result').text(data.message);
+            });
+        });
+    </script>
 </body>
 </html>
+from flask import Flask, render_template, jsonify
+
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/button1', methods=['POST'])
+def button1():
+    return jsonify({"message": "Ура!"})
+
+if __name__ == '__main__':
+    app.run(debug=True)

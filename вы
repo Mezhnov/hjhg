@@ -1,16 +1,41 @@
-<!-- templates/base.html -->
+import socket
+from flask import Flask, jsonify
 
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <title>{% block title %}Поиск{% endblock %}</title>
-    <link rel="stylesheet" href="/static/css/styles.css">
-</head>
-<body>
-    <div class="container">
-        <h1>{% block header %}Поисковая система{% endblock %}</h1>
-        {% block content %}{% endblock %}
-    </div>
-</body>
-</html>
+app = Flask(__name__)
+
+# Flask route для демонстрации работы
+@app.route('/')
+def index():
+    return jsonify({"message": "Привет от Flask через smp:// протокол"})
+
+# Запуск сокет-сервера
+def socket_server():
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind(('0.0.0.0', 8888))
+    sock.listen(5)
+    print("Сокет-сервер запущен на порту 8888")
+
+    while True:
+        client, addr = sock.accept()
+        print(f"Соединение с {addr}")
+        data = client.recv(1024).decode('utf-8')
+
+        # Простая обработка протокола (например, проверка на 'smp://')
+        if data.startswith("smp://"):
+            # Пример передачи запроса в Flask и возврата ответа клиенту
+            response = app.test_client().get('/')  # Прямой запрос к Flask API
+            client.sendall(response.get_data())
+        else:
+            client.sendall(b"Некорректный запрос протокола smp://")
+        
+        client.close()
+
+# Запуск Flask и сокет-сервера
+if __name__ == '__main__':
+    import threading
+    # Flask запускаем в отдельном потоке
+    flask_thread = threading.Thread(target=lambda: app.run(port=5000, debug=True))
+    flask_thread.start()
+    
+    # Сокет-сервер работает в основном потоке
+    socket_server()

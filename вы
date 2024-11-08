@@ -1,7 +1,1 @@
-C:\Programs\PyCharm\Projects\pythonProject7\.venv\Scripts\python.exe C:\Programs\PyCharm\Projects\pythonProject7\1.py 
-  File "C:\Programs\PyCharm\Projects\pythonProject7\1.py", line 31
-    client.sendall(b"Некорректный запрос протокола smp://")
-                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-SyntaxError: bytes can only contain ASCII literal characters
-
-Process finished with exit code 1
+client.sendall("Некорректный запрос протокола smp://".encode('utf-8'))

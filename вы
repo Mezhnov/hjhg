@@ -1,12 +1,29 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project 1 - Приветствие</title>
-</head>
-<body>
-    <h1>Добро пожаловать в Project 1!</h1>
-    <p>Это HTML-шаблон для project1.</p>
-</body>
-</html>
+from flask import Flask, jsonify, request
+
+app = Flask(__name__)
+
+# Маршрут для получения сообщения
+@app.route('/api/data', methods=['GET'])
+def get_data():
+    data = {"message": "Привет из Flask API!"}
+    return jsonify(data)
+
+# Маршрут для получения данных от клиента
+@app.route('/api/data/send', methods=['POST'])
+def receive_data():
+    try:
+        # Получаем данные из JSON запроса
+        data = request.json
+        value = data.get("value")
+
+        # Обработка значения
+        print(f"Получено значение: {value}")
+
+        # Ответ клиенту
+        return jsonify({"response": f"Получено значение: {value}"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)

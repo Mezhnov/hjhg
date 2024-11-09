@@ -1,4 +1,34 @@
-2024-11-09 19:03:48,922 - INFO - [33mPress CTRL+C to quit[0m
-2024-11-09 19:03:48,923 - INFO -  * Restarting with stat
-2024-11-09 19:03:49,097 - WARNING -  * Debugger is active!
-2024-11-09 19:03:49,098 - INFO -  * Debugger PIN: 135-654-06
+from flask import Flask, jsonify, request, render_template
+
+app = Flask(__name__)
+
+# Главная страница
+@app.route('/')
+def index():
+    return render_template('index.html', message="Добро пожаловать на Flask API с HTML и CSS!")
+
+# Маршрут для получения сообщения
+@app.route('/api/data', methods=['GET'])
+def get_data():
+    data = {"message": "Привет из Flask API!"}
+    return jsonify(data)
+
+# Маршрут для получения данных от клиента
+@app.route('/api/data/send', methods=['POST'])
+def receive_data():
+    try:
+        # Получаем данные из JSON запроса
+        data = request.json
+        value = data.get("value")
+
+        # Обработка значения
+        print(f"Получено значение: {value}")
+
+        # Ответ клиенту
+        return jsonify({"response": f"Получено значение: {value}"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)

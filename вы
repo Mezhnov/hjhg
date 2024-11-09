@@ -5,8 +5,25 @@ app = Flask(__name__)
 # Маршрут для получения сообщения
 @app.route('/api/data', methods=['GET'])
 def get_data():
-    data = {"message": "<h1>Привет из Flask API!</h1><p>Этот текст в формате HTML.</p>"}
-    return jsonify(data)
+    # HTML message with CSS styles
+    html_content = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body { font-family: Arial, sans-serif; background-color: #f4f4f9; }
+                h3 { color: #3333cc; text-align: center; }
+                p { color: #666666; font-size: 14px; text-align: center; }
+                .message { color: #008080; font-weight: bold; }
+            </style>
+        </head>
+        <body>
+            <h3>Привет из Flask API!</h3>
+            <p>Это сообщение получено из Flask API.</p>
+        </body>
+        </html>
+    """
+    return html_content
 
 # Маршрут для получения данных от клиента
 @app.route('/api/data/send', methods=['POST'])
@@ -15,9 +32,28 @@ def receive_data():
         data = request.json
         value = data.get("value")
         print(f"Получено значение: {value}")
-        return jsonify({"response": f"<b>Получено значение:</b> {value}"}), 200
+        
+        # Response message with CSS styling
+        html_response = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body { font-family: Arial, sans-serif; }
+                    p { color: #008080; font-size: 16px; text-align: center; font-weight: bold; }
+                </style>
+            </head>
+            <body>
+                <p class='response'>Ответ сервера: Получено значение: {value}</p>
+            </body>
+            </html>
+        """
+        return html_response, 200
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        error_response = f"""
+            <p style='color:red;'>Ошибка: {str(e)}</p>
+        """
+        return error_response, 400
 
 
 if __name__ == '__main__':

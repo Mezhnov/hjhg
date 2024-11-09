@@ -1,50 +1,99 @@
-# client.py
-import sys
-from PyQt5.QtCore import QUrl
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
-from PyQt5.QtWebEngineWidgets import QWebEngineView
+# server.py
+import os
+import sqlite3
+from flask import Flask, render_template_string, request, redirect, url_for
 
-class BrowserWindow(QMainWindow):
-    def __init__(self, server_ip, server_port=5000):
-        super().__init__()
+# Создание экземпляра Flask
+app = Flask(__name__)
 
-        self.setWindowTitle('HTML Viewer')
-        self.setGeometry(100, 100, 1024, 768)
+# Путь к базе данных SQLite
+DATABASE = 'users.db'
 
-        # Настройка виджета для отображения HTML
-        self.browser = QWebEngineView()
+# Функция для подключения к базе данных
+def get_db():
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-        # Формирование URL для подключения к серверу
-        url = f"http://{server_ip}:{server_port}/"
-        self.browser.setUrl(QUrl(url))
+# Функция для инициализации базы данных
+def init_db():
+    if not os.path.exists(DATABASE):
+        with app.app_context():
+            db = get_db()
+            db.execute('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT, password TEXT)')
+            db.commit()
 
-        # Создаём layout для окна
-        layout = QVBoxLayout()
-        layout.addWidget(self.browser)
+# Стартовая страница с регистрацией
+@app.route('/')
+def index():
+    return render_template_string("""
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Регистрация</title>
+        <style>
+            /* Ваши стили */
+        </style>
+    </head>
+    <body>
+        <header>
+            <h1>Регистрация</h1>
+        </header>
+        <main>
+            <form action="/register" method="POST">
+                <input type="text" name="username" placeholder="Имя пользователя" required><br>
+                <input type="password" name="password" placeholder="Пароль" required><br>
+                <button type="submit">Зарегистрироваться</button>
+            </form>
+        </main>
+        <footer>
+            <p>© 2024 Пример регистрации</p>
+        </footer>
+    </body>
+    </html>
+    """)
 
-        container = QWidget()
-        container.setLayout(layout)
+# Обработка регистрации
+@app.route('/register', methods=['POST'])
+def register():
+    username = request.form['username']
+    password = request.form['password']
 
-        self.setCentralWidget(container)
+    # Сохранение данных в базе
+    db = get_db()
+    db.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, password))
+    db.commit()
+
+    # Перенаправление на страницу успеха
+    return redirect(url_for('success'))
+
+@app.route('/success')
+def success():
+    return render_template_string("""
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Успешная регистрация</title>
+        <style>
+            /* Ваши стили */
+        </style>
+    </head>
+    <body>
+        <header>
+            <h1>Регистрация успешна!</h1>
+        </header>
+        <footer>
+            <p>© 2024 Пример регистрации</p>
+        </footer>
+    </body>
+    </html>
+    """)
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print("Использование: python client.py <IP_СЕРВЕРА> [порт]")
-        sys.exit(1)
-
-    server_ip = sys.argv[1]
-    server_port = 5000  # Значение по умолчанию
-
-    if len(sys.argv) >= 3:
-        try:
-            server_port = int(sys.argv[2])
-        except ValueError:
-            print("Порт должен быть числом.")
-            sys.exit(1)
-
-    # Запуск PyQt5
-    app = QApplication(sys.argv)
-    window = BrowserWindow(server_ip, server_port)
-    window.show()
-
-    sys.exit(app.exec_())
+    init_db()
+    # Запуск Flask-сервера, доступного по сети
+    app.run(host='0.0.0.0', port=5000, debug=True)

@@ -1,20 +1,12 @@
-from flask import Blueprint, jsonify, request, render_template
-
-# Создаем Blueprint для project1
-blueprint = Blueprint('project1', __name__, template_folder='templates')
-
-@blueprint.route('/data', methods=['GET'])
-def get_data():
-    return jsonify({"message": "Привет из project1!"})
-
-@blueprint.route('/data/send', methods=['POST'])
-def send_data():
-    data = request.json
-    value = data.get("value")
-    print(f"Получено значение в project1: {value}")
-    return jsonify({"response": f"Получено значение: {value}"}), 200
-
-# Новый маршрут для рендеринга HTML-шаблона
-@blueprint.route('/html', methods=['GET'])
-def show_html():
-    return render_template('index.html')
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project 1 - Приветствие</title>
+</head>
+<body>
+    <h1>Добро пожаловать в Project 1!</h1>
+    <p>Это HTML-шаблон для project1.</p>
+</body>
+</html>

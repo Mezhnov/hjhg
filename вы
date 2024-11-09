@@ -1,72 +1,46 @@
-from flask import Flask, jsonify, request, render_template
+import logging
+from flask import Flask, request, jsonify, render_template
 
 app = Flask(__name__)
 
-# Route for serving the main HTML page
+# Configure logging
+logging.basicConfig(filename='server.log', level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+
+@app.before_request
+def log_request_info():
+    """Logs details about each incoming request."""
+    client_ip = request.remote_addr
+    request_method = request.method
+    request_path = request.path
+    logging.info(f"Client IP: {client_ip} - Method: {request_method} - Path: {request_path}")
+
+# Route to serve the HTML page
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# Existing route to fetch data
+# Route for API data
 @app.route('/api/data', methods=['GET'])
 def get_data():
     data = {"message": "Привет из Flask API!"}
+    logging.info("Data requested by client.")
     return jsonify(data)
 
-# Route for receiving data from the client
+# Route to receive data from client
 @app.route('/api/data/send', methods=['POST'])
 def receive_data():
     try:
+        # Get data from JSON request
         data = request.json
         value = data.get("value")
-        print(f"Получено значение: {value}")
+        logging.info(f"Received value from client: {value}")
+
+        # Respond to client
         return jsonify({"response": f"Получено значение: {value}"}), 200
     except Exception as e:
+        logging.error(f"Error receiving data: {e}")
         return jsonify({"error": str(e)}), 400
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flask HTML Interface</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-</head>
-<body>
-    <div class="container">
-        <h1 id="message">Загрузка данных...</h1>
-        <button onclick="sendData(1)">Отправить 1</button>
-        <button onclick="sendData(2)">Отправить 2</button>
-    </div>
-
-    <script>
-        // Fetch initial data when page loads
-        fetch('/api/data')
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('message').textContent = data.message;
-            })
-            .catch(error => {
-                document.getElementById('message').textContent = 'Ошибка загрузки данных';
-            });
-
-        // Function to send data on button click
-        function sendData(value) {
-            fetch('/api/data/send', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ value: value })
-            })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('message').textContent = data.response;
-            })
-            .catch(error => {
-                document.getElementById('message').textContent = 'Ошибка отправки данных';
-            });
-        }
-    </script>
-</body>
-</html>

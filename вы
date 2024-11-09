@@ -5,55 +5,24 @@ app = Flask(__name__)
 # Маршрут для получения сообщения
 @app.route('/api/data', methods=['GET'])
 def get_data():
-    # HTML message with CSS styles
-    html_content = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                body { font-family: Arial, sans-serif; background-color: #f4f4f9; }
-                h3 { color: #3333cc; text-align: center; }
-                p { color: #666666; font-size: 14px; text-align: center; }
-                .message { color: #008080; font-weight: bold; }
-            </style>
-        </head>
-        <body>
-            <h3>Привет из Flask API!</h3>
-            <p>Это сообщение получено из Flask API.</p>
-        </body>
-        </html>
-    """
-    return html_content
+    data = {"message": "Привет из Flask API!"}
+    return jsonify(data)
 
 # Маршрут для получения данных от клиента
 @app.route('/api/data/send', methods=['POST'])
 def receive_data():
     try:
+        # Получаем данные из JSON запроса
         data = request.json
         value = data.get("value")
+
+        # Обработка значения
         print(f"Получено значение: {value}")
-        
-        # Response message with CSS styling
-        html_response = f"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <style>
-                    body { font-family: Arial, sans-serif; }
-                    p { color: #008080; font-size: 16px; text-align: center; font-weight: bold; }
-                </style>
-            </head>
-            <body>
-                <p class='response'>Ответ сервера: Получено значение: {value}</p>
-            </body>
-            </html>
-        """
-        return html_response, 200
+
+        # Ответ клиенту
+        return jsonify({"response": f"Получено значение: {value}"}), 200
     except Exception as e:
-        error_response = f"""
-            <p style='color:red;'>Ошибка: {str(e)}</p>
-        """
-        return error_response, 400
+        return jsonify({"error": str(e)}), 400
 
 
 if __name__ == '__main__':

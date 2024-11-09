@@ -1,34 +1,63 @@
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template_string
 
 app = Flask(__name__)
 
-# Главная страница
-@app.route('/')
-def index():
-    return render_template('index.html', message="Добро пожаловать на Flask API с HTML и CSS!")
+# Sample HTML content with embedded CSS
+html_content = """
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Пример HTML страницы</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        h1 {
+            color: #333;
+        }
+        p {
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <h1>Добро пожаловать на страницу</h1>
+        <p>Это пример HTML и CSS, отображаемых в PyQt приложении.</p>
+    </div>
+</body>
+</html>
+"""
 
-# Маршрут для получения сообщения
+# API endpoint to get data
 @app.route('/api/data', methods=['GET'])
 def get_data():
-    data = {"message": "Привет из Flask API!"}
-    return jsonify(data)
+    # Sample data to send to the PyQt client
+    return jsonify({"message": "Привет! Это данные с сервера."})
 
-# Маршрут для получения данных от клиента
+# API endpoint to receive data
 @app.route('/api/data/send', methods=['POST'])
-def receive_data():
-    try:
-        # Получаем данные из JSON запроса
-        data = request.json
-        value = data.get("value")
+def send_data():
+    data = request.get_json()
+    value = data.get("value", None)
+    if value is not None:
+        response_message = f"Вы отправили значение: {value}"
+        return jsonify({"response": response_message})
+    return jsonify({"response": "Ошибка: Значение не получено"}), 400
 
-        # Обработка значения
-        print(f"Получено значение: {value}")
-
-        # Ответ клиенту
-        return jsonify({"response": f"Получено значение: {value}"}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
-
+# Endpoint to serve the HTML content
+@app.route('/html')
+def serve_html():
+    return render_template_string(html_content)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Run the server on all available IPs, port 5000
+    app.run(host='0.0.0.0', port=5000)

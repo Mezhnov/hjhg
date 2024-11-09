@@ -1,29 +1,17 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify
+from projects.project1 import views as project1
+from projects.project2 import views as project2
 
 app = Flask(__name__)
 
-# Маршрут для получения сообщения
-@app.route('/api/data', methods=['GET'])
-def get_data():
-    data = {"message": "Привет из Flask API!"}
-    return jsonify(data)
+# Главный маршрут для проверки работы сервера
+@app.route('/api', methods=['GET'])
+def main():
+    return jsonify({"message": "Главный сервер работает!"})
 
-# Маршрут для получения данных от клиента
-@app.route('/api/data/send', methods=['POST'])
-def receive_data():
-    try:
-        # Получаем данные из JSON запроса
-        data = request.json
-        value = data.get("value")
-
-        # Обработка значения
-        print(f"Получено значение: {value}")
-
-        # Ответ клиенту
-        return jsonify({"response": f"Получено значение: {value}"}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
-
+# Регистрируем маршруты из проектов
+app.register_blueprint(project1.blueprint, url_prefix='/api/project1')
+app.register_blueprint(project2.blueprint, url_prefix='/api/project2')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

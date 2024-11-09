@@ -5,22 +5,17 @@ app = Flask(__name__)
 # Маршрут для получения сообщения
 @app.route('/api/data', methods=['GET'])
 def get_data():
-    data = {"message": "Привет из Flask API!"}
+    data = {"message": "<h1>Привет из Flask API!</h1><p>Этот текст в формате HTML.</p>"}
     return jsonify(data)
 
 # Маршрут для получения данных от клиента
 @app.route('/api/data/send', methods=['POST'])
 def receive_data():
     try:
-        # Получаем данные из JSON запроса
         data = request.json
         value = data.get("value")
-
-        # Обработка значения
         print(f"Получено значение: {value}")
-
-        # Ответ клиенту
-        return jsonify({"response": f"Получено значение: {value}"}), 200
+        return jsonify({"response": f"<b>Получено значение:</b> {value}"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 

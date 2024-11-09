@@ -1,63 +1,50 @@
-from flask import Flask, jsonify, request, render_template_string
+# client.py
+import sys
+from PyQt5.QtCore import QUrl
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
+from PyQt5.QtWebEngineWidgets import QWebEngineView
 
-app = Flask(__name__)
+class BrowserWindow(QMainWindow):
+    def __init__(self, server_ip, server_port=5000):
+        super().__init__()
 
-# Sample HTML content with embedded CSS
-html_content = """
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Пример HTML страницы</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f0f0;
-        }
-        h1 {
-            color: #333;
-        }
-        p {
-            color: #666;
-        }
-    </style>
-</head>
-<body>
-    <div>
-        <h1>Добро пожаловать на страницу</h1>
-        <p>Это пример HTML и CSS, отображаемых в PyQt приложении.</p>
-    </div>
-</body>
-</html>
-"""
+        self.setWindowTitle('HTML Viewer')
+        self.setGeometry(100, 100, 1024, 768)
 
-# API endpoint to get data
-@app.route('/api/data', methods=['GET'])
-def get_data():
-    # Sample data to send to the PyQt client
-    return jsonify({"message": "Привет! Это данные с сервера."})
+        # Настройка виджета для отображения HTML
+        self.browser = QWebEngineView()
 
-# API endpoint to receive data
-@app.route('/api/data/send', methods=['POST'])
-def send_data():
-    data = request.get_json()
-    value = data.get("value", None)
-    if value is not None:
-        response_message = f"Вы отправили значение: {value}"
-        return jsonify({"response": response_message})
-    return jsonify({"response": "Ошибка: Значение не получено"}), 400
+        # Формирование URL для подключения к серверу
+        url = f"http://{server_ip}:{server_port}/"
+        self.browser.setUrl(QUrl(url))
 
-# Endpoint to serve the HTML content
-@app.route('/html')
-def serve_html():
-    return render_template_string(html_content)
+        # Создаём layout для окна
+        layout = QVBoxLayout()
+        layout.addWidget(self.browser)
+
+        container = QWidget()
+        container.setLayout(layout)
+
+        self.setCentralWidget(container)
 
 if __name__ == '__main__':
-    # Run the server on all available IPs, port 5000
-    app.run(host='0.0.0.0', port=5000)
+    if len(sys.argv) < 2:
+        print("Использование: python client.py <IP_СЕРВЕРА> [порт]")
+        sys.exit(1)
+
+    server_ip = sys.argv[1]
+    server_port = 5000  # Значение по умолчанию
+
+    if len(sys.argv) >= 3:
+        try:
+            server_port = int(sys.argv[2])
+        except ValueError:
+            print("Порт должен быть числом.")
+            sys.exit(1)
+
+    # Запуск PyQt5
+    app = QApplication(sys.argv)
+    window = BrowserWindow(server_ip, server_port)
+    window.show()
+
+    sys.exit(app.exec_())

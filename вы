@@ -1,6 +1,21 @@
+from flask import Flask, jsonify, request
 from projects.project1 import create_app as create_app1
+from projects.project2 import create_app as create_app2
 
-app = create_app1()
+app1 = create_app1()
+app2 = create_app2()
+
+@app.route('/')
+def home():
+    return "Welcome to the multi-app Flask server!"
+
+@app.route('/app1')
+def app1_home():
+    return app1.send_static_file('index.html')  # Путь к вашему статичному файлу приложения 1
+
+@app.route('/app2')
+def app2_home():
+    return app2.send_static_file('index.html')  # Путь к вашему статичному файлу приложения 2
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000, debug=True)

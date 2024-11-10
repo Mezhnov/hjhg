@@ -44,7 +44,8 @@ void DrawTextLeft(HDC hdc, int x, int y, const std::wstring& text, int fontSize 
 std::wstring GetCurrentDateTime() {
     std::wostringstream dateTimeStream;
     auto now = std::time(nullptr);
-    auto localTime = *std::localtime(&now);
+    std::tm localTime;
+    localtime_s(&localTime, &now); // Используем localtime_s для безопасного получения локального времени
     dateTimeStream << std::put_time(&localTime, L"%Y-%m-%d %H:%M:%S");
     return dateTimeStream.str();
 }
@@ -148,11 +149,3 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
 
     return 0;
 }
-Сборка начата в 23:58...
-1>------ Сборка начата: проект: Browser, Конфигурация: Debug x64 ------
-1>Browser.cpp
-1>C:\Users\User\source\repos\Browser\Browser\Browser.cpp(37,50): warning C4267: аргумент: преобразование из "size_t" в "int"; возможна потеря данных
-1>C:\Users\User\source\repos\Browser\Browser\Browser.cpp(47,28): error C4996: 'localtime': This function or variable may be unsafe. Consider using localtime_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
-1>Сборка проекта "Browser.vcxproj" завершена с ошибкой.
-========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
-========== Сборка завершено в 23:58 и заняло 00,949 с ==========

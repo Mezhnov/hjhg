@@ -1,6 +1,225 @@
-from projects.project1 import create_app as create_app1
+# server.py
 
-app = create_app1()
+import socket
+import threading
+import logging
+import os
+from urllib.parse import urlparse
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000, debug=True)
+# Настройки сервера
+HOST = '0.0.0.0'  # Слушать на всех интерфейсах
+PORT = 8080
+BUFFER_SIZE = 4096  # Размер буфера для передачи данных
+
+# Настройка логирования
+logging.basicConfig(
+    filename='smp_server.log',
+    level=logging.INFO,
+    format='%(asctime)s:%(levelname)s:%(message)s'
+)
+
+# Разрешенные домены и их корневые директории
+allowed_domains = {
+    'example.com': 'example',
+    'test.com': 'test'
+}
+
+
+def send_large_file(conn, filepath):
+    """
+    Отправляет файл клиенту частями с соответствующими заголовками.
+    """
+    if not os.path.exists(filepath):
+        logging.error(f"Файл не найден: {filepath}")
+        message = "File not found"
+        response = (
+            f"SMP 1.0\n"
+            f"STATUS: ERROR\n"
+            f"MESSAGE: {message}\n"
+            f"CONTENT-TYPE: text/plain\n"
+            f"CONTENT-LENGTH: {len(message)}\n\n"
+            f"{message}"
+        )
+        conn.sendall(response.encode())
+        return
+
+    try:
+        file_size = os.path.getsize(filepath)
+        _, ext = os.path.splitext(filepath)
+        ext = ext.lower()
+        if ext in ['.html', '.htm']:
+            content_type = 'text/html'
+        elif ext == '.css':
+            content_type = 'text/css'
+        elif ext == '.png':
+            content_type = 'image/png'
+        elif ext in ['.jpg', '.jpeg']:
+            content_type = 'image/jpeg'
+        elif ext == '.gif':
+            content_type = 'image/gif'
+        elif ext == '.js':
+            content_type = 'application/javascript'
+        else:
+            content_type = 'application/octet-stream'
+
+        # Отправка заголовков
+        response_headers = (
+            f"SMP 1.0\n"
+            f"STATUS: OK\n"
+            f"CONTENT-TYPE: {content_type}\n"
+            f"CONTENT-LENGTH: {file_size}\n\n"
+        )
+        conn.send(response_headers.encode())
+        logging.info(f"Отправка файла: {filepath}")
+
+        # Отправка файла частями
+        with open(filepath, 'rb') as f:
+            while True:
+                chunk = f.read(BUFFER_SIZE)
+                if not chunk:
+                    break
+                conn.sendall(chunk)
+        logging.info(f"Файл отправлен: {filepath}")
+
+    except Exception as e:
+        logging.error(f"Ошибка при отправке файла {filepath}: {e}")
+        message = f"Error sending file: {e}"
+        response = (
+            f"SMP 1.0\n"
+            f"STATUS: ERROR\n"
+            f"MESSAGE: {message}\n"
+            f"CONTENT-TYPE: text/plain\n"
+            f"CONTENT-LENGTH: {len(message)}\n\n"
+            f"{message}"
+        )
+        conn.sendall(response.encode())
+
+
+def handle_client(conn, addr):
+    """
+    Обрабатывает подключения клиентов в отдельных потоках.
+    """
+    logging.info(f"Подключен клиент: {addr}")
+
+    # Удалена отправка начального сообщения
+
+    while True:
+        try:
+            data = b""
+            while b"\n\n" not in data:
+                part = conn.recv(BUFFER_SIZE)
+                if not part:
+                    raise ConnectionResetError("Клиент закрыл соединение")
+                data += part
+
+            header_data, _, body = data.partition(b"\n\n")
+            headers = {}
+            for line in header_data.decode().split('\n'):
+                if ': ' in line:
+                    key, value = line.split(': ', 1)
+                    headers[key.strip().upper()] = value.strip()
+
+            action = headers.get('ACTION')
+            resource = headers.get('RESOURCE')
+
+            if action == 'GET' and resource:
+                # Разбор ресурса для извлечения домена и пути
+                parsed = urlparse('smp://' + resource)  # Для использования urlparse
+                domain = parsed.hostname
+                path = parsed.path.lstrip('/')  # Удаление ведущего '/'
+
+                if domain not in allowed_domains:
+                    message = "Domain not allowed"
+                    response = (
+                        f"SMP 1.0\n"
+                        f"STATUS: ERROR\n"
+                        f"MESSAGE: {message}\n"
+                        f"CONTENT-TYPE: text/plain\n"
+                        f"CONTENT-LENGTH: {len(message)}\n\n"
+                        f"{message}"
+                    )
+                    conn.send(response.encode())
+                    logging.warning(f"Запрошен запрещенный домен: {domain}")
+                    continue
+
+                # Определение пути к файлу
+                domain_root = allowed_domains[domain]
+                file_path = os.path.join(domain_root, path) if path else os.path.join(domain_root, 'index.html')
+
+                # Предотвращение обхода директорий
+                real_file_path = os.path.realpath(file_path)
+                real_domain_root = os.path.realpath(domain_root)
+                if not real_file_path.startswith(real_domain_root):
+                    message = "Invalid resource path"
+                    response = (
+                        f"SMP 1.0\n"
+                        f"STATUS: ERROR\n"
+                        f"MESSAGE: {message}\n"
+                        f"CONTENT-TYPE: text/plain\n"
+                        f"CONTENT-LENGTH: {len(message)}\n\n"
+                        f"{message}"
+                    )
+                    conn.send(response.encode())
+                    logging.warning(f"Некорректный путь ресурса: {file_path}")
+                    continue
+
+                # Если путь указывает на директорию, отправить index.html
+                if os.path.isdir(file_path):
+                    file_path = os.path.join(file_path, 'index.html')
+                if os.path.exists(file_path):
+                    send_large_file(conn, file_path)
+                else:
+                    # Ресурс не найден
+                    message = "Resource not found"
+                    response = (
+                        f"SMP 1.0\n"
+                        f"STATUS: ERROR\n"
+                        f"MESSAGE: {message}\n"
+                        f"CONTENT-TYPE: text/plain\n"
+                        f"CONTENT-LENGTH: {len(message)}\n\n"
+                        f"{message}"
+                    )
+                    conn.send(response.encode())
+                    logging.warning(f"Ресурс не найден: {file_path}")
+
+            else:
+                message = "Invalid ACTION or missing RESOURCE"
+                response = (
+                    f"SMP 1.0\n"
+                    f"STATUS: ERROR\n"
+                    f"MESSAGE: {message}\n"
+                    f"CONTENT-TYPE: text/plain\n"
+                    f"CONTENT-LENGTH: {len(message)}\n\n"
+                    f"{message}"
+                )
+                conn.send(response.encode())
+                logging.warning(f"Некорректный запрос: ACTION={action}, RESOURCE={resource}")
+
+        except ConnectionResetError as e:
+            logging.info(f"Клиент {addr} отключился: {e}")
+            break
+        except Exception as e:
+            logging.error(f"Ошибка при обработке клиента {addr}: {e}")
+            break
+
+    conn.close()
+    logging.info(f"Соединение с {addr} закрыто")
+
+
+def start_server():
+    """
+    Запускает SMP сервер для прослушивания входящих подключений.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+        server_socket.bind((HOST, PORT))
+        server_socket.listen()
+        logging.info(f"SMP Server запущен на {HOST}:{PORT}")
+
+        while True:
+            conn, addr = server_socket.accept()
+            client_thread = threading.Thread(target=handle_client, args=(conn, addr), daemon=True)
+            client_thread.start()
+
+
+if __name__ == "__main__":
+    start_server()

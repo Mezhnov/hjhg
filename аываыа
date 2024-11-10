@@ -45,8 +45,9 @@ struct TabData {
     std::wstring url;
 };
 
-// Вектр для хранения вкладок
+// Вектор для хранения вкладок
 std::vector<TabData> tabs;
+int currentTabIndex = 0;
 
 // Функция для создания браузера внутри вкладки
 HWND CreateBrowser(HWND hParent) {
@@ -57,26 +58,37 @@ HWND CreateBrowser(HWND hParent) {
     HWND hwndBrowser = CreateWindowEx(0, L"Shell.Explorer.2", NULL,
         WS_CHILD | WS_VISIBLE, 0, 0, 800, 600, hParent, NULL, hInst, NULL);
 
-    // Навигация к начальной странице
-    IDispatch* pDisp = NULL;
-    SendMessage(hwndBrowser, WM_USER + 1, 0, (LPARAM)&pDisp);
-    // Реализация навигации через WebBrowser требует дополнительных шагов
-
     return hwndBrowser;
 }
 
-// Обработчик создания вкладки
+// Функция для создания новой вкладки
 void AddNewTab(const std::wstring& url) {
     TabData tab;
     tab.url = url;
     tab.hwndBrowser = CreateBrowser(hMainWnd);
+
     tabs.push_back(tab);
-    // Добавление в TabControl и настройка
+
+    // Переключаемся на новую вкладку
+    currentTabIndex = tabs.size() - 1;
+}
+
+// Функция для обновления URL в адресной строке
+void UpdateAddressBar() {
+    if (currentTabIndex >= 0 && currentTabIndex < tabs.size()) {
+        SetWindowText(GetDlgItem(hMainWnd, IDC_ADDRESSBAR), tabs[currentTabIndex].url.c_str());
+    }
+}
+
+// Обработчик создания вкладки
+void AddTabButtonClick(HWND hwnd) {
+    AddNewTab(L"https://www.google.com");
+    UpdateAddressBar();
 }
 
 // Процедура окна
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    switch(msg) {
+    switch (msg) {
         case WM_CREATE: {
             // Создание адресной строки
             HWND hAddress = CreateWindowEx(WS_EX_CLIENTEDGE, L"EDIT", NULL,
@@ -103,11 +115,19 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 // Получение URL из адресной строки
                 wchar_t url[2048];
                 GetWindowText(GetDlgItem(hwnd, IDC_ADDRESSBAR), url, 2048);
-                // Навигация в текущей вкладке
-                if (!tabs.empty()) {
-                    // Пример: предполагается, что hwndBrowser поддерживает IWebBrowser2
-                    // Для полной реализации потребуется дополнительный код
+                
+                // Обновление URL в текущей вкладке
+                if (currentTabIndex >= 0 && currentTabIndex < tabs.size()) {
+                    tabs[currentTabIndex].url = url;
+                    // Реализовать переход на новый URL через WebBrowser
                 }
+            }
+            break;
+        }
+        case WM_NOTIFY: {
+            if (LOWORD(wParam) == IDC_TABCONTROL && ((LPNMHDR)lParam)->code == TCN_SELCHANGE) {
+                currentTabIndex = TabCtrl_GetCurSel((HWND)lParam);
+                UpdateAddressBar();
             }
             break;
         }
@@ -146,7 +166,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     // Цикл сообщений
     MSG msg;
-    while(GetMessage(&msg, NULL, 0, 0)) {
+    while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }

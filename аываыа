@@ -46,6 +46,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         RECT rect;
         GetClientRect(hwnd, &rect);
 
+        // Установка черного фона
+        HBRUSH blackBrush = CreateSolidBrush(RGB(0, 0, 0));
+        FillRect(hdc, &rect, blackBrush);
+        DeleteObject(blackBrush);
+
         // Пример текста BIOS-подобного интерфейса
         std::wstring line1 = L"BIOS Setup Utility";
         std::wstring line2 = L"Press ESC to exit";
@@ -72,7 +77,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
     wc.lpszClassName = CLASS_NAME;
-    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wc.hCursor = NULL; // Убираем курсор, чтобы создать эффект BIOS-подобного интерфейса
 
     RegisterClass(&wc);
 

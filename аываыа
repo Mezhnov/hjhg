@@ -1,17 +1,14 @@
-// Include необходимые заголовочные файлы
 #include <windows.h>
 #include <string>
 #include <sstream>
 #include <iomanip>
 #include <ctime>
 
-// Глобальные переменные
 const wchar_t CLASS_NAME[] = L"BIOSLikeWindowClass";
 
-// Функция для рисования текста на окне
-void DrawTextCenter(HDC hdc, RECT rect, const std::wstring& text, int fontSize = 24, COLORREF color = RGB(0, 255, 0)) {
+void DrawTextCenter(HDC hdc, RECT rect, const std::wstring& text, int fontSize = 48, COLORREF color = RGB(0, 255, 0)) {
     HFONT hFont = CreateFont(
-        fontSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+        fontSize, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
         DEFAULT_CHARSET, OUT_OUTLINE_PRECIS, CLIP_DEFAULT_PRECIS,
         CLEARTYPE_QUALITY, VARIABLE_PITCH, L"Consolas");
     HFONT hOldFont = (HFONT)SelectObject(hdc, hFont);
@@ -24,8 +21,7 @@ void DrawTextCenter(HDC hdc, RECT rect, const std::wstring& text, int fontSize =
     DeleteObject(hFont);
 }
 
-// Функция для рисования текста с выравниванием по левому краю
-void DrawTextLeft(HDC hdc, int x, int y, const std::wstring& text, int fontSize = 20, COLORREF color = RGB(0, 255, 0)) {
+void DrawTextLeft(HDC hdc, int x, int y, const std::wstring& text, int fontSize = 24, COLORREF color = RGB(0, 255, 0)) {
     HFONT hFont = CreateFont(
         fontSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
         DEFAULT_CHARSET, OUT_OUTLINE_PRECIS, CLIP_DEFAULT_PRECIS,
@@ -40,17 +36,15 @@ void DrawTextLeft(HDC hdc, int x, int y, const std::wstring& text, int fontSize 
     DeleteObject(hFont);
 }
 
-// Функция для получения текущей даты и времени в формате строки
 std::wstring GetCurrentDateTime() {
     std::wostringstream dateTimeStream;
     auto now = std::time(nullptr);
     std::tm localTime;
-    localtime_s(&localTime, &now); // Используем localtime_s для безопасного получения локального времени
+    localtime_s(&localTime, &now);
     dateTimeStream << std::put_time(&localTime, L"%Y-%m-%d %H:%M:%S");
     return dateTimeStream.str();
 }
 
-// Процедура окна
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
     case WM_DESTROY:
@@ -70,37 +64,31 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         RECT rect;
         GetClientRect(hwnd, &rect);
 
-        // Установка черного фона
         HBRUSH blackBrush = CreateSolidBrush(RGB(0, 0, 0));
         FillRect(hdc, &rect, blackBrush);
         DeleteObject(blackBrush);
 
-        // Заголовок BIOS
         RECT headerRect = rect;
         headerRect.top = 20;
-        DrawTextCenter(hdc, headerRect, L"BIOS Setup Utility - Version 1.0.0", 32);
+        DrawTextCenter(hdc, headerRect, L"BIOS Setup Utility - Version 1.0.0", 36);
 
-        // Информация о системе
-        int startY = 100;
-        DrawTextLeft(hdc, 50, startY, L"Processor: Intel(R) Core(TM) i7-10700K CPU @ 3.80GHz");
-        DrawTextLeft(hdc, 50, startY + 30, L"Memory: 16 GB DDR4");
-        DrawTextLeft(hdc, 50, startY + 60, L"Storage: 512 GB SSD");
+        int startY = 150;
+        DrawTextLeft(hdc, 50, startY, L"Processor: Intel(R) Core(TM) i7-10700K CPU @ 3.80GHz", 28);
+        DrawTextLeft(hdc, 50, startY + 40, L"Memory: 16 GB DDR4", 28);
+        DrawTextLeft(hdc, 50, startY + 80, L"Storage: 512 GB SSD", 28);
 
-        // Текущая дата и время
-        DrawTextLeft(hdc, 50, startY + 120, L"Current Date and Time: " + GetCurrentDateTime());
+        DrawTextLeft(hdc, 50, startY + 160, L"Current Date and Time: " + GetCurrentDateTime(), 28);
 
-        // Опции BIOS
-        int optionsY = startY + 200;
-        DrawTextLeft(hdc, 50, optionsY, L"F1 System Information");
-        DrawTextLeft(hdc, 50, optionsY + 30, L"F2 Advanced");
-        DrawTextLeft(hdc, 50, optionsY + 60, L"F3 Boot");
-        DrawTextLeft(hdc, 50, optionsY + 90, L"F4 Security");
-        DrawTextLeft(hdc, 50, optionsY + 120, L"F10 Save and Exit");
+        int optionsY = startY + 280;
+        DrawTextLeft(hdc, 50, optionsY, L"F1 System Information", 26);
+        DrawTextLeft(hdc, 50, optionsY + 40, L"F2 Advanced", 26);
+        DrawTextLeft(hdc, 50, optionsY + 80, L"F3 Boot", 26);
+        DrawTextLeft(hdc, 50, optionsY + 120, L"F4 Security", 26);
+        DrawTextLeft(hdc, 50, optionsY + 160, L"F10 Save and Exit", 26);
 
-        // Подсказка для выхода
         RECT footerRect = rect;
         footerRect.bottom -= 50;
-        DrawTextCenter(hdc, footerRect, L"Press ESC to exit", 20, RGB(255, 0, 0));
+        DrawTextCenter(hdc, footerRect, L"Press ESC to exit", 24, RGB(255, 0, 0));
 
         EndPaint(hwnd, &ps);
     }
@@ -109,7 +97,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
-// Точка входа
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     WNDCLASS wc = {};
     wc.lpfnWndProc = WindowProc;

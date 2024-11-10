@@ -74,11 +74,10 @@ void AddNewTab(const std::wstring& url) {
     // Добавление вкладки в список
     tabs.push_back(tab);
 
-    // Создание новой вкладки в TabControl с кастомным стилем
+    // Создание новой вкладки в TabControl
     TCITEM tie;
-    tie.mask = TCIF_TEXT | TCIF_IMAGE;
+    tie.mask = TCIF_TEXT;
     tie.pszText = const_cast<wchar_t*>(url.c_str());
-    tie.iImage = -1;  // Можно установить индекс изображения для favicon, если нужно
     TabCtrl_InsertItem(hTabControl, tabs.size() - 1, &tie);
 }
 
@@ -89,103 +88,74 @@ void UpdateTabVisibility(int activeTabIndex) {
     }
 }
 
-// Функция для обновления стиля вкладок
-void UpdateTabStyle(int activeTabIndex) {
-    for (int i = 0; i < tabs.size(); ++i) {
-        HWND hwndTab = TabCtrl_GetItem(hTabControl, i);
-        
-        // Для активной вкладки используем светлый фон и темный текст
-        if (i == activeTabIndex) {
-            SetTabControlItemColor(hwndTab, RGB(255, 255, 255), RGB(0, 0, 0));
-        } else {
-            // Для неактивных вкладок темный фон и светлый текст
-            SetTabControlItemColor(hwndTab, RGB(240, 240, 240), RGB(100, 100, 100));
-        }
-    }
-}
-
-// Функция для установки цветов вкладки
-void SetTabControlItemColor(HWND hwndTab, COLORREF backgroundColor, COLORREF textColor) {
-    // Установка фона и текста для вкладки
-    HDC hdc = GetDC(hwndTab);
-    SetBkColor(hdc, backgroundColor);
-    SetTextColor(hdc, textColor);
-    InvalidateRect(hwndTab, NULL, TRUE);
-    ReleaseDC(hwndTab, hdc);
-}
-
 // Обработчик создания окна
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    switch(msg) {
-        case WM_CREATE: {
-            // Создание адресной строки
-            HWND hAddress = CreateWindowEx(WS_EX_CLIENTEDGE, L"EDIT", NULL,
-                WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
-                10, 10, 600, 25, hwnd, (HMENU)IDC_ADDRESSBAR, hInst, NULL);
+    switch (msg) {
+    case WM_CREATE: {
+        // Создание адресной строки
+        HWND hAddress = CreateWindowEx(WS_EX_CLIENTEDGE, L"EDIT", NULL,
+            WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
+            10, 10, 600, 25, hwnd, (HMENU)IDC_ADDRESSBAR, hInst, NULL);
 
-            // Создание кнопки "Go"
-            CreateWindowEx(0, L"BUTTON", L"Go",
-                WS_CHILD | WS_VISIBLE,
-                620, 10, 50, 25, hwnd, (HMENU)IDC_GO_BUTTON, hInst, NULL);
+        // Создание кнопки "Go"
+        CreateWindowEx(0, L"BUTTON", L"Go",
+            WS_CHILD | WS_VISIBLE,
+            620, 10, 50, 25, hwnd, (HMENU)IDC_GO_BUTTON, hInst, NULL);
 
-            // Создание кнопки для новой вкладки
-            CreateWindowEx(0, L"BUTTON", L"New Tab",
-                WS_CHILD | WS_VISIBLE,
-                680, 10, 80, 25, hwnd, (HMENU)IDC_NEW_TAB_BUTTON, hInst, NULL);
+        // Создание кнопки для новой вкладки
+        CreateWindowEx(0, L"BUTTON", L"New Tab",
+            WS_CHILD | WS_VISIBLE,
+            680, 10, 80, 25, hwnd, (HMENU)IDC_NEW_TAB_BUTTON, hInst, NULL);
 
-            // Создание TabControl
-            hTabControl = CreateWindow(WC_TABCONTROL, L"",
-                WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
-                10, 45, 760, 500, hwnd, (HMENU)IDC_TABCONTROL, hInst, NULL);
+        // Создание TabControl
+        hTabControl = CreateWindow(WC_TABCONTROL, L"",
+            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
+            10, 45, 760, 500, hwnd, (HMENU)IDC_TABCONTROL, hInst, NULL);
 
-            // Добавление первой вкладки
-            AddNewTab(L"https://www.google.com");
+        // Добавление первой вкладки
+        AddNewTab(L"https://www.google.com");
 
-            // Инициализация видимости вкладок
-            UpdateTabVisibility(0);
+        // Инициализация видимости вкладок
+        UpdateTabVisibility(0);
 
-            // Обновление стиля вкладок
-            UpdateTabStyle(0);
+        break;
+    }
+    case WM_COMMAND: {
+        if (LOWORD(wParam) == IDC_GO_BUTTON) {
+            // Получение URL из адресной строки
+            wchar_t url[2048];
+            GetWindowText(GetDlgItem(hwnd, IDC_ADDRESSBAR), url, 2048);
 
-            break;
-        }
-        case WM_COMMAND: {
-            if (LOWORD(wParam) == IDC_GO_BUTTON) {
-                // Получение URL из адресной строки
-                wchar_t url[2048];
-                GetWindowText(GetDlgItem(hwnd, IDC_ADDRESSBAR), url, 2048);
-
-                // Навигация в текущей вкладке
-                if (!tabs.empty()) {
-                    // Пример: предполагается, что hwndBrowser поддерживает IWebBrowser2
-                    // Для полной реализации потребуется дополнительный код
-                }
-            } else if (LOWORD(wParam) == IDC_NEW_TAB_BUTTON) {
-                // Добавление новой вкладки
-                AddNewTab(L"https://www.newtab.com");
-
-                // Переключение на новую вкладку
-                TabCtrl_SetCurSel(hTabControl, tabs.size() - 1);
-                UpdateTabVisibility(tabs.size() - 1);
-                UpdateTabStyle(tabs.size() - 1);
+            // Навигация в текущей вкладке
+            if (!tabs.empty()) {
+                // Пример: предполагается, что hwndBrowser поддерживает IWebBrowser2
+                // Для полной реализации потребуется дополнительный код
             }
-            break;
         }
-        case WM_NOTIFY: {
-            if (((LPNMHDR)lParam)->idFrom == IDC_TABCONTROL && ((LPNMHDR)lParam)->code == TCN_SELCHANGE) {
-                // Переключение вкладки
-                int selectedTab = TabCtrl_GetCurSel(hTabControl);
-                UpdateTabVisibility(selectedTab);
-                UpdateTabStyle(selectedTab);
-            }
-            break;
+        else if (LOWORD(wParam) == IDC_NEW_TAB_BUTTON) {
+            // Добавление новой вкладки
+            AddNewTab(L"https://www.newtab.com");
+
+            // Переключение на новую вкладку
+            TabCtrl_SetCurSel(hTabControl, tabs.size() - 1);
+            UpdateTabVisibility(tabs.size() - 1);
         }
-        case WM_DESTROY: {
-            PostQuitMessage(0);
-            break;
+        break;
+    }
+    case WM_NOTIFY: {
+        if (((LPNMHDR)lParam)->idFrom == IDC_TABCONTROL && ((LPNMHDR)lParam)->code == TCN_SELCHANGE) {
+            // Переключение вкладки
+            int selectedTab = TabCtrl_GetCurSel(hTabControl);
+            UpdateTabVisibility(selectedTab);
         }
-        default:
-            return DefWindowProc(hwnd, msg, wParam, lParam);
+        break;
+    }
+    case WM_DESTROY: {
+        PostQuitMessage(0);
+        break;
+    }
+    default:
+        return DefWindowProc(hwnd, msg, wParam, lParam);
     }
     return 0;
 }
@@ -196,7 +166,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     InitCommonControlsExFunc();
 
     // Регистрация класса окна
-    WNDCLASSEX wc = {0};
+    WNDCLASSEX wc = { 0 };
     wc.cbSize = sizeof(WNDCLASSEX);
     wc.style = CS_HREDRAW | CS_VREDRAW;
     wc.lpfnWndProc = WndProc;
@@ -213,12 +183,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     ShowWindow(hMainWnd, nCmdShow);
     UpdateWindow(hMainWnd);
 
-    // Главный цикл сообщений
+    // Цикл сообщений
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
+
+    // Освобождение COM
+    CoUninitialize();
 
     return (int)msg.wParam;
 }

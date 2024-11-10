@@ -1,138 +1,122 @@
 #include <windows.h>
+#include <gdiplus.h>
 #include <string>
 #include <sstream>
-#include <iomanip>
-#include <ctime>
+#include <locale>
+#include <codecvt>
+#include <mmsystem.h> // Для PlaySound
+#include <CommCtrl.h> // Для стандартных элементов управления
+#include <richedit.h> // Для RichEdit
+#include "resource.h" // Для ID ресурсов
 
-const wchar_t CLASS_NAME[] = L"BIOSLikeWindowClass";
+#define IDR_WAVE1 101
+#define IDR_WAVE2 102
+#define IDR_WAVE3 103
+#define IDR_WAVE4 104
 
-void DrawTextCenter(HDC hdc, RECT rect, const std::wstring& text, int fontSize = 48, COLORREF color = RGB(0, 255, 0)) {
-    HFONT hFont = CreateFont(
-        fontSize, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
-        DEFAULT_CHARSET, OUT_OUTLINE_PRECIS, CLIP_DEFAULT_PRECIS,
-        CLEARTYPE_QUALITY, VARIABLE_PITCH, L"Consolas");
-    HFONT hOldFont = (HFONT)SelectObject(hdc, hFont);
+#pragma comment(lib, "gdiplus.lib")
+#pragma comment(lib, "comctl32.lib")
+#pragma comment(lib, "winmm.lib") // Для PlaySound
 
-    SetTextColor(hdc, color);
-    SetBkMode(hdc, TRANSPARENT);
-    DrawTextW(hdc, text.c_str(), -1, &rect, DT_CENTER | DT_SINGLELINE);
+// Глобальные переменные
+HINSTANCE hInst;
+HWND hwndInput;
+HWND hwndEdit;
+HWND hwndBackground;
+std::wstring backgroundImagePath = L"C:\\path_to_your_image.jpg"; // Замените на путь к вашему изображению
 
-    SelectObject(hdc, hOldFont);
-    DeleteObject(hFont);
-}
+// Прототипы функций
+LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+void CreateInputDialog(HWND hwnd);
+void LoadBackgroundImage(HWND hwnd);
 
-void DrawTextLeft(HDC hdc, int x, int y, const std::wstring& text, int fontSize = 24, COLORREF color = RGB(0, 255, 0)) {
-    HFONT hFont = CreateFont(
-        fontSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
-        DEFAULT_CHARSET, OUT_OUTLINE_PRECIS, CLIP_DEFAULT_PRECIS,
-        CLEARTYPE_QUALITY, VARIABLE_PITCH, L"Consolas");
-    HFONT hOldFont = (HFONT)SelectObject(hdc, hFont);
+// Главная функция программы
+int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
+{
+    // Инициализация библиотеки GDI+
+    Gdiplus::GdiplusStartupInput gdiplusStartupInput;
+    ULONG_PTR gdiplusToken;
+    Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
 
-    SetTextColor(hdc, color);
-    SetBkMode(hdc, TRANSPARENT);
-    TextOutW(hdc, x, y, text.c_str(), text.length());
-
-    SelectObject(hdc, hOldFont);
-    DeleteObject(hFont);
-}
-
-std::wstring GetCurrentDateTime() {
-    std::wostringstream dateTimeStream;
-    auto now = std::time(nullptr);
-    std::tm localTime;
-    localtime_s(&localTime, &now);
-    dateTimeStream << std::put_time(&localTime, L"%Y-%m-%d %H:%M:%S");
-    return dateTimeStream.str();
-}
-
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    switch (uMsg) {
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        return 0;
-
-    case WM_KEYDOWN:
-        if (wParam == VK_ESCAPE) {
-            DestroyWindow(hwnd);
-        }
-        return 0;
-
-    case WM_PAINT: {
-        PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(hwnd, &ps);
-
-        RECT rect;
-        GetClientRect(hwnd, &rect);
-
-        HBRUSH blackBrush = CreateSolidBrush(RGB(0, 0, 0));
-        FillRect(hdc, &rect, blackBrush);
-        DeleteObject(blackBrush);
-
-        RECT headerRect = rect;
-        headerRect.top = 20;
-        DrawTextCenter(hdc, headerRect, L"BIOS Setup Utility - Version 1.0.0", 36);
-
-        int startY = 150;
-        DrawTextLeft(hdc, 50, startY, L"Processor: Intel(R) Core(TM) i7-10700K CPU @ 3.80GHz", 28);
-        DrawTextLeft(hdc, 50, startY + 40, L"Memory: 16 GB DDR4", 28);
-        DrawTextLeft(hdc, 50, startY + 80, L"Storage: 512 GB SSD", 28);
-
-        DrawTextLeft(hdc, 50, startY + 160, L"Current Date and Time: " + GetCurrentDateTime(), 28);
-
-        int optionsY = startY + 280;
-        DrawTextLeft(hdc, 50, optionsY, L"F1 System Information", 26);
-        DrawTextLeft(hdc, 50, optionsY + 40, L"F2 Advanced", 26);
-        DrawTextLeft(hdc, 50, optionsY + 80, L"F3 Boot", 26);
-        DrawTextLeft(hdc, 50, optionsY + 120, L"F4 Security", 26);
-        DrawTextLeft(hdc, 50, optionsY + 160, L"F10 Save and Exit", 26);
-
-        RECT footerRect = rect;
-        footerRect.bottom -= 50;
-        DrawTextCenter(hdc, footerRect, L"Press ESC to exit", 24, RGB(255, 0, 0));
-
-        EndPaint(hwnd, &ps);
-    }
-                  return 0;
-    }
-    return DefWindowProc(hwnd, uMsg, wParam, lParam);
-}
-
-int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
-    WNDCLASS wc = {};
-    wc.lpfnWndProc = WindowProc;
+    // Регистрация класса окна
+    WNDCLASS wc = {0};
+    wc.lpfnWndProc = WndProc;
     wc.hInstance = hInstance;
-    wc.lpszClassName = CLASS_NAME;
-    wc.hCursor = NULL;
-
+    wc.lpszClassName = L"UserInputWindowClass";
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     RegisterClass(&wc);
 
-    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+    // Создание окна
+    HWND hwnd = CreateWindowEx(0, L"UserInputWindowClass", L"Enter Username", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+        CW_USEDEFAULT, CW_USEDEFAULT, 800, 600, NULL, NULL, hInstance, NULL);
 
-    HWND hwnd = CreateWindowEx(
-        0,
-        CLASS_NAME,
-        L"BIOS-like Screen",
-        WS_POPUP,
-        0, 0, screenWidth, screenHeight,
-        NULL,
-        NULL,
-        hInstance,
-        NULL
-    );
+    // Инициализация элементов интерфейса
+    hwndBackground = hwnd;
+    CreateInputDialog(hwnd);
 
-    if (hwnd == NULL) {
-        return 0;
-    }
-
-    ShowWindow(hwnd, SW_SHOW);
-    UpdateWindow(hwnd);
-
-    MSG msg = {};
-    while (GetMessage(&msg, NULL, 0, 0)) {
+    // Главный цикл обработки сообщений
+    MSG msg;
+    while (GetMessage(&msg, NULL, 0, 0))
+    {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
+    // Завершение работы с GDI+
+    Gdiplus::GdiplusShutdown(gdiplusToken);
+
+    return (int)msg.wParam;
+}
+
+// Обработчик сообщений
+LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    switch (msg)
+    {
+    case WM_CREATE:
+        // Загрузить фоновое изображение
+        LoadBackgroundImage(hwnd);
+        break;
+
+    case WM_KEYDOWN:
+        if (wParam == VK_ESCAPE)
+        {
+            PostMessage(hwnd, WM_CLOSE, 0, 0); // Закрыть окно при нажатии ESC
+        }
+        break;
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+
+    default:
+        return DefWindowProc(hwnd, msg, wParam, lParam);
+    }
+
     return 0;
+}
+
+// Функция для создания диалога с вводом имени пользователя
+void CreateInputDialog(HWND hwnd)
+{
+    // Создание текста
+    CreateWindowEx(0, L"STATIC", L"Please enter your username:",
+        WS_CHILD | WS_VISIBLE | SS_CENTER, 50, 150, 700, 30, hwnd, NULL, hInst, NULL);
+
+    // Создание поля ввода
+    hwndEdit = CreateWindowEx(0, L"EDIT", L"",
+        WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 50, 200, 700, 30, hwnd, NULL, hInst, NULL);
+}
+
+// Функция для загрузки фонового изображения
+void LoadBackgroundImage(HWND hwnd)
+{
+    HDC hdc = GetDC(hwnd);
+    Gdiplus::Graphics graphics(hdc);
+
+    // Загрузка изображения
+    Gdiplus::Image image(backgroundImagePath.c_str());
+    graphics.DrawImage(&image, 0, 0, 800, 600);
+
+    ReleaseDC(hwnd, hdc);
 }

@@ -1,54 +1,6 @@
-import os
-import sqlite3
-from flask import Flask, render_template, request, redirect, url_for
+from projects.project1 import create_app as create_app1
 
-# Define the path to the SQLite database
-DATABASE = os.path.join(os.path.dirname(__file__), 'users.db')
+app = create_app1()
 
-# Function to create a Flask application
-def create_app():
-    app = Flask(__name__)
-    init_db()  # Initialize the database when the app starts
-
-    # Home page with registration form
-    @app.route('/')
-    def index():
-        return render_template("index.html")
-
-    # Registration handler
-    @app.route('/register', methods=['POST'])
-    def register():
-        username = request.form['username']
-        password = request.form['password']
-
-        db = get_db()
-        db.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, password))
-        db.commit()
-
-        return redirect(url_for('success'))
-
-    @app.route('/success')
-    def success():
-        return render_template("success.html")
-
-    return app
-
-# Function to connect to the database
-def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-# Function to initialize the database and create the table if it doesn't exist
-def init_db():
-    try:
-        with sqlite3.connect(DATABASE) as conn:
-            conn.execute('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, password TEXT NOT NULL)')
-            conn.commit()
-    except sqlite3.Error as e:
-        print(f"An error occurred while initializing the database: {e}")
-
-# Run the app
-if __name__ == "__main__":
-    app = create_app()
-    app.run(debug=True)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8000, debug=True)

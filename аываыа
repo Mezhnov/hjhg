@@ -1,122 +1,108 @@
 #include <windows.h>
+#include <commctrl.h>
+#include <mmsystem.h>
 #include <gdiplus.h>
 #include <string>
 #include <sstream>
-#include <locale>
-#include <codecvt>
-#include <mmsystem.h> // Для PlaySound
-#include <CommCtrl.h> // Для стандартных элементов управления
-#include <richedit.h> // Для RichEdit
-#include "resource.h" // Для ID ресурсов
-
-#define IDR_WAVE1 101
-#define IDR_WAVE2 102
-#define IDR_WAVE3 103
-#define IDR_WAVE4 104
+#include <iomanip>
 
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "comctl32.lib")
-#pragma comment(lib, "winmm.lib") // Для PlaySound
 
-// Глобальные переменные
+// Global variables
 HINSTANCE hInst;
-HWND hwndInput;
-HWND hwndEdit;
-HWND hwndBackground;
-std::wstring backgroundImagePath = L"C:\\path_to_your_image.jpg"; // Замените на путь к вашему изображению
+HWND hWndMain;
+Gdiplus::GdiplusStartupInput gdiplusStartupInput;
+Gdiplus::StartupOutput gdiplusStartupOutput;
+Gdiplus::GdiplusStartupToken gdiplusToken;
 
-// Прототипы функций
+// Forward declarations
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
-void CreateInputDialog(HWND hwnd);
-void LoadBackgroundImage(HWND hwnd);
+void CreateMainMenu(HWND);
+void DisplayTime(HWND);
+void InitGDIPlus();
 
-// Главная функция программы
-int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
-{
-    // Инициализация библиотеки GDI+
-    Gdiplus::GdiplusStartupInput gdiplusStartupInput;
-    ULONG_PTR gdiplusToken;
-    Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
+int main() {
+    // Initialize GDI+
+    InitGDIPlus();
 
-    // Регистрация класса окна
-    WNDCLASS wc = {0};
-    wc.lpfnWndProc = WndProc;
-    wc.hInstance = hInstance;
-    wc.lpszClassName = L"UserInputWindowClass";
-    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-    RegisterClass(&wc);
+    // Initialize Windows components
+    WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_HREDRAW | CS_VREDRAW, WndProc, 0, 0, GetModuleHandle(NULL), NULL, NULL, (HBRUSH)(COLOR_WINDOW+1), NULL, L"MainWindowClass", NULL };
+    RegisterClassEx(&wc);
 
-    // Создание окна
-    HWND hwnd = CreateWindowEx(0, L"UserInputWindowClass", L"Enter Username", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-        CW_USEDEFAULT, CW_USEDEFAULT, 800, 600, NULL, NULL, hInstance, NULL);
+    hWndMain = CreateWindow(L"MainWindowClass", L"Main Screen", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 800, 600, NULL, NULL, wc.hInstance, NULL);
+    
+    // Show window and start message loop
+    ShowWindow(hWndMain, SW_SHOW);
+    UpdateWindow(hWndMain);
 
-    // Инициализация элементов интерфейса
-    hwndBackground = hwnd;
-    CreateInputDialog(hwnd);
-
-    // Главный цикл обработки сообщений
     MSG msg;
-    while (GetMessage(&msg, NULL, 0, 0))
-    {
+    while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
-    // Завершение работы с GDI+
+    // Shutdown GDI+
     Gdiplus::GdiplusShutdown(gdiplusToken);
-
-    return (int)msg.wParam;
-}
-
-// Обработчик сообщений
-LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
-{
-    switch (msg)
-    {
-    case WM_CREATE:
-        // Загрузить фоновое изображение
-        LoadBackgroundImage(hwnd);
-        break;
-
-    case WM_KEYDOWN:
-        if (wParam == VK_ESCAPE)
-        {
-            PostMessage(hwnd, WM_CLOSE, 0, 0); // Закрыть окно при нажатии ESC
-        }
-        break;
-
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        break;
-
-    default:
-        return DefWindowProc(hwnd, msg, wParam, lParam);
-    }
-
     return 0;
 }
 
-// Функция для создания диалога с вводом имени пользователя
-void CreateInputDialog(HWND hwnd)
-{
-    // Создание текста
-    CreateWindowEx(0, L"STATIC", L"Please enter your username:",
-        WS_CHILD | WS_VISIBLE | SS_CENTER, 50, 150, 700, 30, hwnd, NULL, hInst, NULL);
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
+    switch (message) {
+        case WM_CREATE:
+            // Create the menu and display time
+            CreateMainMenu(hWnd);
+            DisplayTime(hWnd);
+            return 0;
+        
+        case WM_TIMER:
+            // Update the time every second
+            DisplayTime(hWnd);
+            return 0;
 
-    // Создание поля ввода
-    hwndEdit = CreateWindowEx(0, L"EDIT", L"",
-        WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, 50, 200, 700, 30, hwnd, NULL, hInst, NULL);
+        case WM_COMMAND:
+            // Handle menu actions
+            if (LOWORD(wParam) == ID_FILE_EXIT) {
+                PostMessage(hWnd, WM_CLOSE, 0, 0);
+            }
+            return 0;
+        
+        case WM_CLOSE:
+            PostQuitMessage(0);
+            return 0;
+        
+        case WM_DESTROY:
+            return 0;
+    }
+    return DefWindowProc(hWnd, message, wParam, lParam);
 }
 
-// Функция для загрузки фонового изображения
-void LoadBackgroundImage(HWND hwnd)
-{
-    HDC hdc = GetDC(hwnd);
-    Gdiplus::Graphics graphics(hdc);
+void CreateMainMenu(HWND hWnd) {
+    // Create a menu with File and Exit options
+    HMENU hMenu = CreateMenu();
+    HMENU hFileMenu = CreatePopupMenu();
+    
+    AppendMenu(hFileMenu, MF_STRING, ID_FILE_EXIT, L"Exit");
+    AppendMenu(hMenu, MF_POPUP, (UINT_PTR)hFileMenu, L"File");
+    
+    SetMenu(hWnd, hMenu);
+}
 
-    // Загрузка изображения
-    Gdiplus::Image image(backgroundImagePath.c_str());
-    graphics.DrawImage(&image, 0, 0, 800, 600);
+void DisplayTime(HWND hWnd) {
+    // Get current time
+    SYSTEMTIME time;
+    GetLocalTime(&time);
+    std::wostringstream timeStream;
+    timeStream << std::setw(2) << std::setfill(L'0') << time.wHour << L":"
+               << std::setw(2) << std::setfill(L'0') << time.wMinute << L":"
+               << std::setw(2) << std::setfill(L'0') << time.wSecond;
+    
+    // Convert time to string and display it
+    std::wstring timeStr = timeStream.str();
+    SetWindowText(hWnd, timeStr.c_str());
+}
 
-    ReleaseDC(hwnd, hdc);
+void InitGDIPlus() {
+    // Initialize GDI+
+    Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, &gdiplusStartupOutput);
 }

@@ -2,20 +2,20 @@ import os
 import sqlite3
 from flask import Flask, render_template, request, redirect, url_for
 
-# Путь к базе данных SQLite для project1
+# Define the path to the SQLite database
 DATABASE = os.path.join(os.path.dirname(__file__), 'users.db')
 
-# Функция для создания Flask-приложения
+# Function to create a Flask application
 def create_app():
     app = Flask(__name__)
-    init_db()  # Инициализация базы данных при запуске приложения
+    init_db()  # Initialize the database when the app starts
 
-    # Главная страница с регистрацией
+    # Home page with registration form
     @app.route('/')
     def index():
         return render_template("index.html")
 
-    # Обработка регистрации
+    # Registration handler
     @app.route('/register', methods=['POST'])
     def register():
         username = request.form['username']
@@ -33,15 +33,22 @@ def create_app():
 
     return app
 
-# Функция для подключения к базе данных
+# Function to connect to the database
 def get_db():
     conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
     return conn
 
-# Функция для инициализации базы данных
+# Function to initialize the database and create the table if it doesn't exist
 def init_db():
-    if not os.path.exists(DATABASE):
+    try:
         with sqlite3.connect(DATABASE) as conn:
-            conn.execute('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT, password TEXT)')
+            conn.execute('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, password TEXT NOT NULL)')
             conn.commit()
+    except sqlite3.Error as e:
+        print(f"An error occurred while initializing the database: {e}")
+
+# Run the app
+if __name__ == "__main__":
+    app = create_app()
+    app.run(debug=True)

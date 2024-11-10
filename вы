@@ -1,155 +1,47 @@
-Понял! Давайте организуем структуру так, чтобы в корне была папка `projects`, и в ней могли быть различные проекты (например, `project1`, `project2` и т.д.), каждый со своим кодом и шаблонами. Вот как это можно сделать.
+import os
+import sqlite3
+from flask import Flask, render_template, request, redirect, url_for
 
-### Структура проекта
+# Путь к базе данных SQLite для project1
+DATABASE = os.path.join(os.path.dirname(__file__), 'users.db')
 
-```
-project/
-├── server.py                  # Главный файл сервера
-├── projects                   # Папка с проектами
-│   ├── project1               # Первый проект
-│   │   ├── __init__.py        # Инициализация Flask-приложения
-│   │   ├── templates          # Папка с HTML-шаблонами для project1
-│   │   │   ├── index.html     # Страница регистрации
-│   │   │   └── success.html   # Страница успешной регистрации
-│   │   └── users.db           # База данных SQLite для project1
-│   └── project2               # Второй проект (может быть аналогично настроен)
-│       ├── __init__.py
-│       ├── templates
-│       │   ├── index.html
-│       │   └── success.html
-│       └── users.db
-└── requirements.txt           # Зависимости проекта
-```
+# Функция для создания Flask-приложения
+def create_app():
+    app = Flask(__name__)
+    init_db()  # Инициализация базы данных при запуске приложения
 
-### Настройка файлов
+    # Главная страница с регистрацией
+    @app.route('/')
+    def index():
+        return render_template("index.html")
 
-1. **`server.py`** – основной файл для запуска приложений:
-    ```python
-    from projects.project1 import create_app as create_app1
-    from projects.project2 import create_app as create_app2  # Если потребуется подключить второй проект
+    # Обработка регистрации
+    @app.route('/register', methods=['POST'])
+    def register():
+        username = request.form['username']
+        password = request.form['password']
 
-    # Выбираем, какое приложение запустить (например, project1)
-    app = create_app1()
+        db = get_db()
+        db.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, password))
+        db.commit()
 
-    if __name__ == '__main__':
-        app.run(host='0.0.0.0', port=5000, debug=True)
-    ```
+        return redirect(url_for('success'))
 
-2. **Создание проекта `project1`** в папке `projects`:
-   - **Файл `__init__.py`** для `project1`:
-     ```python
-     import os
-     import sqlite3
-     from flask import Flask, render_template, request, redirect, url_for
+    @app.route('/success')
+    def success():
+        return render_template("success.html")
 
-     # Путь к базе данных SQLite для project1
-     DATABASE = os.path.join(os.path.dirname(__file__), 'users.db')
+    return app
 
-     # Функция для создания Flask-приложения
-     def create_app():
-         app = Flask(__name__)
+# Функция для подключения к базе данных
+def get_db():
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-         # Главная страница с регистрацией
-         @app.route('/')
-         def index():
-             return render_template("index.html")
-
-         # Обработка регистрации
-         @app.route('/register', methods=['POST'])
-         def register():
-             username = request.form['username']
-             password = request.form['password']
-
-             db = get_db()
-             db.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, password))
-             db.commit()
-
-             return redirect(url_for('success'))
-
-         @app.route('/success')
-         def success():
-             return render_template("success.html")
-
-         return app
-
-     # Функция для подключения к базе данных
-     def get_db():
-         conn = sqlite3.connect(DATABASE)
-         conn.row_factory = sqlite3.Row
-         return conn
-
-     # Функция для инициализации базы данных
-     def init_db():
-         if not os.path.exists(DATABASE):
-             with create_app().app_context():
-                 db = get_db()
-                 db.execute('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT, password TEXT)')
-                 db.commit()
-     ```
-
-3. **Шаблоны для `project1`**:
-   - Создайте папку `templates` в `projects/project1` и добавьте файлы:
-
-     - **`index.html`**:
-       ```html
-       <!DOCTYPE html>
-       <html lang="ru">
-       <head>
-           <meta charset="UTF-8">
-           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-           <title>Регистрация</title>
-       </head>
-       <body>
-           <header>
-               <h1>Регистрация</h1>
-           </header>
-           <main>
-               <form action="/register" method="POST">
-                   <input type="text" name="username" placeholder="Имя пользователя" required><br>
-                   <input type="password" name="password" placeholder="Пароль" required><br>
-                   <button type="submit">Зарегистрироваться</button>
-               </form>
-           </main>
-           <footer>
-               <p>© 2024 Пример регистрации</p>
-           </footer>
-       </body>
-       </html>
-       ```
-
-     - **`success.html`**:
-       ```html
-       <!DOCTYPE html>
-       <html lang="ru">
-       <head>
-           <meta charset="UTF-8">
-           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-           <title>Успешная регистрация</title>
-       </head>
-       <body>
-           <header>
-               <h1>Регистрация успешна!</h1>
-           </header>
-           <footer>
-               <p>© 2024 Пример регистрации</p>
-           </footer>
-       </body>
-       </html>
-       ```
-
-4. **Файл `requirements.txt`**:
-   ```
-   Flask
-   ```
-
-5. **Запуск проекта**:
-   - Установите зависимости:
-     ```bash
-     pip install -r requirements.txt
-     ```
-   - Запустите приложение:
-     ```bash
-     python server.py
-     ```
-
-Теперь приложение можно запускать и переносить, добавляя новые проекты в `projects`.
+# Функция для инициализации базы данных
+def init_db():
+    if not os.path.exists(DATABASE):
+        with sqlite3.connect(DATABASE) as conn:
+            conn.execute('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT, password TEXT)')
+            conn.commit()

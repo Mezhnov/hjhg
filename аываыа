@@ -25,7 +25,6 @@
 #define IDC_TABCONTROL 101
 #define IDC_ADDRESSBAR 102
 #define IDC_GO_BUTTON 103
-#define IDC_NEW_TAB_BUTTON 104
 
 // Глобальные переменные
 HINSTANCE hInst;
@@ -46,9 +45,8 @@ struct TabData {
     std::wstring url;
 };
 
-// Вектор для хранения вкладок
+// Вектр для хранения вкладок
 std::vector<TabData> tabs;
-HWND hTabControl;
 
 // Функция для создания браузера внутри вкладки
 HWND CreateBrowser(HWND hParent) {
@@ -59,103 +57,66 @@ HWND CreateBrowser(HWND hParent) {
     HWND hwndBrowser = CreateWindowEx(0, L"Shell.Explorer.2", NULL,
         WS_CHILD | WS_VISIBLE, 0, 0, 800, 600, hParent, NULL, hInst, NULL);
 
+    // Навигация к начальной странице
+    IDispatch* pDisp = NULL;
+    SendMessage(hwndBrowser, WM_USER + 1, 0, (LPARAM)&pDisp);
+    // Реализация навигации через WebBrowser требует дополнительных шагов
+
     return hwndBrowser;
 }
 
-// Функция для добавления новой вкладки
+// Обработчик создания вкладки
 void AddNewTab(const std::wstring& url) {
-    // Создание новой вкладки
     TabData tab;
     tab.url = url;
-
-    // Создание окна для браузера
     tab.hwndBrowser = CreateBrowser(hMainWnd);
-
-    // Добавление вкладки в список
     tabs.push_back(tab);
-
-    // Создание новой вкладки в TabControl
-    TCITEM tie;
-    tie.mask = TCIF_TEXT;
-    tie.pszText = const_cast<wchar_t*>(url.c_str());
-    TabCtrl_InsertItem(hTabControl, tabs.size() - 1, &tie);
+    // Добавление в TabControl и настройка
 }
 
-// Функция для обновления видимости вкладок
-void UpdateTabVisibility(int activeTabIndex) {
-    for (int i = 0; i < tabs.size(); ++i) {
-        ShowWindow(tabs[i].hwndBrowser, (i == activeTabIndex) ? SW_SHOW : SW_HIDE);
-    }
-}
-
-// Обработчик создания окна
+// Процедура окна
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    switch (msg) {
-    case WM_CREATE: {
-        // Создание адресной строки
-        HWND hAddress = CreateWindowEx(WS_EX_CLIENTEDGE, L"EDIT", NULL,
-            WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
-            10, 10, 600, 25, hwnd, (HMENU)IDC_ADDRESSBAR, hInst, NULL);
-
-        // Создание кнопки "Go"
-        CreateWindowEx(0, L"BUTTON", L"Go",
-            WS_CHILD | WS_VISIBLE,
-            620, 10, 50, 25, hwnd, (HMENU)IDC_GO_BUTTON, hInst, NULL);
-
-        // Создание кнопки для новой вкладки
-        CreateWindowEx(0, L"BUTTON", L"New Tab",
-            WS_CHILD | WS_VISIBLE,
-            680, 10, 80, 25, hwnd, (HMENU)IDC_NEW_TAB_BUTTON, hInst, NULL);
-
-        // Создание TabControl
-        hTabControl = CreateWindow(WC_TABCONTROL, L"",
-            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
-            10, 45, 760, 500, hwnd, (HMENU)IDC_TABCONTROL, hInst, NULL);
-
-        // Добавление первой вкладки
-        AddNewTab(L"https://www.google.com");
-
-        // Инициализация видимости вкладок
-        UpdateTabVisibility(0);
-
-        break;
-    }
-    case WM_COMMAND: {
-        if (LOWORD(wParam) == IDC_GO_BUTTON) {
-            // Получение URL из адресной строки
-            wchar_t url[2048];
-            GetWindowText(GetDlgItem(hwnd, IDC_ADDRESSBAR), url, 2048);
-
-            // Навигация в текущей вкладке
-            if (!tabs.empty()) {
-                // Пример: предполагается, что hwndBrowser поддерживает IWebBrowser2
-                // Для полной реализации потребуется дополнительный код
+    switch(msg) {
+        case WM_CREATE: {
+            // Создание адресной строки
+            HWND hAddress = CreateWindowEx(WS_EX_CLIENTEDGE, L"EDIT", NULL,
+                WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
+                10, 10, 600, 25, hwnd, (HMENU)IDC_ADDRESSBAR, hInst, NULL);
+            
+            // Создание кнопки "Go"
+            CreateWindowEx(0, L"BUTTON", L"Go",
+                WS_CHILD | WS_VISIBLE,
+                620, 10, 50, 25, hwnd, (HMENU)IDC_GO_BUTTON, hInst, NULL);
+            
+            // Создание TabControl
+            HWND hTab = CreateWindow(WC_TABCONTROL, L"",
+                WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
+                10, 45, 760, 500, hwnd, (HMENU)IDC_TABCONTROL, hInst, NULL);
+            
+            // Добавление первой вкладки
+            AddNewTab(L"https://www.google.com");
+            
+            break;
+        }
+        case WM_COMMAND: {
+            if (LOWORD(wParam) == IDC_GO_BUTTON) {
+                // Получение URL из адресной строки
+                wchar_t url[2048];
+                GetWindowText(GetDlgItem(hwnd, IDC_ADDRESSBAR), url, 2048);
+                // Навигация в текущей вкладке
+                if (!tabs.empty()) {
+                    // Пример: предполагается, что hwndBrowser поддерживает IWebBrowser2
+                    // Для полной реализации потребуется дополнительный код
+                }
             }
+            break;
         }
-        else if (LOWORD(wParam) == IDC_NEW_TAB_BUTTON) {
-            // Добавление новой вкладки
-            AddNewTab(L"https://www.newtab.com");
-
-            // Переключение на новую вкладку
-            TabCtrl_SetCurSel(hTabControl, tabs.size() - 1);
-            UpdateTabVisibility(tabs.size() - 1);
+        case WM_DESTROY: {
+            PostQuitMessage(0);
+            break;
         }
-        break;
-    }
-    case WM_NOTIFY: {
-        if (((LPNMHDR)lParam)->idFrom == IDC_TABCONTROL && ((LPNMHDR)lParam)->code == TCN_SELCHANGE) {
-            // Переключение вкладки
-            int selectedTab = TabCtrl_GetCurSel(hTabControl);
-            UpdateTabVisibility(selectedTab);
-        }
-        break;
-    }
-    case WM_DESTROY: {
-        PostQuitMessage(0);
-        break;
-    }
-    default:
-        return DefWindowProc(hwnd, msg, wParam, lParam);
+        default:
+            return DefWindowProc(hwnd, msg, wParam, lParam);
     }
     return 0;
 }
@@ -166,7 +127,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     InitCommonControlsExFunc();
 
     // Регистрация класса окна
-    WNDCLASSEX wc = { 0 };
+    WNDCLASSEX wc = {0};
     wc.cbSize = sizeof(WNDCLASSEX);
     wc.style = CS_HREDRAW | CS_VREDRAW;
     wc.lpfnWndProc = WndProc;
@@ -185,7 +146,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     // Цикл сообщений
     MSG msg;
-    while (GetMessage(&msg, NULL, 0, 0)) {
+    while(GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }

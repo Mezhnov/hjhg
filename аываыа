@@ -1,0 +1,158 @@
+#include <windows.h>
+#include <gdiplus.h>
+#include <wininet.h>
+#include <string>
+#include <vector>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
+#include <locale>
+#include <codecvt>
+#include <windowsx.h>
+#include <mmsystem.h>
+#include <CommCtrl.h>
+#include <richedit.h>
+#include "resource.h"
+
+#pragma comment(lib, "gdiplus.lib")
+#pragma comment(lib, "wininet.lib")
+#pragma comment(lib, "winmm.lib")
+#pragma comment(lib, "comctl32.lib")
+#pragma comment(lib, "ole32.lib")
+#pragma comment(lib, "oleaut32.lib")
+
+// Идентификаторы для вкладок и контролов
+#define IDC_TABCONTROL 101
+#define IDC_ADDRESSBAR 102
+#define IDC_GO_BUTTON 103
+
+// Глобальные переменные
+HINSTANCE hInst;
+HWND hMainWnd;
+INITCOMMONCONTROLSEX icex;
+
+// Функция для инициализации общих контролов
+void InitCommonControlsExFunc() {
+    icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
+    icex.dwICC = ICC_TAB_CLASSES;
+    InitCommonControlsEx(&icex);
+}
+
+// Структура для хранения данных вкладки
+struct TabData {
+    HWND hwndTab;
+    HWND hwndBrowser;
+    std::wstring url;
+};
+
+// Вектр для хранения вкладок
+std::vector<TabData> tabs;
+
+// Функция для создания браузера внутри вкладки
+HWND CreateBrowser(HWND hParent) {
+    // Инициализация COM
+    CoInitialize(NULL);
+
+    // Создание WebBrowser Control
+    HWND hwndBrowser = CreateWindowEx(0, L"Shell.Explorer.2", NULL,
+        WS_CHILD | WS_VISIBLE, 0, 0, 800, 600, hParent, NULL, hInst, NULL);
+
+    // Навигация к начальной странице
+    IDispatch* pDisp = NULL;
+    SendMessage(hwndBrowser, WM_USER + 1, 0, (LPARAM)&pDisp);
+    // Реализация навигации через WebBrowser требует дополнительных шагов
+
+    return hwndBrowser;
+}
+
+// Обработчик создания вкладки
+void AddNewTab(const std::wstring& url) {
+    TabData tab;
+    tab.url = url;
+    tab.hwndBrowser = CreateBrowser(hMainWnd);
+    tabs.push_back(tab);
+    // Добавление в TabControl и настройка
+}
+
+// Процедура окна
+LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch(msg) {
+        case WM_CREATE: {
+            // Создание адресной строки
+            HWND hAddress = CreateWindowEx(WS_EX_CLIENTEDGE, L"EDIT", NULL,
+                WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
+                10, 10, 600, 25, hwnd, (HMENU)IDC_ADDRESSBAR, hInst, NULL);
+            
+            // Создание кнопки "Go"
+            CreateWindowEx(0, L"BUTTON", L"Go",
+                WS_CHILD | WS_VISIBLE,
+                620, 10, 50, 25, hwnd, (HMENU)IDC_GO_BUTTON, hInst, NULL);
+            
+            // Создание TabControl
+            HWND hTab = CreateWindow(WC_TABCONTROL, L"",
+                WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
+                10, 45, 760, 500, hwnd, (HMENU)IDC_TABCONTROL, hInst, NULL);
+            
+            // Добавление первой вкладки
+            AddNewTab(L"https://www.google.com");
+            
+            break;
+        }
+        case WM_COMMAND: {
+            if (LOWORD(wParam) == IDC_GO_BUTTON) {
+                // Получение URL из адресной строки
+                wchar_t url[2048];
+                GetWindowText(GetDlgItem(hwnd, IDC_ADDRESSBAR), url, 2048);
+                // Навигация в текущей вкладке
+                if (!tabs.empty()) {
+                    // Пример: предполагается, что hwndBrowser поддерживает IWebBrowser2
+                    // Для полной реализации потребуется дополнительный код
+                }
+            }
+            break;
+        }
+        case WM_DESTROY: {
+            PostQuitMessage(0);
+            break;
+        }
+        default:
+            return DefWindowProc(hwnd, msg, wParam, lParam);
+    }
+    return 0;
+}
+
+// Точка входа
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+    hInst = hInstance;
+    InitCommonControlsExFunc();
+
+    // Регистрация класса окна
+    WNDCLASSEX wc = {0};
+    wc.cbSize = sizeof(WNDCLASSEX);
+    wc.style = CS_HREDRAW | CS_VREDRAW;
+    wc.lpfnWndProc = WndProc;
+    wc.hInstance = hInstance;
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wc.lpszClassName = L"SimpleBrowserClass";
+    RegisterClassEx(&wc);
+
+    // Создание окна
+    hMainWnd = CreateWindowEx(0, L"SimpleBrowserClass", L"Простой Браузер",
+        WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 800, 600,
+        NULL, NULL, hInstance, NULL);
+
+    ShowWindow(hMainWnd, nCmdShow);
+    UpdateWindow(hMainWnd);
+
+    // Цикл сообщений
+    MSG msg;
+    while(GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    // Освобождение COM
+    CoUninitialize();
+
+    return (int)msg.wParam;
+}

@@ -1,104 +1,112 @@
+// Include необходимые заголовочные файлы
 #include <windows.h>
-#include <commctrl.h>
-#include <gdiplus.h>
 #include <string>
 
-#pragma comment(lib, "comctl32.lib")
-#pragma comment(lib, "gdiplus.lib")
-
 // Глобальные переменные
-HINSTANCE hInst;
-HWND hwndMain;
-HWND hTabControl;
+const wchar_t CLASS_NAME[] = L"BIOSLikeWindowClass";
 
-// Функции для обработки сообщений
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-void InitTabControl(HWND hwnd);
+// Функция для рисования текста на окне
+void DrawTextCenter(HDC hdc, RECT rect, const std::wstring& text, int fontSize = 24) {
+    // Установка шрифта
+    HFONT hFont = CreateFont(
+        fontSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_OUTLINE_PRECIS, CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY, VARIABLE_PITCH, L"Consolas");
+    HFONT hOldFont = (HFONT)SelectObject(hdc, hFont);
 
-// Точка входа в программу
-int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
-{
-    // Инициализация библиотеки GDI+
-    Gdiplus::GdiplusStartupInput gdiplusStartupInput;
-    ULONG_PTR gdiplusToken;
-    Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
+    // Установка цвета текста
+    SetTextColor(hdc, RGB(0, 255, 0)); // Зелёный текст
+    SetBkMode(hdc, TRANSPARENT);
 
-    // Регистрируем класс окна
-    WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_HREDRAW | CS_VREDRAW, WindowProc, 0, 0, hInstance, NULL, NULL, (HBRUSH)(COLOR_WINDOW + 1), NULL, L"BIOSAnalog", NULL };
-    RegisterClassEx(&wc);
+    // Рисование текста по центру
+    DrawTextW(hdc, text.c_str(), -1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-    // Создаем главное окно
-    hwndMain = CreateWindow(L"BIOSAnalog", L"BIOS Аналог", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 800, 600, NULL, NULL, hInstance, NULL);
-    ShowWindow(hwndMain, nCmdShow);
-    UpdateWindow(hwndMain);
-
-    // Основной цикл сообщений
-    MSG msg;
-    while (GetMessage(&msg, NULL, 0, 0))
-    {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-    }
-
-    // Остановка GDI+
-    Gdiplus::GdiplusShutdown(gdiplusToken);
-    return (int)msg.wParam;
+    // Восстановление старого шрифта и удаление созданного
+    SelectObject(hdc, hOldFont);
+    DeleteObject(hFont);
 }
 
-// Инициализация вкладок
-void InitTabControl(HWND hwnd)
-{
-    // Создаем контрол вкладок
-    hTabControl = CreateWindow(WC_TABCONTROL, L"", WS_CHILD | WS_VISIBLE | WS_BORDER, 10, 10, 760, 450, hwnd, (HMENU)IDC_TABCONTROL, hInst, NULL);
-
-    // Добавляем вкладки
-    TCITEM tci = { 0 };
-    tci.mask = TCIF_TEXT;
-
-    tci.pszText = L"Основные";
-    TabCtrl_InsertItem(hTabControl, 0, &tci);
-
-    tci.pszText = L"Система";
-    TabCtrl_InsertItem(hTabControl, 1, &tci);
-
-    tci.pszText = L"Сеть";
-    TabCtrl_InsertItem(hTabControl, 2, &tci);
-
-    tci.pszText = L"Дополнительно";
-    TabCtrl_InsertItem(hTabControl, 3, &tci);
-}
-
-// Обработка сообщений окна
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
-{
-    switch (uMsg)
-    {
-    case WM_CREATE:
-        InitTabControl(hwnd);
-        return 0;
-        
-    case WM_COMMAND:
-        // Обработка команд, например, кнопок
-        if (LOWORD(wParam) == IDC_GO_BUTTON)
-        {
-            MessageBox(hwnd, L"Вы нажали кнопку GO", L"Сообщение", MB_OK);
-        }
-        return 0;
-
-    case WM_NOTIFY:
-        if (((LPNMHDR)lParam)->code == TCN_SELCHANGE)
-        {
-            int sel = TabCtrl_GetCurSel(hTabControl);
-            // Здесь можно обновлять интерфейс в зависимости от выбранной вкладки
-            MessageBox(hwnd, (L"Вы выбрали вкладку #" + std::to_wstring(sel)).c_str(), L"Выбор вкладки", MB_OK);
-        }
-        return 0;
-
+// Процедура окна
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    switch (uMsg) {
     case WM_DESTROY:
         PostQuitMessage(0);
         return 0;
 
-    default:
-        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    case WM_KEYDOWN:
+        if (wParam == VK_ESCAPE) {
+            DestroyWindow(hwnd);
+        }
+        return 0;
+
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
+
+        RECT rect;
+        GetClientRect(hwnd, &rect);
+
+        // Пример текста BIOS-подобного интерфейса
+        std::wstring line1 = L"BIOS Setup Utility";
+        std::wstring line2 = L"Press ESC to exit";
+
+        // Рисуем первый заголовок
+        DrawTextCenter(hdc, rect, line1, 36);
+
+        // Сдвигаем координаты вниз для второго текста
+        rect.top += 100;
+        DrawTextCenter(hdc, rect, line2, 24);
+
+        EndPaint(hwnd, &ps);
     }
+                  return 0;
+
+    }
+    return DefWindowProc(hwnd, uMsg, wParam, lParam);
+}
+
+// Точка входа
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
+    // Регистрация класса окна
+    WNDCLASS wc = {};
+    wc.lpfnWndProc = WindowProc;
+    wc.hInstance = hInstance;
+    wc.lpszClassName = CLASS_NAME;
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+
+    RegisterClass(&wc);
+
+    // Получение размеров экрана
+    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+    // Создание окна
+    HWND hwnd = CreateWindowEx(
+        0,
+        CLASS_NAME,
+        L"BIOS-like Screen",
+        WS_POPUP, // Без рамок и заголовка
+        0, 0, screenWidth, screenHeight,
+        NULL,
+        NULL,
+        hInstance,
+        NULL
+    );
+
+    if (hwnd == NULL) {
+        return 0;
+    }
+
+    // Установка полной экранной поверхностной области
+    ShowWindow(hwnd, SW_SHOW);
+    UpdateWindow(hwnd);
+
+    // Цикл сообщений
+    MSG msg = {};
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    return 0;
 }

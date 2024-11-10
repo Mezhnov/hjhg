@@ -1,6 +1,7 @@
-from flask import Flask, render_template, request, redirect, url_for, abort
-import os
+import socketserver
+import json
 import sqlite3
+import os
 
 # Список допустимых доменов
 ALLOWED_DOMAINS = {
@@ -11,60 +12,6 @@ ALLOWED_DOMAINS = {
 
 # Определяем путь к базе данных пользователей
 DATABASE = os.path.join(os.path.dirname(__file__), 'users.db')
-
-def create_app():
-    app = Flask(__name__)
-    init_db()  # Инициализация базы данных при запуске приложения
-
-    @app.before_request
-    def check_domain():
-        host = request.headers.get('Host', '')
-        if host not in ALLOWED_DOMAINS:
-            abort(404)  # Не найдено, если домен не разрешен
-
-    # Главная страница для каждого домена
-    @app.route('/')
-    def index():
-        host = request.headers.get('Host', '')
-        domain_key = ALLOWED_DOMAINS.get(host)
-        if domain_key:
-            return render_template(f"{domain_key}_index.html")
-        else:
-            abort(404)
-
-    # Страница успешной регистрации
-    @app.route('/success')
-    def success():
-        host = request.headers.get('Host', '')
-        domain_key = ALLOWED_DOMAINS.get(host)
-        if domain_key:
-            return render_template(f"{domain_key}_success.html")
-        else:
-            abort(404)
-
-    # Обработчик регистрации
-    @app.route('/register', methods=['POST'])
-    def register():
-        host = request.headers.get('Host', '')
-        domain_key = ALLOWED_DOMAINS.get(host)
-        if not domain_key:
-            abort(404)
-
-        username = request.form['username']
-        password = request.form['password']
-
-        db = get_db()
-        db.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, password))
-        db.commit()
-
-        return redirect(url_for('success'))
-
-    return app
-
-def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
 
 def init_db():
     try:
@@ -78,9 +25,54 @@ def init_db():
             ''')
             conn.commit()
     except sqlite3.Error as e:
-        print(f"An error occurred while initializing the database: {e}")
+        print(f"Ошибка при инициализации базы данных: {e}")
+
+class SMPHandler(socketserver.BaseRequestHandler):
+    def handle(self):
+        try:
+            data = self.request.recv(1024).strip()
+            if not data:
+                return
+            message = json.loads(data.decode('utf-8'))
+            response = self.process_message(message)
+            self.request.sendall(json.dumps(response).encode('utf-8'))
+        except Exception as e:
+            error_response = {'status': 'error', 'message': str(e)}
+            self.request.sendall(json.dumps(error_response).encode('utf-8'))
+
+    def process_message(self, message):
+        action = message.get('action')
+        domain = message.get('domain')
+        if domain not in ALLOWED_DOMAINS:
+            return {'status': 'error', 'message': 'Домен не разрешён'}
+
+        if action == 'register':
+            return self.register_user(message, ALLOWED_DOMAINS[domain])
+        elif action == 'success':
+            return {'status': 'success', 'message': 'Регистрация прошла успешно'}
+        else:
+            return {'status': 'error', 'message': 'Неизвестное действие'}
+
+    def register_user(self, message, domain_key):
+        username = message.get('username')
+        password = message.get('password')
+        if not username or not password:
+            return {'status': 'error', 'message': 'Недостаточно данных для регистрации'}
+
+        try:
+            with sqlite3.connect(DATABASE) as conn:
+                conn.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, password))
+                conn.commit()
+            return {'status': 'success', 'message': f'Пользователь {username} зарегистрирован на {domain_key}'}
+        except sqlite3.Error as e:
+            return {'status': 'error', 'message': f'Ошибка базы данных: {e}'}
+
+class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    pass
 
 if __name__ == "__main__":
-    app = create_app()
-    # Запускаем сервер, прослушивающий все интерфейсы на порту 8000
-    app.run(host='0.0.0.0', port=8000, debug=True)
+    init_db()
+    HOST, PORT = "0.0.0.0", 8000
+    with ThreadedTCPServer((HOST, PORT), SMPHandler) as server:
+        print(f"SMP сервер запущен и слушает {HOST}:{PORT}")
+        server.serve_forever()

@@ -74,10 +74,11 @@ void AddNewTab(const std::wstring& url) {
     // Добавление вкладки в список
     tabs.push_back(tab);
 
-    // Создание новой вкладки в TabControl
+    // Создание новой вкладки в TabControl с кастомным стилем
     TCITEM tie;
-    tie.mask = TCIF_TEXT;
+    tie.mask = TCIF_TEXT | TCIF_IMAGE;
     tie.pszText = const_cast<wchar_t*>(url.c_str());
+    tie.iImage = -1;  // Можно установить индекс изображения для favicon, если нужно
     TabCtrl_InsertItem(hTabControl, tabs.size() - 1, &tie);
 }
 
@@ -86,6 +87,31 @@ void UpdateTabVisibility(int activeTabIndex) {
     for (int i = 0; i < tabs.size(); ++i) {
         ShowWindow(tabs[i].hwndBrowser, (i == activeTabIndex) ? SW_SHOW : SW_HIDE);
     }
+}
+
+// Функция для обновления стиля вкладок
+void UpdateTabStyle(int activeTabIndex) {
+    for (int i = 0; i < tabs.size(); ++i) {
+        HWND hwndTab = TabCtrl_GetItem(hTabControl, i);
+        
+        // Для активной вкладки используем светлый фон и темный текст
+        if (i == activeTabIndex) {
+            SetTabControlItemColor(hwndTab, RGB(255, 255, 255), RGB(0, 0, 0));
+        } else {
+            // Для неактивных вкладок темный фон и светлый текст
+            SetTabControlItemColor(hwndTab, RGB(240, 240, 240), RGB(100, 100, 100));
+        }
+    }
+}
+
+// Функция для установки цветов вкладки
+void SetTabControlItemColor(HWND hwndTab, COLORREF backgroundColor, COLORREF textColor) {
+    // Установка фона и текста для вкладки
+    HDC hdc = GetDC(hwndTab);
+    SetBkColor(hdc, backgroundColor);
+    SetTextColor(hdc, textColor);
+    InvalidateRect(hwndTab, NULL, TRUE);
+    ReleaseDC(hwndTab, hdc);
 }
 
 // Обработчик создания окна
@@ -118,6 +144,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             // Инициализация видимости вкладок
             UpdateTabVisibility(0);
 
+            // Обновление стиля вкладок
+            UpdateTabStyle(0);
+
             break;
         }
         case WM_COMMAND: {
@@ -138,6 +167,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 // Переключение на новую вкладку
                 TabCtrl_SetCurSel(hTabControl, tabs.size() - 1);
                 UpdateTabVisibility(tabs.size() - 1);
+                UpdateTabStyle(tabs.size() - 1);
             }
             break;
         }
@@ -146,6 +176,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 // Переключение вкладки
                 int selectedTab = TabCtrl_GetCurSel(hTabControl);
                 UpdateTabVisibility(selectedTab);
+                UpdateTabStyle(selectedTab);
             }
             break;
         }
@@ -182,15 +213,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     ShowWindow(hMainWnd, nCmdShow);
     UpdateWindow(hMainWnd);
 
-    // Цикл сообщений
+    // Главный цикл сообщений
     MSG msg;
-    while(GetMessage(&msg, NULL, 0, 0)) {
+    while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
-
-    // Освобождение COM
-    CoUninitialize();
 
     return (int)msg.wParam;
 }

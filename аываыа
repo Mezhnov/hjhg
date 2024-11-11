@@ -1,29 +1,80 @@
 #include <windows.h>
+#include <wininet.h>
+#include <fstream>
+#include <string>
 
-// Перевод миллиметров в пиксели в зависимости от DPI экрана
-int mmToPixels(float mm, int dpi) {
-    return static_cast<int>(mm * dpi / 25.4f); // 1 дюйм = 25.4 мм
+#pragma comment(lib, "wininet.lib")
+
+// Функция для скачивания изображения с URL
+bool DownloadImageFromURL(const std::wstring& url, const std::wstring& localFilePath) {
+    HINTERNET hInternet = InternetOpen(L"ImageDownloader", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+    if (!hInternet) {
+        return false;
+    }
+
+    HINTERNET hUrl = InternetOpenUrl(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD, 0);
+    if (!hUrl) {
+        InternetCloseHandle(hInternet);
+        return false;
+    }
+
+    std::ofstream file(localFilePath, std::ios::binary);
+    if (!file) {
+        InternetCloseHandle(hUrl);
+        InternetCloseHandle(hInternet);
+        return false;
+    }
+
+    char buffer[4096];
+    DWORD bytesRead;
+    while (InternetReadFile(hUrl, buffer, sizeof(buffer), &bytesRead) && bytesRead > 0) {
+        file.write(buffer, bytesRead);
+    }
+
+    file.close();
+    InternetCloseHandle(hUrl);
+    InternetCloseHandle(hInternet);
+
+    return true;
 }
 
 // Функция для обработки сообщений окна
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    static HBITMAP hBitmap = NULL;
+
     switch (uMsg) {
-    case WM_DESTROY:
-        PostQuitMessage(0);
+    case WM_CREATE:
+        // Скачивание изображения
+        if (!DownloadImageFromURL(L"https://i.pinimg.com/originals/56/cb/5f/56cb5ff3d83e4159c447b04d5d3a333e.jpg", L"background.bmp")) {
+            MessageBox(hwnd, L"Не удалось скачать изображение!", L"Ошибка", MB_OK | MB_ICONERROR);
+        } else {
+            hBitmap = (HBITMAP)LoadImage(NULL, L"background.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
+        }
         return 0;
 
     case WM_PAINT: {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
 
-        // Установка зеленого фона
-        HBRUSH greenBrush = CreateSolidBrush(RGB(0, 255, 0));
-        FillRect(hdc, &ps.rcPaint, greenBrush);
-        DeleteObject(greenBrush);
+        // Отображение изображения в качестве фона
+        if (hBitmap) {
+            HDC hdcMem = CreateCompatibleDC(hdc);
+            SelectObject(hdcMem, hBitmap);
+
+            BITMAP bitmap;
+            GetObject(hBitmap, sizeof(bitmap), &bitmap);
+            StretchBlt(hdc, 0, 0, ps.rcPaint.right, ps.rcPaint.bottom, hdcMem, 0, 0, bitmap.bmWidth, bitmap.bmHeight, SRCCOPY);
+
+            DeleteDC(hdcMem);
+        }
 
         EndPaint(hwnd, &ps);
         return 0;
     }
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        return 0;
 
     default:
         return DefWindowProc(hwnd, uMsg, wParam, lParam);
@@ -32,46 +83,30 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
 // Основная функция для оконных приложений на Windows
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-    // Параметры окна
     const wchar_t CLASS_NAME[] = L"Sample Window Class";
 
     // Регистрация класса окна
     WNDCLASS wc = {};
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
-    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1); // Задает фоновый цвет по умолчанию
     wc.lpszClassName = CLASS_NAME;
 
     RegisterClass(&wc);
 
-    // Получение DPI экрана
-    HDC screen = GetDC(0);
-    int dpiX = GetDeviceCaps(screen, LOGPIXELSX);
-    int dpiY = GetDeviceCaps(screen, LOGPIXELSY);
-    ReleaseDC(0, screen);
-
-    // Размеры окна в миллиметрах
-    float widthMM = 74.1f;
-    float heightMM = 159.1f;
-
-    // Преобразование размеров окна из миллиметров в пиксели
-    int width = mmToPixels(widthMM, dpiX);
-    int height = mmToPixels(heightMM, dpiY);
-
-    // Создание окна без рамки и кнопок управления
+    // Создание окна
     HWND hwnd = CreateWindowEx(
         0,
         CLASS_NAME,
         L"My Window",
         WS_POPUP, // Стиль окна без рамок и кнопок управления
-        CW_USEDEFAULT, CW_USEDEFAULT, width, height,
+        CW_USEDEFAULT, CW_USEDEFAULT, 800, 600,
         NULL,
         NULL,
         hInstance,
         NULL
     );
 
-    if (hwnd == NULL) {
+    if (!hwnd) {
         return 0;
     }
 

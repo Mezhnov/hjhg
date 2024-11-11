@@ -1,17 +1,59 @@
 #include <windows.h>
 #include <gdiplus.h>
 #include <urlmon.h>
+#include <shlwapi.h> // Для функций работы с путями
+#include <string>
+
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "urlmon.lib")
+#pragma comment(lib, "shlwapi.lib") // Для функций работы с путями
 
 using namespace Gdiplus;
 
-// Перевод миллиметров в пиксели в зависимости от DPI экрана
+// Глобальная переменная для хранения изображения
+Bitmap* g_image = nullptr;
+
+// Функция для перевода миллиметров в пиксели в зависимости от DPI экрана
 int mmToPixels(float mm, int dpi) {
     return static_cast<int>(mm * dpi / 25.4f); // 1 дюйм = 25.4 мм
 }
 
-// Функция для обработки сообщений окна
+// Функция для загрузки изображения из URL
+Bitmap* LoadImageFromURL(const wchar_t* url) {
+    // Получение временного пути
+    wchar_t tempPath[MAX_PATH];
+    if (!GetTempPath(MAX_PATH, tempPath)) {
+        return nullptr;
+    }
+
+    // Создание временного файла
+    wchar_t tempFile[MAX_PATH];
+    if (!GetTempFileName(tempPath, L"IMG", 0, tempFile)) {
+        return nullptr;
+    }
+
+    // Скачивание изображения во временный файл
+    HRESULT hr = URLDownloadToFile(NULL, url, tempFile, 0, NULL);
+    if (FAILED(hr)) {
+        // Удаление временного файла, если скачивание не удалось
+        DeleteFile(tempFile);
+        return nullptr;
+    }
+
+    // Загрузка изображения с помощью GDI+
+    Bitmap* bmp = Bitmap::FromFile(tempFile);
+    if (bmp && bmp->GetLastStatus() != Ok) {
+        delete bmp;
+        bmp = nullptr;
+    }
+
+    // Удаление временного файла
+    DeleteFile(tempFile);
+
+    return bmp;
+}
+
+// Функция обработки сообщений окна
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
     case WM_DESTROY:
@@ -25,15 +67,22 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         // Инициализация GDI+
         Graphics graphics(hdc);
 
-        // Загрузка изображения из URL
-        Bitmap* image = Bitmap::FromFile(L"https://i.pinimg.com/originals/56/cb/5f/56cb5ff3d83e4159c447b04d5d3a333e.jpg");
+        // Получение размеров клиентской области окна
+        RECT rect;
+        GetClientRect(hwnd, &rect);
+        int windowWidth = rect.right - rect.left;
+        int windowHeight = rect.bottom - rect.top;
 
         // Отображение изображения в окне
-        if (image) {
-            graphics.DrawImage(image, 0, 0);
+        if (g_image) {
+            // Получение размеров изображения
+            UINT imgWidth = g_image->GetWidth();
+            UINT imgHeight = g_image->GetHeight();
+
+            // Рисование изображения, масштабированного под размер окна
+            graphics.DrawImage(g_image, 0, 0, windowWidth, windowHeight);
         }
 
-        delete image;
         EndPaint(hwnd, &ps);
         return 0;
     }
@@ -48,7 +97,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Инициализация GDI+
     GdiplusStartupInput gdiplusStartupInput;
     ULONG_PTR gdiplusToken;
-    GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
+    if (GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL) != Ok) {
+        return 0;
+    }
+
+    // Загрузка изображения из URL
+    const wchar_t* imageURL = L"https://i.pinimg.com/originals/56/cb/5f/56cb5ff3d83e4159c447b04d5d3a333e.jpg";
+    g_image = LoadImageFromURL(imageURL);
+    if (!g_image) {
+        MessageBox(NULL, L"Не удалось загрузить изображение по указанному URL.", L"Ошибка", MB_ICONERROR);
+        GdiplusShutdown(gdiplusToken);
+        return 0;
+    }
 
     // Параметры окна
     const wchar_t CLASS_NAME[] = L"Sample Window Class";
@@ -57,7 +117,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     WNDCLASS wc = {};
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
-    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1); // Задает фоновый цвет по умолчанию
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1); // Установка фонового цвета по умолчанию
     wc.lpszClassName = CLASS_NAME;
 
     RegisterClass(&wc);
@@ -76,13 +136,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     int width = mmToPixels(widthMM, dpiX);
     int height = mmToPixels(heightMM, dpiY);
 
+    // Настройка размеров окна с учётом рамок
+    RECT wr = { 0, 0, width, height };
+    DWORD style = WS_POPUP;
+    AdjustWindowRectEx(&wr, style, FALSE, 0);
+    int adjustedWidth = wr.right - wr.left;
+    int adjustedHeight = wr.bottom - wr.top;
+
     // Создание окна без рамки и кнопок управления
     HWND hwnd = CreateWindowEx(
         0,
         CLASS_NAME,
         L"My Window",
-        WS_POPUP, // Стиль окна без рамок и кнопок управления
-        CW_USEDEFAULT, CW_USEDEFAULT, width, height,
+        style, // Стиль окна без рамок и кнопок управления
+        CW_USEDEFAULT, CW_USEDEFAULT, adjustedWidth, adjustedHeight,
         NULL,
         NULL,
         hInstance,
@@ -90,18 +157,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     );
 
     if (hwnd == NULL) {
+        delete g_image;
         GdiplusShutdown(gdiplusToken);
         return 0;
     }
 
     ShowWindow(hwnd, nCmdShow);
 
-    // Запуск цикла обработки сообщений
+    // Цикл обработки сообщений
     MSG msg = {};
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
+
+    // Освобождение ресурсов
+    delete g_image;
 
     // Завершение работы с GDI+
     GdiplusShutdown(gdiplusToken);

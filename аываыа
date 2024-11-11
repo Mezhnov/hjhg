@@ -1,194 +1,72 @@
-// client.cpp
+#include <windows.h>
 
-#include <jni.h>
-#include <android/native_activity.h>
-#include <android/native_window.h>
-#include <android/native_window_jni.h>
-#include <GLES2/gl2.h>
-#include <cstdlib>
-#include <cstring>
-#include <chrono>
-#include <ctime>
-#include <string>
-#include <vector>
-
-// Структура для хранения информации об иконке
-struct Icon {
-    float x, y;        // Позиция
-    float size;        // Размер
-    float color[4];    // Цвет RGBA
-};
-
-// Глобальные переменные для OpenGL
-ANativeWindow* window = nullptr;
-EGLDisplay display;
-EGLSurface surface;
-EGLContext context;
-int width = 0;
-int height = 0;
-
-// Список иконок
-std::vector<Icon> icons;
-
-// Функция для инициализации OpenGL
-bool InitializeOpenGL() {
-    // Получение EGL display
-    display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-    if (display == EGL_NO_DISPLAY) return false;
-
-    if (!eglInitialize(display, nullptr, nullptr)) return false;
-
-    // Выбор конфигурации
-    const EGLint attribs[] = {
-        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-        EGL_RED_SIZE,       8,
-        EGL_GREEN_SIZE,     8,
-        EGL_BLUE_SIZE,      8,
-        EGL_ALPHA_SIZE,     8,
-        EGL_DEPTH_SIZE,     16,
-        EGL_NONE
-    };
-    EGLint num_configs;
-    EGLConfig config;
-    if (!eglChooseConfig(display, attribs, &config, 1, &num_configs) || num_configs < 1) return false;
-
-    // Создание EGL surface
-    surface = eglCreateWindowSurface(display, config, window, nullptr);
-    if (surface == EGL_NO_SURFACE) return false;
-
-    // Создание EGL context
-    const EGLint context_attribs[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
-    context = eglCreateContext(display, config, EGL_NO_CONTEXT, context_attribs);
-    if (context == EGL_NO_CONTEXT) return false;
-
-    // Привязка context к surface
-    if (!eglMakeCurrent(display, surface, surface, context)) return false;
-
-    // Инициализация списка иконок
-    Icon wifi = { 50.0f, 150.0f, 60.0f, {0.0f, 0.6f, 1.0f, 1.0f} };      // Wi-Fi (синий цвет)
-    Icon sound = { 130.0f, 150.0f, 60.0f, {1.0f, 0.6f, 0.0f, 1.0f} };    // Звук (оранжевый цвет)
-    Icon battery = { 210.0f, 150.0f, 60.0f, {0.0f, 1.0f, 0.0f, 1.0f} }; // Батарея (зеленый цвет)
-    Icon startMenu = { 290.0f, 150.0f, 60.0f, {1.0f, 1.0f, 0.0f, 1.0f} }; // Меню Пуск (желтый цвет)
-
-    icons.push_back(wifi);
-    icons.push_back(sound);
-    icons.push_back(battery);
-    icons.push_back(startMenu);
-
-    return true;
+// Перевод миллиметров в пиксели в зависимости от DPI экрана
+int mmToPixels(float mm, int dpi) {
+    return static_cast<int>(mm * dpi / 25.4f); // 1 дюйм = 25.4 мм
 }
 
-// Функция для очистки OpenGL
-void CleanupOpenGL() {
-    if (display != EGL_NO_DISPLAY) {
-        eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
-        if (context != EGL_NO_CONTEXT) eglDestroyContext(display, context);
-        if (surface != EGL_NO_SURFACE) eglDestroySurface(display, surface);
-        eglTerminate(display);
+// Функция для обработки сообщений окна
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    switch (uMsg) {
+        case WM_DESTROY:
+            PostQuitMessage(0);
+            return 0;
+        default:
+            return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
 }
 
-// Функция для рендеринга сцены
-void Render() {
-    // Очистка экрана
-    glViewport(0, 0, width, height);
-    glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+int main() {
+    // Параметры окна
+    const wchar_t CLASS_NAME[] = L"Sample Window Class";
 
-    // Рисование иконок как простые квадраты
-    for (const auto& icon : icons) {
-        glColor4f(icon.color[0], icon.color[1], icon.color[2], icon.color[3]);
-        glBegin(GL_TRIANGLE_FAN);
-            glVertex2f(icon.x / width * 2 - 1, -(icon.y / height * 2 - 1)); // Центр квадрата
-            glVertex2f((icon.x / width * 2 - 1) - icon.size / width, -(icon.y / height * 2 - 1) - icon.size / height);
-            glVertex2f((icon.x / width * 2 - 1) + icon.size / width, -(icon.y / height * 2 - 1) - icon.size / height);
-            glVertex2f((icon.x / width * 2 - 1) + icon.size / width, -(icon.y / height * 2 - 1) + icon.size / height);
-            glVertex2f((icon.x / width * 2 - 1) - icon.size / width, -(icon.y / height * 2 - 1) + icon.size / height);
-            glVertex2f((icon.x / width * 2 - 1) - icon.size / width, -(icon.y / height * 2 - 1) - icon.size / height);
-        glEnd();
+    // Регистрация класса окна
+    WNDCLASS wc = {};
+    wc.lpfnWndProc = WindowProc;
+    wc.hInstance = GetModuleHandle(NULL);
+    wc.lpszClassName = CLASS_NAME;
+
+    RegisterClass(&wc);
+
+    // Получение DPI экрана
+    HDC screen = GetDC(0);
+    int dpiX = GetDeviceCaps(screen, LOGPIXELSX);
+    int dpiY = GetDeviceCaps(screen, LOGPIXELSY);
+    ReleaseDC(0, screen);
+
+    // Размеры окна в миллиметрах
+    float widthMM = 74.1f;
+    float heightMM = 159.1f;
+
+    // Преобразование размеров окна из миллиметров в пиксели
+    int width = mmToPixels(widthMM, dpiX);
+    int height = mmToPixels(heightMM, dpiY);
+
+    // Создание окна
+    HWND hwnd = CreateWindowEx(
+        0,
+        CLASS_NAME,
+        L"My Window",
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT, width, height,
+        NULL,
+        NULL,
+        GetModuleHandle(NULL),
+        NULL
+    );
+
+    if (hwnd == NULL) {
+        return 0;
     }
 
-    // Отображение времени
-    auto now = std::chrono::system_clock::now();
-    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
-    std::tm tm;
-    localtime_s(&tm, &now_c);
-    wchar_t timeStr[6];
-    swprintf_s(timeStr, L"%02d:%02d", tm.tm_hour, tm.tm_min);
+    ShowWindow(hwnd, SW_SHOW);
 
-    // Конвертация координат для текстового вывода
-    float xTime = (width - 100) / width * 2 - 1;
-    float yTime = -0.9f;
-
-    // Настройка для отображения текста (ограниченные возможности OpenGL ES 2.0 без шрифтов)
-    // Для упрощения просто рисуем цветной квадрат как замену текста
-    // Реализация полноценного шрифта требует загрузки текстур и сложных шейдеров
-
-    glColor4f(1.0f, 1.0f, 1.0f, 1.0f); // Белый цвет для текста-графики
-    glBegin(GL_TRIANGLE_FAN);
-        glVertex2f(xTime, yTime);
-        glVertex2f(xTime - 0.05f, yTime - 0.02f);
-        glVertex2f(xTime + 0.05f, yTime - 0.02f);
-        glVertex2f(xTime + 0.05f, yTime + 0.02f);
-        glVertex2f(xTime - 0.05f, yTime + 0.02f);
-        glVertex2f(xTime - 0.05f, yTime - 0.02f);
-    glEnd();
-
-    // Смена буфера
-    eglSwapBuffers(display, surface);
-}
-
-// Основной цикл приложения
-void RunLoop() {
-    while (true) {
-        // Рендеринг сцены
-        Render();
-
-        // Задержка для ограничения FPS (примерно 60 FPS)
-        std::this_thread::sleep_for(std::chrono::milliseconds(16));
-    }
-}
-
-// Функция обратного вызова для событий NativeActivity
-void android_main(struct android_app* app) {
-    // Инициализация OpenGL после получения окна
-    app->onAppCmd = [](struct android_app* app, int32_t cmd) {
-        switch (cmd) {
-            case APP_CMD_INIT_WINDOW:
-                if (app->window) {
-                    window = app->window;
-
-                    // Получение размеров окна
-                    ANativeWindow_getWidth(window, &width);
-                    ANativeWindow_getHeight(window, &height);
-
-                    // Инициализация OpenGL
-                    if (!InitializeOpenGL()) {
-                        // Обработка ошибки и выход
-                        app->destroyRequested = 1;
-                    }
-
-                    // Запуск рендеринга в отдельном потоке
-                    std::thread renderThread(RunLoop);
-                    renderThread.detach();
-                }
-                break;
-            case APP_CMD_TERM_WINDOW:
-                CleanupOpenGL();
-                break;
-        }
-    };
-
-    // Главный цикл обработки событий
-    while (!(app->destroyRequested)) {
-        // Обработка событий
-        int events;
-        android_poll_source* source;
-        while (ALooper_pollAll(0, NULL, &events, (void**)&source) >= 0) {
-            if (source) source->process(app, source);
-        }
+    // Запуск цикла обработки сообщений
+    MSG msg = {};
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
     }
 
-    // Очистка при выходе
-    CleanupOpenGL();
+    return 0;
 }

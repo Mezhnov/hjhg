@@ -16,14 +16,15 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     }
 }
 
-int main() {
+// Основная функция для оконных приложений на Windows
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     // Параметры окна
     const wchar_t CLASS_NAME[] = L"Sample Window Class";
 
     // Регистрация класса окна
     WNDCLASS wc = {};
     wc.lpfnWndProc = WindowProc;
-    wc.hInstance = GetModuleHandle(NULL);
+    wc.hInstance = hInstance;
     wc.lpszClassName = CLASS_NAME;
 
     RegisterClass(&wc);
@@ -51,7 +52,7 @@ int main() {
         CW_USEDEFAULT, CW_USEDEFAULT, width, height,
         NULL,
         NULL,
-        GetModuleHandle(NULL),
+        hInstance,
         NULL
     );
 
@@ -59,7 +60,7 @@ int main() {
         return 0;
     }
 
-    ShowWindow(hwnd, SW_SHOW);
+    ShowWindow(hwnd, nCmdShow);
 
     // Запуск цикла обработки сообщений
     MSG msg = {};
@@ -70,11 +71,3 @@ int main() {
 
     return 0;
 }
-Сборка начата в 13:07...
-1>------ Сборка начата: проект: Browser, Конфигурация: Debug x64 ------
-1>Browser.cpp
-1>MSVCRTD.lib(exe_winmain.obj) : error LNK2019: ссылка на неразрешенный внешний символ WinMain в функции "int __cdecl invoke_main(void)" (?invoke_main@@YAHXZ).
-1>C:\Users\User\source\repos\Browser\x64\Debug\Browser.exe : fatal error LNK1120: неразрешенных внешних элементов: 1
-1>Сборка проекта "Browser.vcxproj" завершена с ошибкой.
-========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
-========== Сборка завершено в 13:07 и заняло 01,236 с ==========

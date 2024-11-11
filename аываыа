@@ -26,8 +26,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         Graphics graphics(hdc);
 
         // Загрузка изображения из URL
-        Bitmap* image = Bitmap::FromFile(L"https://example.com/image.jpg");
-        
+        Bitmap* image = Bitmap::FromFile(L"https://i.pinimg.com/originals/56/cb/5f/56cb5ff3d83e4159c447b04d5d3a333e.jpg");
+
         // Отображение изображения в окне
         if (image) {
             graphics.DrawImage(image, 0, 0);

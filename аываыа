@@ -70,3 +70,11 @@ int main() {
 
     return 0;
 }
+Сборка начата в 13:07...
+1>------ Сборка начата: проект: Browser, Конфигурация: Debug x64 ------
+1>Browser.cpp
+1>MSVCRTD.lib(exe_winmain.obj) : error LNK2019: ссылка на неразрешенный внешний символ WinMain в функции "int __cdecl invoke_main(void)" (?invoke_main@@YAHXZ).
+1>C:\Users\User\source\repos\Browser\x64\Debug\Browser.exe : fatal error LNK1120: неразрешенных внешних элементов: 1
+1>Сборка проекта "Browser.vcxproj" завершена с ошибкой.
+========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
+========== Сборка завершено в 13:07 и заняло 01,236 с ==========

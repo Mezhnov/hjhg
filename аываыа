@@ -1,17 +1,214 @@
-Сборка начата в 17:57...
-1>------ Сборка начата: проект: Browser, Конфигурация: Debug x64 ------
-1>Browser.cpp
-1>C:\Users\User\source\repos\Browser\Browser\Browser.cpp(176,22): error C2668: Gdiplus::Graphics::DrawImage: неоднозначный вызов перегруженной функции
-1>    C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\um\GdiplusGraphics.h(1576,12):
-1>    может быть "Gdiplus::Status Gdiplus::Graphics::DrawImage(Gdiplus::Image *,INT,INT,INT,INT)"
-1>    C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\um\GdiplusGraphics.h(1534,12):
-1>    или       "Gdiplus::Status Gdiplus::Graphics::DrawImage(Gdiplus::Image *,Gdiplus::REAL,Gdiplus::REAL,Gdiplus::REAL,Gdiplus::REAL)"
-1>    C:\Users\User\source\repos\Browser\Browser\Browser.cpp(176,22):
-1>    при попытке сопоставить список аргументов "(Gdiplus::Bitmap *const , const LONG, const LONG, LONG, LONG)"
-1>C:\Users\User\source\repos\Browser\Browser\Browser.cpp(192,20): error C3861: GET_X_LPARAM: идентификатор не найден
-1>C:\Users\User\source\repos\Browser\Browser\Browser.cpp(193,20): error C3861: GET_Y_LPARAM: идентификатор не найден
-1>C:\Users\User\source\repos\Browser\Browser\Browser.cpp(221,20): error C3861: GET_X_LPARAM: идентификатор не найден
-1>C:\Users\User\source\repos\Browser\Browser\Browser.cpp(222,20): error C3861: GET_Y_LPARAM: идентификатор не найден
-1>Сборка проекта "Browser.vcxproj" завершена с ошибкой.
-========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
-========== Сборка завершено в 17:57 и заняло 00,921 с ==========
+#include <windows.h>
+#include <gdiplus.h>
+#include <urlmon.h>
+#include <shlwapi.h>
+#include <string>
+#include <vector>
+#include <ctime>
+
+#pragma comment(lib, "gdiplus.lib")
+#pragma comment(lib, "urlmon.lib")
+#pragma comment(lib, "shlwapi.lib")
+
+using namespace Gdiplus;
+
+Bitmap* LoadImageFromURL(const wchar_t* url) {
+    wchar_t tempPath[MAX_PATH];
+    if (!GetTempPath(MAX_PATH, tempPath)) {
+        return nullptr;
+    }
+    wchar_t tempFile[MAX_PATH];
+    if (!GetTempFileName(tempPath, L"IMG", 0, tempFile)) {
+        return nullptr;
+    }
+    HRESULT hr = URLDownloadToFile(NULL, url, tempFile, 0, NULL);
+    if (FAILED(hr)) {
+        DeleteFile(tempFile);
+        return nullptr;
+    }
+    Bitmap* bmp = Bitmap::FromFile(tempFile);
+    DeleteFile(tempFile);
+    return bmp && bmp->GetLastStatus() == Ok ? bmp : nullptr;
+}
+
+struct DraggableImage {
+    Bitmap* image;
+    POINT position;
+    SIZE size;
+    bool dragging = false;
+    POINT dragStartPos;
+
+    DraggableImage(Bitmap* bmp, int x, int y, int w, int h)
+        : image(bmp), position{ x, y }, size{ w, h } {}
+
+    void Draw(Graphics& graphics) {
+        if (image) {
+            graphics.DrawImage(image, position.x, position.y, size.cx, size.cy);
+        }
+    }
+
+    bool HitTest(int x, int y) {
+        return x >= position.x && x <= position.x + size.cx &&
+               y >= position.y && y <= position.y + size.cy;
+    }
+};
+
+std::vector<DraggableImage> images;
+
+struct TimeDisplay {
+    POINT position;
+    bool dragging = false;
+    POINT dragStartPos;
+
+    void Draw(Graphics& graphics, HFONT font, HDC hdc) {
+        SYSTEMTIME time;
+        GetLocalTime(&time);
+
+        wchar_t timeStr[16];
+        swprintf(timeStr, 16, L"%02d:%02d", time.wHour, time.wMinute);
+
+        SelectObject(hdc, font);
+        TextOut(hdc, position.x, position.y, timeStr, wcslen(timeStr));
+    }
+
+    bool HitTest(int x, int y) {
+        // Adjust as necessary based on the displayed time position
+        RECT timeRect = { position.x, position.y, position.x + 60, position.y + 20 };
+        return PtInRect(&timeRect, { x, y });
+    }
+};
+
+TimeDisplay timeDisplay{ 10, 10 };
+
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    static bool draggingImage = false;
+    static bool draggingTime = false;
+
+    switch (uMsg) {
+        case WM_DESTROY:
+            PostQuitMessage(0);
+            return 0;
+
+        case WM_PAINT: {
+            PAINTSTRUCT ps;
+            HDC hdc = BeginPaint(hwnd, &ps);
+            Graphics graphics(hdc);
+
+            for (auto& img : images) {
+                img.Draw(graphics);
+            }
+
+            HFONT font = CreateFont(20, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+                                    OUT_OUTLINE_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY,
+                                    VARIABLE_PITCH, TEXT("Arial"));
+            timeDisplay.Draw(graphics, font, hdc);
+            DeleteObject(font);
+            EndPaint(hwnd, &ps);
+            return 0;
+        }
+
+        case WM_LBUTTONDOWN: {
+            int x = GET_X_LPARAM(lParam);
+            int y = GET_Y_LPARAM(lParam);
+
+            for (auto& img : images) {
+                if (img.HitTest(x, y)) {
+                    img.dragging = true;
+                    img.dragStartPos = { x - img.position.x, y - img.position.y };
+                    SetCapture(hwnd);
+                    return 0;
+                }
+            }
+
+            if (timeDisplay.HitTest(x, y)) {
+                timeDisplay.dragging = true;
+                timeDisplay.dragStartPos = { x - timeDisplay.position.x, y - timeDisplay.position.y };
+                SetCapture(hwnd);
+            }
+            return 0;
+        }
+
+        case WM_LBUTTONUP:
+            for (auto& img : images) {
+                img.dragging = false;
+            }
+            timeDisplay.dragging = false;
+            ReleaseCapture();
+            return 0;
+
+        case WM_MOUSEMOVE:
+            if (wParam & MK_LBUTTON) {
+                int x = GET_X_LPARAM(lParam);
+                int y = GET_Y_LPARAM(lParam);
+
+                for (auto& img : images) {
+                    if (img.dragging) {
+                        img.position.x = x - img.dragStartPos.x;
+                        img.position.y = y - img.dragStartPos.y;
+                        InvalidateRect(hwnd, NULL, TRUE);
+                        return 0;
+                    }
+                }
+
+                if (timeDisplay.dragging) {
+                    timeDisplay.position.x = x - timeDisplay.dragStartPos.x;
+                    timeDisplay.position.y = y - timeDisplay.dragStartPos.y;
+                    InvalidateRect(hwnd, NULL, TRUE);
+                }
+            }
+            return 0;
+
+        case WM_TIMER:
+            if (wParam == 1) {
+                InvalidateRect(hwnd, NULL, TRUE);
+            }
+            return 0;
+    }
+    return DefWindowProc(hwnd, uMsg, wParam, lParam);
+}
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
+    GdiplusStartupInput gdiplusStartupInput;
+    ULONG_PTR gdiplusToken;
+    GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
+
+    const wchar_t* urls[] = {
+        L"https://i.pinimg.com/736x/44/ba/d5/44bad5b1b0839e5ab430433c6ddfb4be.jpg",
+        L"https://example.com/image2.jpg",
+        L"https://example.com/image3.jpg",
+        L"https://example.com/image4.jpg"
+    };
+    int posX = 10;
+    for (const auto& url : urls) {
+        Bitmap* bmp = LoadImageFromURL(url);
+        if (bmp) {
+            images.emplace_back(bmp, posX, 100, 200, 150);
+            posX += 210;
+        }
+    }
+
+    WNDCLASS wc = {};
+    wc.lpfnWndProc = WindowProc;
+    wc.hInstance = hInstance;
+    wc.lpszClassName = L"Sample Window Class";
+    RegisterClass(&wc);
+
+    HWND hwnd = CreateWindowEx(0, L"Sample Window Class", L"My Window",
+                               WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
+                               800, 600, NULL, NULL, hInstance, NULL);
+
+    ShowWindow(hwnd, nCmdShow);
+    SetTimer(hwnd, 1, 60000, NULL); // Update time every 60 seconds
+
+    MSG msg = {};
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    for (auto& img : images) {
+        delete img.image;
+    }
+    GdiplusShutdown(gdiplusToken);
+    return 0;
+}

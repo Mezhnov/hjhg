@@ -1,48 +1,6 @@
-// Функция обработки сообщений окна
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    switch (uMsg) {
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        return 0;
-
-    case WM_PAINT: {
-        PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(hwnd, &ps);
-
-        // Инициализация GDI+
-        Graphics graphics(hdc);
-
-        // Получение размеров клиентской области окна
-        RECT rect;
-        GetClientRect(hwnd, &rect);
-        int windowWidth = rect.right - rect.left;
-        int windowHeight = rect.bottom - rect.top;
-
-        // Отображение фона
-        if (g_image) {
-            // Получение размеров изображения
-            UINT imgWidth = g_image->GetWidth();
-            UINT imgHeight = g_image->GetHeight();
-
-            // Рисование изображения фона, масштабированного под размер окна
-            graphics.DrawImage(g_image, 0, 0, static_cast<INT>(windowWidth), static_cast<INT>(windowHeight));
-        }
-
-        // Отображение дополнительных изображений поверх фона
-        for (int i = 0; i < 4; ++i) {
-            if (g_images[i]) {
-                // Масштабируем изображения и рисуем их
-                graphics.DrawImage(g_images[i], g_imagesRects[i].left, g_imagesRects[i].top,
-                    static_cast<INT>(g_imagesRects[i].right - g_imagesRects[i].left),
-                    static_cast<INT>(g_imagesRects[i].bottom - g_imagesRects[i].top));
-            }
-        }
-
-        EndPaint(hwnd, &ps);
-        return 0;
-    }
-
-    default:
-        return DefWindowProc(hwnd, uMsg, wParam, lParam);
-    }
-}
+// Устанавливаем начальные размеры и положение изображений на одной горизонтальной линии
+int yPosition = 50;  // Все изображения будут на высоте 50 пикселей
+g_imagesRects[0] = { 50, yPosition, 150, 150 };  // Первое изображение
+g_imagesRects[1] = { 200, yPosition, 150, 150 }; // Второе изображение
+g_imagesRects[2] = { 350, yPosition, 150, 150 }; // Третье изображение
+g_imagesRects[3] = { 500, yPosition, 150, 150 }; // Четвертое изображение

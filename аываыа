@@ -3,7 +3,6 @@
 #include <urlmon.h>
 #include <shlwapi.h> // Для функций работы с путями
 #include <string>
-#include <windowsx.h>
 
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "urlmon.lib")
@@ -13,8 +12,6 @@ using namespace Gdiplus;
 
 // Глобальная переменная для хранения изображения
 Bitmap* g_image = nullptr;
-Bitmap* g_images[4] = { nullptr, nullptr, nullptr, nullptr }; // Массив для дополнительных изображений
-RECT g_imagesRects[4]; // Массив для хранения прямоугольников изображений
 
 // Функция для перевода миллиметров в пиксели в зависимости от DPI экрана
 int mmToPixels(float mm, int dpi) {
@@ -76,22 +73,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         int windowWidth = rect.right - rect.left;
         int windowHeight = rect.bottom - rect.top;
 
-        // Отображение фона
+        // Отображение изображения в окне
         if (g_image) {
-            // Рисование изображения фона, масштабированного под размер окна
-            graphics.DrawImage(g_image, 0, 0, static_cast<INT>(windowWidth), static_cast<INT>(windowHeight));
-        }
+            // Получение размеров изображения
+            UINT imgWidth = g_image->GetWidth();
+            UINT imgHeight = g_image->GetHeight();
 
-        // Отображение дополнительных изображений поверх фона
-        for (int i = 0; i < 4; ++i) {
-            if (g_images[i]) {
-                // Масштабируем изображения и рисуем их
-                graphics.DrawImage(g_images[i],
-                    g_imagesRects[i].left,
-                    g_imagesRects[i].top,
-                    static_cast<INT>(g_imagesRects[i].right - g_imagesRects[i].left),
-                    static_cast<INT>(g_imagesRects[i].bottom - g_imagesRects[i].top));
-            }
+            // Рисование изображения, масштабированного под размер окна
+            graphics.DrawImage(g_image, 0, 0, windowWidth, windowHeight);
         }
 
         EndPaint(hwnd, &ps);
@@ -112,7 +101,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         return 0;
     }
 
-    // Загрузка изображения фона
+    // Загрузка изображения из URL
     const wchar_t* imageURL = L"https://i.pinimg.com/736x/44/ba/d5/44bad5b1b0839e5ab430433c6ddfb4be.jpg";
     g_image = LoadImageFromURL(imageURL);
     if (!g_image) {
@@ -121,40 +110,35 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         return 0;
     }
 
-    // Загрузка дополнительных изображений
-    const wchar_t* imageURLs[4] = {
-        L"https://i.postimg.cc/qgVxqq8N/Remove-bg-ai-1730637074101.png", // Пример
-        L"https://i.postimg.cc/X7WMDrgp/Remove-bg-ai-1730624299550.png",
-        L"https://i.postimg.cc/4NdmpG5m/fra01-temp-p5-FXAe-Zabapcdd-X5k-Pb0-R-1.png",
-        L"https://i.postimg.cc/4NdmpG5m/fra01-temp-p5-FXAe-Zabapcdd-X5k-Pb0-R-1.png"
-    };
-    for (int i = 0; i < 4; ++i) {
-        g_images[i] = LoadImageFromURL(imageURLs[i]);
-        if (!g_images[i]) {
-            MessageBox(NULL, L"Не удалось загрузить одно из дополнительных изображений.", L"Ошибка", MB_ICONERROR);
-            // Освобождение ранее загруженных изображений
-            for (int j = 0; j < i; ++j) {
-                delete g_images[j];
-            }
-            delete g_image;
-            GdiplusShutdown(gdiplusToken);
-            return 0;
-        }
-    }
+    // Параметры окна
+    const wchar_t CLASS_NAME[] = L"Sample Window Class";
 
-    // Получаем DPI экрана
+    // Регистрация класса окна
+    WNDCLASS wc = {};
+    wc.lpfnWndProc = WindowProc;
+    wc.hInstance = hInstance;
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1); // Установка фонового цвета по умолчанию
+    wc.lpszClassName = CLASS_NAME;
+
+    RegisterClass(&wc);
+
+    // Получение DPI экрана
     HDC screen = GetDC(0);
     int dpiX = GetDeviceCaps(screen, LOGPIXELSX);
     int dpiY = GetDeviceCaps(screen, LOGPIXELSY);
     ReleaseDC(0, screen);
 
-    // Задаем размеры окна, приближенные к мобильным устройствам (например, 360x640 пикселей)
-    int windowWidth = 360;
-    int windowHeight = 640;
+    // Размеры окна в миллиметрах
+    float widthMM = 90.1f;
+    float heightMM = 159.1f;
+
+    // Преобразование размеров окна из миллиметров в пиксели
+    int width = mmToPixels(widthMM, dpiX);
+    int height = mmToPixels(heightMM, dpiY);
 
     // Настройка размеров окна с учётом рамок
-    RECT wr = { 0, 0, windowWidth, windowHeight };
-    DWORD style = WS_POPUP; // Без рамки
+    RECT wr = { 0, 0, width, height };
+    DWORD style = WS_POPUP;
     AdjustWindowRectEx(&wr, style, FALSE, 0);
     int adjustedWidth = wr.right - wr.left;
     int adjustedHeight = wr.bottom - wr.top;
@@ -162,8 +146,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Создание окна без рамки и кнопок управления
     HWND hwnd = CreateWindowEx(
         0,
-        L"Sample Window Class",
-        L"Моё Мобильное Окно",
+        CLASS_NAME,
+        L"My Window",
         style, // Стиль окна без рамок и кнопок управления
         CW_USEDEFAULT, CW_USEDEFAULT, adjustedWidth, adjustedHeight,
         NULL,
@@ -173,24 +157,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     );
 
     if (hwnd == NULL) {
-        for (int i = 0; i < 4; ++i) {
-            delete g_images[i];
-        }
         delete g_image;
         GdiplusShutdown(gdiplusToken);
         return 0;
     }
-
-    // Устанавливаем начальные размеры и положение изображений на сетке 2x2
-    int padding = 20; // Отступы от краев окна
-    int imageWidth = (windowWidth - 3 * padding) / 2; // Две картинки по горизонтали с отступом
-    int imageHeight = (windowHeight - 3 * padding - 100) / 2; // Две картинки по вертикали с отступом и учетом пространства для фона
-
-    // Располагаем изображения в левом верхнем и правом нижнем углах
-    g_imagesRects[0] = { padding, padding, padding + imageWidth, padding + imageHeight };
-    g_imagesRects[1] = { padding * 2 + imageWidth, padding, padding * 2 + 2 * imageWidth, padding + imageHeight };
-    g_imagesRects[2] = { padding, padding * 2 + imageHeight, padding + imageWidth, padding * 2 + 2 * imageHeight };
-    g_imagesRects[3] = { padding * 2 + imageWidth, padding * 2 + imageHeight, padding * 2 + 2 * imageWidth, padding * 2 + 2 * imageHeight };
 
     ShowWindow(hwnd, nCmdShow);
 
@@ -202,9 +172,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
 
     // Освобождение ресурсов
-    for (int i = 0; i < 4; ++i) {
-        delete g_images[i];
-    }
     delete g_image;
 
     // Завершение работы с GDI+

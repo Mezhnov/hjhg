@@ -7,6 +7,7 @@
 
 #pragma comment(lib, "wininet.lib")
 
+// Функция для скачивания изображения с URL
 bool DownloadImageFromURL(const std::wstring& url, const std::wstring& localFilePath) {
     HINTERNET hInternet = InternetOpen(L"ImageDownloader", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (!hInternet) {
@@ -39,9 +40,12 @@ bool DownloadImageFromURL(const std::wstring& url, const std::wstring& localFile
     return true;
 }
 
+// Основной обработчик оконных сообщений
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    static wchar_t timeBuffer[9];
-    static HBITMAP hBitmap = NULL;
+    static wchar_t timeBuffer[9];  // Буфер для времени
+    static HBITMAP hBitmap = NULL;  // Хранение битмапа изображения
+    std::chrono::system_clock::time_point now;  // Переменная для текущего времени
+    std::time_t nowTime;  // Переменная для преобразованного времени
 
     switch (uMsg) {
         case WM_CREATE:
@@ -51,22 +55,23 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             } else {
                 MessageBox(hwnd, L"Не удалось скачать изображение!", L"Ошибка", MB_OK | MB_ICONERROR);
             }
-            SetTimer(hwnd, 1, 1000, NULL);
+            SetTimer(hwnd, 1, 1000, NULL);  // Таймер обновления времени каждую секунду
             return 0;
 
         case WM_TIMER:
-            auto now = std::chrono::system_clock::now();
-            std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
+            now = std::chrono::system_clock::now();  // Получение текущего времени
+            nowTime = std::chrono::system_clock::to_time_t(now);
             std::tm localTime;
-            localtime_s(&localTime, &nowTime);
-            wcsftime(timeBuffer, sizeof(timeBuffer) / sizeof(wchar_t), L"%H:%M:%S", &localTime);
-            InvalidateRect(hwnd, NULL, TRUE);
+            localtime_s(&localTime, &nowTime);  // Преобразование времени в локальное
+            wcsftime(timeBuffer, sizeof(timeBuffer) / sizeof(wchar_t), L"%H:%M:%S", &localTime);  // Форматирование времени
+            InvalidateRect(hwnd, NULL, TRUE);  // Перерисовка окна
             return 0;
 
         case WM_PAINT: {
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hwnd, &ps);
 
+            // Отображение фона (если изображение загружено)
             if (hBitmap) {
                 HDC hdcMem = CreateCompatibleDC(hdc);
                 SelectObject(hdcMem, hBitmap);
@@ -78,16 +83,17 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 DeleteDC(hdcMem);
             }
 
-            SetTextColor(hdc, RGB(255, 255, 255));
-            SetBkMode(hdc, TRANSPARENT);
+            // Отображение времени поверх фона
+            SetTextColor(hdc, RGB(255, 255, 255));  // Белый цвет текста
+            SetBkMode(hdc, TRANSPARENT);  // Прозрачный фон для текста
             HFONT hFont = CreateFont(30, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 
                                      OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, 
                                      DEFAULT_PITCH | FF_SWISS, L"Arial");
             SelectObject(hdc, hFont);
 
             RECT rect;
-            GetClientRect(hwnd, &rect);
-            DrawText(hdc, timeBuffer, -1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            GetClientRect(hwnd, &rect);  // Получение размеров окна
+            DrawText(hdc, timeBuffer, -1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);  // Отображение времени по центру
 
             DeleteObject(hFont);
             EndPaint(hwnd, &ps);
@@ -95,14 +101,15 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         }
 
         case WM_DESTROY:
-            PostQuitMessage(0);
+            PostQuitMessage(0);  // Завершение приложения
             return 0;
 
         default:
-            return DefWindowProc(hwnd, uMsg, wParam, lParam);
+            return DefWindowProc(hwnd, uMsg, wParam, lParam);  // Стандартная обработка сообщений
     }
 }
 
+// Точка входа в приложение
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     const wchar_t CLASS_NAME[] = L"Sample Window Class";
 
@@ -111,8 +118,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     wc.hInstance = hInstance;
     wc.lpszClassName = CLASS_NAME;
 
+    // Регистрация класса окна
     RegisterClass(&wc);
 
+    // Создание окна
     HWND hwnd = CreateWindowEx(
         0,
         CLASS_NAME,
@@ -127,8 +136,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     if (!hwnd) return 0;
 
+    // Показ окна
     ShowWindow(hwnd, nCmdShow);
 
+    // Основной цикл обработки сообщений
     MSG msg = {};
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
@@ -137,27 +148,3 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     return 0;
 }
-Сборка начата в 13:22...
-1>------ Сборка начата: проект: Browser, Конфигурация: Debug x64 ------
-1>Browser.cpp
-1>C:\Users\User\source\repos\Browser\Browser\Browser.cpp(67,5): error C2360: пропуск инициализации "nowTime" из-за метки "case"
-1>    C:\Users\User\source\repos\Browser\Browser\Browser.cpp(60,21):
-1>     см. объявление "nowTime"
-1>C:\Users\User\source\repos\Browser\Browser\Browser.cpp(67,5): error C2360: пропуск инициализации "now" из-за метки "case"
-1>    C:\Users\User\source\repos\Browser\Browser\Browser.cpp(59,14):
-1>     см. объявление "now"
-1>C:\Users\User\source\repos\Browser\Browser\Browser.cpp(98,5): error C2360: пропуск инициализации "nowTime" из-за метки "case"
-1>    C:\Users\User\source\repos\Browser\Browser\Browser.cpp(60,21):
-1>     см. объявление "nowTime"
-1>C:\Users\User\source\repos\Browser\Browser\Browser.cpp(98,5): error C2360: пропуск инициализации "now" из-за метки "case"
-1>    C:\Users\User\source\repos\Browser\Browser\Browser.cpp(59,14):
-1>     см. объявление "now"
-1>C:\Users\User\source\repos\Browser\Browser\Browser.cpp(102,5): error C2361: пропуск инициализации "nowTime" из-за метки "default"
-1>    C:\Users\User\source\repos\Browser\Browser\Browser.cpp(60,21):
-1>     см. объявление "nowTime"
-1>C:\Users\User\source\repos\Browser\Browser\Browser.cpp(102,5): error C2361: пропуск инициализации "now" из-за метки "default"
-1>    C:\Users\User\source\repos\Browser\Browser\Browser.cpp(59,14):
-1>     см. объявление "now"
-1>Сборка проекта "Browser.vcxproj" завершена с ошибкой.
-========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
-========== Сборка завершено в 13:22 и заняло 00,950 с ==========

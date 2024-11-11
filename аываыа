@@ -58,16 +58,6 @@ Bitmap* LoadImageFromURL(const wchar_t* url) {
     return bmp;
 }
 
-// Функция для загрузки изображения из локального файла
-Bitmap* LoadImageFromFile(const wchar_t* filePath) {
-    Bitmap* bmp = Bitmap::FromFile(filePath);
-    if (bmp && bmp->GetLastStatus() != Ok) {
-        delete bmp;
-        bmp = nullptr;
-    }
-    return bmp;
-}
-
 // Функция обработки сообщений окна
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
@@ -100,10 +90,16 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         int spacingMM = 10;         // 10 мм между иконками
         int marginMM = 10;          // 10 мм от края окна
 
-        int iconSize_Wifi = mmToPixels(static_cast<float>(iconSizeMM_Wifi), 96); // Используем 96 DPI для примера
-        int iconSize_App = mmToPixels(static_cast<float>(iconSizeMM_App), 96);
-        int appSpacing = mmToPixels(static_cast<float>(spacingMM), 96);
-        int margin = mmToPixels(static_cast<float>(marginMM), 96);
+        // Получение DPI
+        HDC screen = GetDC(0);
+        int dpiX = GetDeviceCaps(screen, LOGPIXELSX);
+        int dpiY = GetDeviceCaps(screen, LOGPIXELSY);
+        ReleaseDC(0, screen);
+
+        int iconSize_Wifi = mmToPixels(static_cast<float>(iconSizeMM_Wifi), dpiX); // Используем DPI-X
+        int iconSize_App = mmToPixels(static_cast<float>(iconSizeMM_App), dpiX);
+        int appSpacing = mmToPixels(static_cast<float>(spacingMM), dpiX);
+        int margin = mmToPixels(static_cast<float>(marginMM), dpiX);
 
         // Отображение WiFi-иконки в верхнем правом углу
         if (g_wifiIcon) {
@@ -124,7 +120,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         int totalApps = 4;
         int totalWidth = totalApps * appIconSize + (totalApps - 1) * appSpacingPixels;
         int startX = (windowWidth - totalWidth) / 2;
-        int startY = windowHeight - appIconSize - mmToPixels(20.0f, 96); // 20 мм от нижнего края
+        int startY = windowHeight - appIconSize - mmToPixels(20.0f, dpiY); // 20 мм от нижнего края
 
         // Отображение иконки Настроек
         if (g_settingsIcon) {
@@ -182,54 +178,41 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         return 0;
     }
 
-    // Загрузка дополнительных иконок из локальных файлов
-    // Убедитесь, что указанные пути корректны и файлы существуют
-    // Можно заменить пути на свои или загрузить их из URL при необходимости
+    // Определение URL-адресов иконок
+    const wchar_t* wifiIconURL = L"https://example.com/icons/wifi.png";
+    const wchar_t* settingsIconURL = L"https://example.com/icons/settings.png";
+    const wchar_t* filesIconURL = L"https://example.com/icons/files.png";
+    const wchar_t* cameraIconURL = L"https://example.com/icons/camera.png";
+    const wchar_t* browserIconURL = L"https://example.com/icons/browser.png";
 
-    // Получение пути к папке с исполняемым файлом
-    wchar_t executablePath[MAX_PATH];
-    GetModuleFileName(NULL, executablePath, MAX_PATH);
-    PathRemoveFileSpec(executablePath); // Удаление имени файла, чтобы получить папку
-    std::wstring iconsPath = executablePath;
-    iconsPath += L"\\icons\\"; // Папка с иконками
-
-    // Загрузка WiFi-иконки
-    std::wstring wifiPath = iconsPath + L"wifi.png";
-    g_wifiIcon = LoadImageFromFile(wifiPath.c_str());
+    // Загрузка дополнительных иконок из URL
+    g_wifiIcon = LoadImageFromURL(wifiIconURL);
     if (!g_wifiIcon) {
-        MessageBox(NULL, L"Не удалось загрузить WiFi-иконку.", L"Ошибка", MB_ICONERROR);
+        MessageBox(NULL, L"Не удалось загрузить WiFi-иконку из интернета.", L"Ошибка", MB_ICONERROR);
         // Продолжаем без иконки WiFi
     }
 
-    // Загрузка иконки Настроек
-    std::wstring settingsPath = iconsPath + L"settings.png";
-    g_settingsIcon = LoadImageFromFile(settingsPath.c_str());
+    g_settingsIcon = LoadImageFromURL(settingsIconURL);
     if (!g_settingsIcon) {
-        MessageBox(NULL, L"Не удалось загрузить иконку Настроек.", L"Ошибка", MB_ICONERROR);
+        MessageBox(NULL, L"Не удалось загрузить иконку Настроек из интернета.", L"Ошибка", MB_ICONERROR);
         // Продолжаем без данной иконки
     }
 
-    // Загрузка иконки Файлов
-    std::wstring filesPath = iconsPath + L"files.png";
-    g_filesIcon = LoadImageFromFile(filesPath.c_str());
+    g_filesIcon = LoadImageFromURL(filesIconURL);
     if (!g_filesIcon) {
-        MessageBox(NULL, L"Не удалось загрузить иконку Файлов.", L"Ошибка", MB_ICONERROR);
+        MessageBox(NULL, L"Не удалось загрузить иконку Файлов из интернета.", L"Ошибка", MB_ICONERROR);
         // Продолжаем без данной иконки
     }
 
-    // Загрузка иконки Камеры
-    std::wstring cameraPath = iconsPath + L"camera.png";
-    g_cameraIcon = LoadImageFromFile(cameraPath.c_str());
+    g_cameraIcon = LoadImageFromURL(cameraIconURL);
     if (!g_cameraIcon) {
-        MessageBox(NULL, L"Не удалось загрузить иконку Камеры.", L"Ошибка", MB_ICONERROR);
+        MessageBox(NULL, L"Не удалось загрузить иконку Камеры из интернета.", L"Ошибка", MB_ICONERROR);
         // Продолжаем без данной иконки
     }
 
-    // Загрузка иконки Браузера
-    std::wstring browserPath = iconsPath + L"browser.png";
-    g_browserIcon = LoadImageFromFile(browserPath.c_str());
+    g_browserIcon = LoadImageFromURL(browserIconURL);
     if (!g_browserIcon) {
-        MessageBox(NULL, L"Не удалось загрузить иконку Браузера.", L"Ошибка", MB_ICONERROR);
+        MessageBox(NULL, L"Не удалось загрузить иконку Браузера из интернета.", L"Ошибка", MB_ICONERROR);
         // Продолжаем без данной иконки
     }
 
@@ -246,10 +229,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     RegisterClass(&wc);
 
     // Получение DPI экрана
-    HDC screen = GetDC(0);
-    int dpiX = GetDeviceCaps(screen, LOGPIXELSX);
-    int dpiY = GetDeviceCaps(screen, LOGPIXELSY);
-    ReleaseDC(0, screen);
+    HDC screenDC = GetDC(0);
+    int dpiX = GetDeviceCaps(screenDC, LOGPIXELSX);
+    int dpiY = GetDeviceCaps(screenDC, LOGPIXELSY);
+    ReleaseDC(0, screenDC);
 
     // Размеры окна в миллиметрах
     float widthMM = 90.1f;
@@ -261,7 +244,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     // Настройка размеров окна с учётом рамок
     RECT wr = { 0, 0, width, height };
-    DWORD style = WS_POPUP;
+    DWORD style = WS_POPUP; // Бессмысленные рамки и кнопки
     AdjustWindowRectEx(&wr, style, FALSE, 0);
     int adjustedWidth = wr.right - wr.left;
     int adjustedHeight = wr.bottom - wr.top;

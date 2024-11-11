@@ -10,8 +10,13 @@
 
 using namespace Gdiplus;
 
-// Глобальная переменная для хранения изображения
-Bitmap* g_image = nullptr;
+// Глобальные переменные для хранения изображений
+Bitmap* g_mainImage = nullptr;
+Bitmap* g_wifiIcon = nullptr;
+Bitmap* g_settingsIcon = nullptr;
+Bitmap* g_filesIcon = nullptr;
+Bitmap* g_cameraIcon = nullptr;
+Bitmap* g_browserIcon = nullptr;
 
 // Функция для перевода миллиметров в пиксели в зависимости от DPI экрана
 int mmToPixels(float mm, int dpi) {
@@ -53,6 +58,16 @@ Bitmap* LoadImageFromURL(const wchar_t* url) {
     return bmp;
 }
 
+// Функция для загрузки изображения из локального файла
+Bitmap* LoadImageFromFile(const wchar_t* filePath) {
+    Bitmap* bmp = Bitmap::FromFile(filePath);
+    if (bmp && bmp->GetLastStatus() != Ok) {
+        delete bmp;
+        bmp = nullptr;
+    }
+    return bmp;
+}
+
 // Функция обработки сообщений окна
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
@@ -73,14 +88,70 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         int windowWidth = rect.right - rect.left;
         int windowHeight = rect.bottom - rect.top;
 
-        // Отображение изображения в окне
-        if (g_image) {
-            // Получение размеров изображения
-            UINT imgWidth = g_image->GetWidth();
-            UINT imgHeight = g_image->GetHeight();
-
+        // Основное изображение (фон)
+        if (g_mainImage) {
             // Рисование изображения, масштабированного под размер окна
-            graphics.DrawImage(g_image, 0, 0, windowWidth, windowHeight);
+            graphics.DrawImage(g_mainImage, 0, 0, windowWidth, windowHeight);
+        }
+
+        // Расчет размеров иконок с учетом DPI
+        int iconSizeMM_Wifi = 10; // 10 мм
+        int iconSizeMM_App = 15;   // 15 мм
+        int spacingMM = 10;         // 10 мм между иконками
+        int marginMM = 10;          // 10 мм от края окна
+
+        int iconSize_Wifi = mmToPixels(static_cast<float>(iconSizeMM_Wifi), 96); // Используем 96 DPI для примера
+        int iconSize_App = mmToPixels(static_cast<float>(iconSizeMM_App), 96);
+        int appSpacing = mmToPixels(static_cast<float>(spacingMM), 96);
+        int margin = mmToPixels(static_cast<float>(marginMM), 96);
+
+        // Отображение WiFi-иконки в верхнем правом углу
+        if (g_wifiIcon) {
+            // Размер иконки
+            int iconSize = iconSize_Wifi;
+            // Позиция (отступ от верхнего правого угла)
+            int x = windowWidth - iconSize - margin; // 10 мм от правого края
+            int y = margin; // 10 мм от верхнего края
+
+            graphics.DrawImage(g_wifiIcon, x, y, iconSize, iconSize);
+        }
+
+        // Определение размеров иконок приложений
+        int appIconSize = iconSize_App; // 15 мм
+        int appSpacingPixels = appSpacing; // 10 мм
+
+        // Позиция для начала рисования иконок приложений
+        int totalApps = 4;
+        int totalWidth = totalApps * appIconSize + (totalApps - 1) * appSpacingPixels;
+        int startX = (windowWidth - totalWidth) / 2;
+        int startY = windowHeight - appIconSize - mmToPixels(20.0f, 96); // 20 мм от нижнего края
+
+        // Отображение иконки Настроек
+        if (g_settingsIcon) {
+            int x = startX;
+            graphics.DrawImage(g_settingsIcon, x, startY, appIconSize, appIconSize);
+            startX += appIconSize + appSpacingPixels;
+        }
+
+        // Отображение иконки Файлов
+        if (g_filesIcon) {
+            int x = startX;
+            graphics.DrawImage(g_filesIcon, x, startY, appIconSize, appIconSize);
+            startX += appIconSize + appSpacingPixels;
+        }
+
+        // Отображение иконки Камеры
+        if (g_cameraIcon) {
+            int x = startX;
+            graphics.DrawImage(g_cameraIcon, x, startY, appIconSize, appIconSize);
+            startX += appIconSize + appSpacingPixels;
+        }
+
+        // Отображение иконки Браузера
+        if (g_browserIcon) {
+            int x = startX;
+            graphics.DrawImage(g_browserIcon, x, startY, appIconSize, appIconSize);
+            // startX += appIconSize + appSpacingPixels; // Не требуется после последней иконки
         }
 
         EndPaint(hwnd, &ps);
@@ -98,16 +169,68 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     GdiplusStartupInput gdiplusStartupInput;
     ULONG_PTR gdiplusToken;
     if (GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL) != Ok) {
+        MessageBox(NULL, L"Не удалось инициализировать GDI+.", L"Ошибка", MB_ICONERROR);
         return 0;
     }
 
-    // Загрузка изображения из URL
-    const wchar_t* imageURL = L"https://i.pinimg.com/736x/44/ba/d5/44bad5b1b0839e5ab430433c6ddfb4be.jpg";
-    g_image = LoadImageFromURL(imageURL);
-    if (!g_image) {
-        MessageBox(NULL, L"Не удалось загрузить изображение по указанному URL.", L"Ошибка", MB_ICONERROR);
+    // Загрузка основного изображения из URL
+    const wchar_t* mainImageURL = L"https://i.pinimg.com/736x/44/ba/d5/44bad5b1b0839e5ab430433c6ddfb4be.jpg";
+    g_mainImage = LoadImageFromURL(mainImageURL);
+    if (!g_mainImage) {
+        MessageBox(NULL, L"Не удалось загрузить основное изображение по указанному URL.", L"Ошибка", MB_ICONERROR);
         GdiplusShutdown(gdiplusToken);
         return 0;
+    }
+
+    // Загрузка дополнительных иконок из локальных файлов
+    // Убедитесь, что указанные пути корректны и файлы существуют
+    // Можно заменить пути на свои или загрузить их из URL при необходимости
+
+    // Получение пути к папке с исполняемым файлом
+    wchar_t executablePath[MAX_PATH];
+    GetModuleFileName(NULL, executablePath, MAX_PATH);
+    PathRemoveFileSpec(executablePath); // Удаление имени файла, чтобы получить папку
+    std::wstring iconsPath = executablePath;
+    iconsPath += L"\\icons\\"; // Папка с иконками
+
+    // Загрузка WiFi-иконки
+    std::wstring wifiPath = iconsPath + L"wifi.png";
+    g_wifiIcon = LoadImageFromFile(wifiPath.c_str());
+    if (!g_wifiIcon) {
+        MessageBox(NULL, L"Не удалось загрузить WiFi-иконку.", L"Ошибка", MB_ICONERROR);
+        // Продолжаем без иконки WiFi
+    }
+
+    // Загрузка иконки Настроек
+    std::wstring settingsPath = iconsPath + L"settings.png";
+    g_settingsIcon = LoadImageFromFile(settingsPath.c_str());
+    if (!g_settingsIcon) {
+        MessageBox(NULL, L"Не удалось загрузить иконку Настроек.", L"Ошибка", MB_ICONERROR);
+        // Продолжаем без данной иконки
+    }
+
+    // Загрузка иконки Файлов
+    std::wstring filesPath = iconsPath + L"files.png";
+    g_filesIcon = LoadImageFromFile(filesPath.c_str());
+    if (!g_filesIcon) {
+        MessageBox(NULL, L"Не удалось загрузить иконку Файлов.", L"Ошибка", MB_ICONERROR);
+        // Продолжаем без данной иконки
+    }
+
+    // Загрузка иконки Камеры
+    std::wstring cameraPath = iconsPath + L"camera.png";
+    g_cameraIcon = LoadImageFromFile(cameraPath.c_str());
+    if (!g_cameraIcon) {
+        MessageBox(NULL, L"Не удалось загрузить иконку Камеры.", L"Ошибка", MB_ICONERROR);
+        // Продолжаем без данной иконки
+    }
+
+    // Загрузка иконки Браузера
+    std::wstring browserPath = iconsPath + L"browser.png";
+    g_browserIcon = LoadImageFromFile(browserPath.c_str());
+    if (!g_browserIcon) {
+        MessageBox(NULL, L"Не удалось загрузить иконку Браузера.", L"Ошибка", MB_ICONERROR);
+        // Продолжаем без данной иконки
     }
 
     // Параметры окна
@@ -147,7 +270,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     HWND hwnd = CreateWindowEx(
         0,
         CLASS_NAME,
-        L"My Window",
+        L"My OS Design",
         style, // Стиль окна без рамок и кнопок управления
         CW_USEDEFAULT, CW_USEDEFAULT, adjustedWidth, adjustedHeight,
         NULL,
@@ -157,7 +280,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     );
 
     if (hwnd == NULL) {
-        delete g_image;
+        // Освобождение ресурсов перед выходом
+        if (g_mainImage) delete g_mainImage;
+        if (g_wifiIcon) delete g_wifiIcon;
+        if (g_settingsIcon) delete g_settingsIcon;
+        if (g_filesIcon) delete g_filesIcon;
+        if (g_cameraIcon) delete g_cameraIcon;
+        if (g_browserIcon) delete g_browserIcon;
         GdiplusShutdown(gdiplusToken);
         return 0;
     }
@@ -172,7 +301,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
 
     // Освобождение ресурсов
-    delete g_image;
+    if (g_mainImage) delete g_mainImage;
+    if (g_wifiIcon) delete g_wifiIcon;
+    if (g_settingsIcon) delete g_settingsIcon;
+    if (g_filesIcon) delete g_filesIcon;
+    if (g_cameraIcon) delete g_cameraIcon;
+    if (g_browserIcon) delete g_browserIcon;
 
     // Завершение работы с GDI+
     GdiplusShutdown(gdiplusToken);

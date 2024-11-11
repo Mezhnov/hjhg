@@ -137,3 +137,27 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
     return 0;
 }
+Сборка начата в 13:22...
+1>------ Сборка начата: проект: Browser, Конфигурация: Debug x64 ------
+1>Browser.cpp
+1>C:\Users\User\source\repos\Browser\Browser\Browser.cpp(67,5): error C2360: пропуск инициализации "nowTime" из-за метки "case"
+1>    C:\Users\User\source\repos\Browser\Browser\Browser.cpp(60,21):
+1>     см. объявление "nowTime"
+1>C:\Users\User\source\repos\Browser\Browser\Browser.cpp(67,5): error C2360: пропуск инициализации "now" из-за метки "case"
+1>    C:\Users\User\source\repos\Browser\Browser\Browser.cpp(59,14):
+1>     см. объявление "now"
+1>C:\Users\User\source\repos\Browser\Browser\Browser.cpp(98,5): error C2360: пропуск инициализации "nowTime" из-за метки "case"
+1>    C:\Users\User\source\repos\Browser\Browser\Browser.cpp(60,21):
+1>     см. объявление "nowTime"
+1>C:\Users\User\source\repos\Browser\Browser\Browser.cpp(98,5): error C2360: пропуск инициализации "now" из-за метки "case"
+1>    C:\Users\User\source\repos\Browser\Browser\Browser.cpp(59,14):
+1>     см. объявление "now"
+1>C:\Users\User\source\repos\Browser\Browser\Browser.cpp(102,5): error C2361: пропуск инициализации "nowTime" из-за метки "default"
+1>    C:\Users\User\source\repos\Browser\Browser\Browser.cpp(60,21):
+1>     см. объявление "nowTime"
+1>C:\Users\User\source\repos\Browser\Browser\Browser.cpp(102,5): error C2361: пропуск инициализации "now" из-за метки "default"
+1>    C:\Users\User\source\repos\Browser\Browser\Browser.cpp(59,14):
+1>     см. объявление "now"
+1>Сборка проекта "Browser.vcxproj" завершена с ошибкой.
+========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
+========== Сборка завершено в 13:22 и заняло 00,950 с ==========

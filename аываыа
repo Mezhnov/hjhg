@@ -78,10 +78,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         // Отображение фона
         if (g_image) {
-            // Получение размеров изображения
-            UINT imgWidth = g_image->GetWidth();
-            UINT imgHeight = g_image->GetHeight();
-
             // Рисование изображения фона, масштабированного под размер окна
             graphics.DrawImage(g_image, 0, 0, static_cast<INT>(windowWidth), static_cast<INT>(windowHeight));
         }
@@ -90,7 +86,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         for (int i = 0; i < 4; ++i) {
             if (g_images[i]) {
                 // Масштабируем изображения и рисуем их
-                graphics.DrawImage(g_images[i], g_imagesRects[i].left, g_imagesRects[i].top,
+                graphics.DrawImage(g_images[i],
+                    g_imagesRects[i].left,
+                    g_imagesRects[i].top,
                     static_cast<INT>(g_imagesRects[i].right - g_imagesRects[i].left),
                     static_cast<INT>(g_imagesRects[i].bottom - g_imagesRects[i].top));
             }
@@ -104,6 +102,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
 }
+
 // Основная функция для оконных приложений на Windows
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     // Инициализация GDI+
@@ -132,48 +131,30 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     for (int i = 0; i < 4; ++i) {
         g_images[i] = LoadImageFromURL(imageURLs[i]);
         if (!g_images[i]) {
-            MessageBox(NULL, L"Не удалось загрузить изображение по указанному URL.", L"Ошибка", MB_ICONERROR);
+            MessageBox(NULL, L"Не удалось загрузить одно из дополнительных изображений.", L"Ошибка", MB_ICONERROR);
+            // Освобождение ранее загруженных изображений
+            for (int j = 0; j < i; ++j) {
+                delete g_images[j];
+            }
+            delete g_image;
             GdiplusShutdown(gdiplusToken);
             return 0;
         }
     }
 
-    // Устанавливаем начальные размеры и положение изображений на одной горизонтальной линии
-    int yPosition = 50;  // Все изображения будут на высоте 50 пикселей
-    g_imagesRects[0] = { 50, yPosition, 150, 150 };  // Первое изображение
-    g_imagesRects[1] = { 200, yPosition, 10, 150 }; // Второе изображение
-    g_imagesRects[2] = { 350, yPosition, 10, 150 }; // Третье изображение
-    g_imagesRects[3] = { 500, yPosition, 10, 150 }; // Четвертое изображение
-
-    // Параметры окна
-    const wchar_t CLASS_NAME[] = L"Sample Window Class";
-
-    // Регистрация класса окна
-    WNDCLASS wc = {};
-    wc.lpfnWndProc = WindowProc;
-    wc.hInstance = hInstance;
-    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1); // Установка фонового цвета по умолчанию
-    wc.lpszClassName = CLASS_NAME;
-
-    RegisterClass(&wc);
-
-    // Получение DPI экрана
+    // Получаем DPI экрана
     HDC screen = GetDC(0);
     int dpiX = GetDeviceCaps(screen, LOGPIXELSX);
     int dpiY = GetDeviceCaps(screen, LOGPIXELSY);
     ReleaseDC(0, screen);
 
-    // Размеры окна в миллиметрах
-    float widthMM = 90.1f;
-    float heightMM = 159.1f;
-
-    // Преобразование размеров окна из миллиметров в пиксели
-    int width = mmToPixels(widthMM, dpiX);
-    int height = mmToPixels(heightMM, dpiY);
+    // Задаем размеры окна, приближенные к мобильным устройствам (например, 360x640 пикселей)
+    int windowWidth = 360;
+    int windowHeight = 640;
 
     // Настройка размеров окна с учётом рамок
-    RECT wr = { 0, 0, width, height };
-    DWORD style = WS_POPUP;
+    RECT wr = { 0, 0, windowWidth, windowHeight };
+    DWORD style = WS_POPUP; // Без рамки
     AdjustWindowRectEx(&wr, style, FALSE, 0);
     int adjustedWidth = wr.right - wr.left;
     int adjustedHeight = wr.bottom - wr.top;
@@ -181,8 +162,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Создание окна без рамки и кнопок управления
     HWND hwnd = CreateWindowEx(
         0,
-        CLASS_NAME,
-        L"My Window",
+        L"Sample Window Class",
+        L"Моё Мобильное Окно",
         style, // Стиль окна без рамок и кнопок управления
         CW_USEDEFAULT, CW_USEDEFAULT, adjustedWidth, adjustedHeight,
         NULL,
@@ -199,6 +180,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         GdiplusShutdown(gdiplusToken);
         return 0;
     }
+
+    // Устанавливаем начальные размеры и положение изображений на сетке 2x2
+    int padding = 20; // Отступы от краев окна
+    int imageWidth = (windowWidth - 3 * padding) / 2; // Две картинки по горизонтали с отступом
+    int imageHeight = (windowHeight - 3 * padding - 100) / 2; // Две картинки по вертикали с отступом и учетом пространства для фона
+
+    // Располагаем изображения в левом верхнем и правом нижнем углах
+    g_imagesRects[0] = { padding, padding, padding + imageWidth, padding + imageHeight };
+    g_imagesRects[1] = { padding * 2 + imageWidth, padding, padding * 2 + 2 * imageWidth, padding + imageHeight };
+    g_imagesRects[2] = { padding, padding * 2 + imageHeight, padding + imageWidth, padding * 2 + 2 * imageHeight };
+    g_imagesRects[3] = { padding * 2 + imageWidth, padding * 2 + imageHeight, padding * 2 + 2 * imageWidth, padding * 2 + 2 * imageHeight };
 
     ShowWindow(hwnd, nCmdShow);
 

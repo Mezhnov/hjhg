@@ -4,10 +4,11 @@
 #include <string>
 #include <chrono>
 #include <ctime>
+#include <commdlg.h>
 
 #pragma comment(lib, "wininet.lib")
 
-// Функция для скачивания изображения с URL
+// Функция для скачивания изображения с URL и сохранения его на диск в формате BMP
 bool DownloadImageFromURL(const std::wstring& url, const std::wstring& localFilePath) {
     HINTERNET hInternet = InternetOpen(L"ImageDownloader", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (!hInternet) {
@@ -52,6 +53,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         // Скачивание изображения
         if (DownloadImageFromURL(L"https://i.pinimg.com/originals/56/cb/5f/56cb5ff3d83e4159c447b04d5d3a333e.jpg", L"background.bmp")) {
             hBitmap = (HBITMAP)LoadImage(NULL, L"background.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
+            if (hBitmap == NULL) {
+                MessageBox(hwnd, L"Ошибка при загрузке изображения!", L"Ошибка", MB_OK | MB_ICONERROR);
+            }
         }
         else {
             MessageBox(hwnd, L"Не удалось скачать изображение!", L"Ошибка", MB_OK | MB_ICONERROR);

@@ -1,12 +1,11 @@
 #include <windows.h>
-
-// Перевод миллиметров в пиксели в зависимости от DPI экрана
-int mmToPixels(float mm, int dpi) {
-    return static_cast<int>(mm * dpi / 25.4f); // 1 дюйм = 25.4 мм
-}
+#include <string>
 
 // Функция для обработки сообщений окна
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    static HBITMAP hBitmap = NULL;
+    static int imgWidth = 0, imgHeight = 0;
+
     switch (uMsg) {
     case WM_DESTROY:
         PostQuitMessage(0);
@@ -16,12 +15,33 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
 
-        // Установка зеленого фона
-        HBRUSH greenBrush = CreateSolidBrush(RGB(0, 255, 0));
-        FillRect(hdc, &ps.rcPaint, greenBrush);
-        DeleteObject(greenBrush);
+        // Отображение изображения, если оно было загружено
+        if (hBitmap != NULL) {
+            // Получаем размер изображения
+            HDC hdcMem = CreateCompatibleDC(hdc);
+            SelectObject(hdcMem, hBitmap);
+
+            // Рисуем часть изображения, если оно слишком большое
+            BitBlt(hdc, 0, 0, imgWidth, imgHeight, hdcMem, 0, 0, SRCCOPY);
+            
+            DeleteDC(hdcMem);
+        }
 
         EndPaint(hwnd, &ps);
+        return 0;
+    }
+
+    case WM_CREATE: {
+        // Загружаем изображение из файла
+        hBitmap = (HBITMAP)LoadImage(NULL, L"C:\\path\\to\\your\\image.jpg", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
+        
+        if (hBitmap != NULL) {
+            // Получаем размер изображения
+            BITMAP bm;
+            GetObject(hBitmap, sizeof(bm), &bm);
+            imgWidth = bm.bmWidth;
+            imgHeight = bm.bmHeight;
+        }
         return 0;
     }
 

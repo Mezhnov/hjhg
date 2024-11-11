@@ -43,12 +43,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     int width = mmToPixels(widthMM, dpiX);
     int height = mmToPixels(heightMM, dpiY);
 
-    // Создание окна
+    // Создание окна без рамки и кнопок управления
     HWND hwnd = CreateWindowEx(
         0,
         CLASS_NAME,
         L"My Window",
-        WS_OVERLAPPEDWINDOW,
+        WS_POPUP, // Стиль окна без рамок и кнопок управления
         CW_USEDEFAULT, CW_USEDEFAULT, width, height,
         NULL,
         NULL,

@@ -1,50 +1,83 @@
 #include <windows.h>
+#include <wininet.h>
+#include <fstream>
 #include <string>
 #include <chrono>
 #include <ctime>
 
-// Перевод миллиметров в пиксели в зависимости от DPI экрана
-int mmToPixels(float mm, int dpi) {
-    return static_cast<int>(mm * dpi / 25.4f); // 1 дюйм = 25.4 мм
+#pragma comment(lib, "wininet.lib")
+
+bool DownloadImageFromURL(const std::wstring& url, const std::wstring& localFilePath) {
+    HINTERNET hInternet = InternetOpen(L"ImageDownloader", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+    if (!hInternet) {
+        return false;
+    }
+
+    HINTERNET hUrl = InternetOpenUrl(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD, 0);
+    if (!hUrl) {
+        InternetCloseHandle(hInternet);
+        return false;
+    }
+
+    std::ofstream file(localFilePath, std::ios::binary);
+    if (!file) {
+        InternetCloseHandle(hUrl);
+        InternetCloseHandle(hInternet);
+        return false;
+    }
+
+    char buffer[4096];
+    DWORD bytesRead;
+    while (InternetReadFile(hUrl, buffer, sizeof(buffer), &bytesRead) && bytesRead > 0) {
+        file.write(buffer, bytesRead);
+    }
+
+    file.close();
+    InternetCloseHandle(hUrl);
+    InternetCloseHandle(hInternet);
+
+    return true;
 }
 
-// Функция для обработки сообщений окна
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    static wchar_t timeBuffer[9];  // Буфер для времени в формате HH:MM:SS
+    static wchar_t timeBuffer[9];
+    static HBITMAP hBitmap = NULL;
 
     switch (uMsg) {
-        case WM_DESTROY:
-            PostQuitMessage(0);
-            return 0;
-
         case WM_CREATE:
-            // Установка таймера на 1 секунду
+            // Скачивание изображения
+            if (DownloadImageFromURL(L"https://example.com/path/to/image.bmp", L"background.bmp")) {
+                hBitmap = (HBITMAP)LoadImage(NULL, L"background.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
+            } else {
+                MessageBox(hwnd, L"Не удалось скачать изображение!", L"Ошибка", MB_OK | MB_ICONERROR);
+            }
             SetTimer(hwnd, 1, 1000, NULL);
             return 0;
 
-        case WM_TIMER: {
-            // Получение текущего времени
+        case WM_TIMER:
             auto now = std::chrono::system_clock::now();
             std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
             std::tm localTime;
             localtime_s(&localTime, &nowTime);
             wcsftime(timeBuffer, sizeof(timeBuffer) / sizeof(wchar_t), L"%H:%M:%S", &localTime);
-
-            // Перерисовка окна
             InvalidateRect(hwnd, NULL, TRUE);
             return 0;
-        }
 
         case WM_PAINT: {
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hwnd, &ps);
 
-            // Установка зеленого фона
-            HBRUSH greenBrush = CreateSolidBrush(RGB(0, 255, 0));
-            FillRect(hdc, &ps.rcPaint, greenBrush);
-            DeleteObject(greenBrush);
+            if (hBitmap) {
+                HDC hdcMem = CreateCompatibleDC(hdc);
+                SelectObject(hdcMem, hBitmap);
 
-            // Установка шрифта и цвета текста
+                BITMAP bitmap;
+                GetObject(hBitmap, sizeof(bitmap), &bitmap);
+                StretchBlt(hdc, 0, 0, ps.rcPaint.right, ps.rcPaint.bottom, hdcMem, 0, 0, bitmap.bmWidth, bitmap.bmHeight, SRCCOPY);
+
+                DeleteDC(hdcMem);
+            }
+
             SetTextColor(hdc, RGB(255, 255, 255));
             SetBkMode(hdc, TRANSPARENT);
             HFONT hFont = CreateFont(30, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 
@@ -52,7 +85,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                                      DEFAULT_PITCH | FF_SWISS, L"Arial");
             SelectObject(hdc, hFont);
 
-            // Отображение времени
             RECT rect;
             GetClientRect(hwnd, &rect);
             DrawText(hdc, timeBuffer, -1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
@@ -62,59 +94,41 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             return 0;
         }
 
+        case WM_DESTROY:
+            PostQuitMessage(0);
+            return 0;
+
         default:
             return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
 }
 
-// Основная функция для оконных приложений на Windows
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-    // Параметры окна
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     const wchar_t CLASS_NAME[] = L"Sample Window Class";
 
-    // Регистрация класса окна
     WNDCLASS wc = {};
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
-    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1); // Задает фоновый цвет по умолчанию
     wc.lpszClassName = CLASS_NAME;
 
     RegisterClass(&wc);
 
-    // Получение DPI экрана
-    HDC screen = GetDC(0);
-    int dpiX = GetDeviceCaps(screen, LOGPIXELSX);
-    int dpiY = GetDeviceCaps(screen, LOGPIXELSY);
-    ReleaseDC(0, screen);
-
-    // Размеры окна в миллиметрах
-    float widthMM = 74.1f;
-    float heightMM = 159.1f;
-
-    // Преобразование размеров окна из миллиметров в пиксели
-    int width = mmToPixels(widthMM, dpiX);
-    int height = mmToPixels(heightMM, dpiY);
-
-    // Создание окна без рамки и кнопок управления
     HWND hwnd = CreateWindowEx(
         0,
         CLASS_NAME,
         L"My Window",
-        WS_POPUP, // Стиль окна без рамок и кнопок управления
-        CW_USEDEFAULT, CW_USEDEFAULT, width, height,
+        WS_POPUP,
+        CW_USEDEFAULT, CW_USEDEFAULT, 800, 600,
         NULL,
         NULL,
         hInstance,
         NULL
     );
 
-    if (hwnd == NULL) {
-        return 0;
-    }
+    if (!hwnd) return 0;
 
     ShowWindow(hwnd, nCmdShow);
 
-    // Запуск цикла обработки сообщений
     MSG msg = {};
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);

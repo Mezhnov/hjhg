@@ -1,4 +1,7 @@
 #include <windows.h>
+#include <string>
+#include <chrono>
+#include <ctime>
 
 // Перевод миллиметров в пиксели в зависимости от DPI экрана
 int mmToPixels(float mm, int dpi) {
@@ -7,10 +10,30 @@ int mmToPixels(float mm, int dpi) {
 
 // Функция для обработки сообщений окна
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    static wchar_t timeBuffer[9];  // Буфер для времени в формате HH:MM:SS
+
     switch (uMsg) {
         case WM_DESTROY:
             PostQuitMessage(0);
             return 0;
+
+        case WM_CREATE:
+            // Установка таймера на 1 секунду
+            SetTimer(hwnd, 1, 1000, NULL);
+            return 0;
+
+        case WM_TIMER: {
+            // Получение текущего времени
+            auto now = std::chrono::system_clock::now();
+            std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
+            std::tm localTime;
+            localtime_s(&localTime, &nowTime);
+            wcsftime(timeBuffer, sizeof(timeBuffer) / sizeof(wchar_t), L"%H:%M:%S", &localTime);
+
+            // Перерисовка окна
+            InvalidateRect(hwnd, NULL, TRUE);
+            return 0;
+        }
 
         case WM_PAINT: {
             PAINTSTRUCT ps;
@@ -21,6 +44,20 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             FillRect(hdc, &ps.rcPaint, greenBrush);
             DeleteObject(greenBrush);
 
+            // Установка шрифта и цвета текста
+            SetTextColor(hdc, RGB(255, 255, 255));
+            SetBkMode(hdc, TRANSPARENT);
+            HFONT hFont = CreateFont(30, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 
+                                     OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, 
+                                     DEFAULT_PITCH | FF_SWISS, L"Arial");
+            SelectObject(hdc, hFont);
+
+            // Отображение времени
+            RECT rect;
+            GetClientRect(hwnd, &rect);
+            DrawText(hdc, timeBuffer, -1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+            DeleteObject(hFont);
             EndPaint(hwnd, &ps);
             return 0;
         }

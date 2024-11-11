@@ -1,89 +1,289 @@
 #include <windows.h>
 #include <gdiplus.h>
 #include <urlmon.h>
-#include <shlwapi.h> // Для функций работы с путями
+#include <shlwapi.h>
 #include <string>
+#include <vector>
+#include <ctime>
 
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "urlmon.lib")
-#pragma comment(lib, "shlwapi.lib") // Для функций работы с путями
+#pragma comment(lib, "shlwapi.lib")
 
 using namespace Gdiplus;
 
-// Глобальная переменная для хранения изображения
-Bitmap* g_image = nullptr;
+// Structure to represent each image
+struct ImageObject {
+    Bitmap* bitmap;
+    RECT rect;        // Position and size
+    bool dragging;
+    POINT dragStart;
+    bool resizing;
+    POINT resizeStart;
+};
 
-// Функция для перевода миллиметров в пиксели в зависимости от DPI экрана
-int mmToPixels(float mm, int dpi) {
-    return static_cast<int>(mm * dpi / 25.4f); // 1 дюйм = 25.4 мм
+// Structure to represent draggable time text
+struct TimeObject {
+    std::wstring timeStr;
+    RECT rect;        // Position and size
+    bool dragging;
+    POINT dragStart;
+};
+
+// Global variables
+std::vector<ImageObject> g_images;
+TimeObject g_time;
+int g_spacing = 10; // Spacing between images
+
+// Forward declarations
+Bitmap* LoadImageFromURL(const wchar_t* url);
+int mmToPixels(float mm, int dpi);
+
+// Function to update the current time string
+void UpdateTime() {
+    std::time_t t = std::time(nullptr);
+    std::tm tm;
+    localtime_s(&tm, &t);
+    wchar_t buffer[6];
+    swprintf_s(buffer, L"%02d:%02d", tm.tm_hour, tm.tm_min);
+    g_time.timeStr = buffer;
 }
 
-// Функция для загрузки изображения из URL
+// Function to load multiple images
+bool LoadImages(const std::vector<std::wstring>& urls) {
+    for (const auto& url : urls) {
+        Bitmap* bmp = LoadImageFromURL(url.c_str());
+        if (!bmp) return false;
+
+        // Initialize ImageObject
+        ImageObject img;
+        img.bitmap = bmp;
+        img.dragging = false;
+        img.resizing = false;
+        // Set initial size to the image's original size
+        img.rect.left = 0;
+        img.rect.top = 0;
+        img.rect.right = bmp->GetWidth();
+        img.rect.bottom = bmp->GetHeight();
+        g_images.push_back(img);
+    }
+    return true;
+}
+
+// Function to load image from URL
 Bitmap* LoadImageFromURL(const wchar_t* url) {
-    // Получение временного пути
+    // Get temporary path
     wchar_t tempPath[MAX_PATH];
     if (!GetTempPath(MAX_PATH, tempPath)) {
         return nullptr;
     }
 
-    // Создание временного файла
+    // Create temporary file
     wchar_t tempFile[MAX_PATH];
     if (!GetTempFileName(tempPath, L"IMG", 0, tempFile)) {
         return nullptr;
     }
 
-    // Скачивание изображения во временный файл
+    // Download the image
     HRESULT hr = URLDownloadToFile(NULL, url, tempFile, 0, NULL);
     if (FAILED(hr)) {
-        // Удаление временного файла, если скачивание не удалось
         DeleteFile(tempFile);
         return nullptr;
     }
 
-    // Загрузка изображения с помощью GDI+
+    // Load the image with GDI+
     Bitmap* bmp = Bitmap::FromFile(tempFile);
     if (bmp && bmp->GetLastStatus() != Ok) {
         delete bmp;
         bmp = nullptr;
     }
 
-    // Удаление временного файла
+    // Delete the temporary file
     DeleteFile(tempFile);
 
     return bmp;
 }
 
-// Функция обработки сообщений окна
+// Window Procedure
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    static ULONG_PTR gdiplusToken;
+    static HDC hdcMem = NULL;
+    static Bitmap* memBitmap = NULL;
+    static Graphics* memGraphics = NULL;
+
     switch (uMsg) {
-    case WM_DESTROY:
-        PostQuitMessage(0);
+    case WM_CREATE: {
+        // Initialize GDI+
+        GdiplusStartupInput gdiplusStartupInput;
+        GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
+
+        // Initialize time
+        UpdateTime();
+        // Set initial position for time
+        g_time.rect.left = 50;
+        g_time.rect.top = 50;
+        g_time.rect.right = 200;
+        g_time.rect.bottom = 100;
+        g_time.dragging = false;
+
+        // Load images
+        std::vector<std::wstring> imageURLs = {
+            L"https://example.com/image1.jpg",
+            L"https://example.com/image2.jpg",
+            L"https://example.com/image3.jpg",
+            L"https://example.com/image4.jpg"
+        };
+
+        if (!LoadImages(imageURLs)) {
+            MessageBox(NULL, L"Failed to load one or more images.", L"Error", MB_ICONERROR);
+            PostQuitMessage(0);
+        }
+
+        // Arrange images horizontally with spacing
+        int currentX = 50;
+        int currentY = 150;
+        for (auto& img : g_images) {
+            img.rect.left = currentX;
+            img.rect.top = currentY;
+            img.rect.right = currentX + img.bitmap->GetWidth();
+            img.rect.bottom = currentY + img.bitmap->GetHeight();
+            currentX += img.bitmap->GetWidth() + g_spacing;
+        }
+
+        // Create memory DC for double buffering
+        RECT rect;
+        GetClientRect(hwnd, &rect);
+        hdcMem = CreateCompatibleDC(NULL);
+        memBitmap = new Bitmap(rect.right - rect.left, rect.bottom - rect.top);
+        memGraphics = new Graphics(memBitmap);
+
+        // Set a timer to update the time every minute
+        SetTimer(hwnd, 1, 60000, NULL); // 60,000 ms = 1 minute
+
         return 0;
+    }
 
     case WM_PAINT: {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
 
-        // Инициализация GDI+
+        // Use double buffering to prevent flickering
         Graphics graphics(hdc);
+        graphics.Clear(Color::White);
 
-        // Получение размеров клиентской области окна
-        RECT rect;
-        GetClientRect(hwnd, &rect);
-        int windowWidth = rect.right - rect.left;
-        int windowHeight = rect.bottom - rect.top;
-
-        // Отображение изображения в окне
-        if (g_image) {
-            // Получение размеров изображения
-            UINT imgWidth = g_image->GetWidth();
-            UINT imgHeight = g_image->GetHeight();
-
-            // Рисование изображения, масштабированного под размер окна
-            graphics.DrawImage(g_image, 0, 0, windowWidth, windowHeight);
+        // Draw images
+        for (const auto& img : g_images) {
+            graphics.DrawImage(img.bitmap, img.rect.left, img.rect.top,
+                img.rect.right - img.rect.left, img.rect.bottom - img.rect.top);
         }
 
+        // Draw time
+        FontFamily fontFamily(L"Arial");
+        Font font(&fontFamily, 24, FontStyleRegular, UnitPixel);
+        SolidBrush brush(Color(255, 0, 0, 0)); // Black color
+
+        graphics.DrawString(g_time.timeStr.c_str(), -1, &font, PointF((REAL)g_time.rect.left, (REAL)g_time.rect.top), &brush);
+
         EndPaint(hwnd, &ps);
+        return 0;
+    }
+
+    case WM_LBUTTONDOWN: {
+        int xPos = GET_X_LPARAM(lParam);
+        int yPos = GET_Y_LPARAM(lParam);
+
+        // Check if clicking on any image
+        for (auto& img : g_images) {
+            if (xPos >= img.rect.left && xPos <= img.rect.right &&
+                yPos >= img.rect.top && yPos <= img.rect.bottom) {
+                img.dragging = true;
+                img.dragStart.x = xPos - img.rect.left;
+                img.dragStart.y = yPos - img.rect.top;
+                SetCapture(hwnd);
+                return 0;
+            }
+        }
+
+        // Check if clicking on time
+        if (xPos >= g_time.rect.left && xPos <= g_time.rect.right &&
+            yPos >= g_time.rect.top && yPos <= g_time.rect.bottom) {
+            g_time.dragging = true;
+            g_time.dragStart.x = xPos - g_time.rect.left;
+            g_time.dragStart.y = yPos - g_time.rect.top;
+            SetCapture(hwnd);
+            return 0;
+        }
+
+        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }
+
+    case WM_MOUSEMOVE: {
+        int xPos = GET_X_LPARAM(lParam);
+        int yPos = GET_Y_LPARAM(lParam);
+
+        // Dragging images
+        for (auto& img : g_images) {
+            if (img.dragging) {
+                img.rect.left = xPos - img.dragStart.x;
+                img.rect.top = yPos - img.dragStart.y;
+                img.rect.right = img.rect.left + img.bitmap->GetWidth();
+                img.rect.bottom = img.rect.top + img.bitmap->GetHeight();
+                InvalidateRect(hwnd, NULL, TRUE);
+                return 0;
+            }
+        }
+
+        // Dragging time
+        if (g_time.dragging) {
+            g_time.rect.left = xPos - g_time.dragStart.x;
+            g_time.rect.top = yPos - g_time.dragStart.y;
+            // Estimate the size based on font
+            g_time.rect.right = g_time.rect.left + 100; // Adjust as needed
+            g_time.rect.bottom = g_time.rect.top + 30;  // Adjust as needed
+            InvalidateRect(hwnd, NULL, TRUE);
+            return 0;
+        }
+
+        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }
+
+    case WM_LBUTTONUP: {
+        // Stop dragging
+        for (auto& img : g_images) {
+            if (img.dragging) {
+                img.dragging = false;
+                ReleaseCapture();
+                return 0;
+            }
+        }
+
+        if (g_time.dragging) {
+            g_time.dragging = false;
+            ReleaseCapture();
+            return 0;
+        }
+
+        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }
+
+    case WM_TIMER: {
+        if (wParam == 1) { // Timer ID
+            UpdateTime();
+            InvalidateRect(hwnd, NULL, TRUE);
+        }
+        return 0;
+    }
+
+    case WM_DESTROY: {
+        // Cleanup
+        for (auto& img : g_images) {
+            delete img.bitmap;
+        }
+        if (memGraphics) delete memGraphics;
+        if (memBitmap) delete memBitmap;
+        if (hdcMem) DeleteDC(hdcMem);
+        GdiplusShutdown(gdiplusToken);
+        PostQuitMessage(0);
         return 0;
     }
 
@@ -92,63 +292,45 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     }
 }
 
-// Основная функция для оконных приложений на Windows
+// Entry point
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-    // Инициализация GDI+
-    GdiplusStartupInput gdiplusStartupInput;
-    ULONG_PTR gdiplusToken;
-    if (GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL) != Ok) {
-        return 0;
-    }
-
-    // Загрузка изображения из URL
-    const wchar_t* imageURL = L"https://i.pinimg.com/736x/44/ba/d5/44bad5b1b0839e5ab430433c6ddfb4be.jpg";
-    g_image = LoadImageFromURL(imageURL);
-    if (!g_image) {
-        MessageBox(NULL, L"Не удалось загрузить изображение по указанному URL.", L"Ошибка", MB_ICONERROR);
-        GdiplusShutdown(gdiplusToken);
-        return 0;
-    }
-
-    // Параметры окна
+    // Register window class
     const wchar_t CLASS_NAME[] = L"Sample Window Class";
 
-    // Регистрация класса окна
     WNDCLASS wc = {};
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
-    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1); // Установка фонового цвета по умолчанию
     wc.lpszClassName = CLASS_NAME;
-
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     RegisterClass(&wc);
 
-    // Получение DPI экрана
+    // Get DPI
     HDC screen = GetDC(0);
     int dpiX = GetDeviceCaps(screen, LOGPIXELSX);
     int dpiY = GetDeviceCaps(screen, LOGPIXELSY);
     ReleaseDC(0, screen);
 
-    // Размеры окна в миллиметрах
+    // Window size in mm
     float widthMM = 90.1f;
     float heightMM = 159.1f;
 
-    // Преобразование размеров окна из миллиметров в пиксели
+    // Convert to pixels
     int width = mmToPixels(widthMM, dpiX);
     int height = mmToPixels(heightMM, dpiY);
 
-    // Настройка размеров окна с учётом рамок
+    // Adjust window size
     RECT wr = { 0, 0, width, height };
-    DWORD style = WS_POPUP;
+    DWORD style = WS_OVERLAPPEDWINDOW;
     AdjustWindowRectEx(&wr, style, FALSE, 0);
     int adjustedWidth = wr.right - wr.left;
     int adjustedHeight = wr.bottom - wr.top;
 
-    // Создание окна без рамки и кнопок управления
+    // Create window
     HWND hwnd = CreateWindowEx(
         0,
         CLASS_NAME,
-        L"My Window",
-        style, // Стиль окна без рамок и кнопок управления
+        L"Image Viewer",
+        style,
         CW_USEDEFAULT, CW_USEDEFAULT, adjustedWidth, adjustedHeight,
         NULL,
         NULL,
@@ -157,25 +339,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     );
 
     if (hwnd == NULL) {
-        delete g_image;
-        GdiplusShutdown(gdiplusToken);
         return 0;
     }
 
     ShowWindow(hwnd, nCmdShow);
 
-    // Цикл обработки сообщений
+    // Message loop
     MSG msg = {};
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
-    // Освобождение ресурсов
-    delete g_image;
-
-    // Завершение работы с GDI+
-    GdiplusShutdown(gdiplusToken);
-
     return 0;
+}
+
+// Function to convert millimeters to pixels
+int mmToPixels(float mm, int dpi) {
+    return static_cast<int>(mm * dpi / 25.4f); // 1 inch = 25.4 mm
 }

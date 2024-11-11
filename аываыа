@@ -48,64 +48,65 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     std::time_t nowTime;  // Переменная для преобразованного времени
 
     switch (uMsg) {
-        case WM_CREATE:
-            // Скачивание изображения
-            if (DownloadImageFromURL(L"https://example.com/path/to/image.bmp", L"background.bmp")) {
-                hBitmap = (HBITMAP)LoadImage(NULL, L"background.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
-            } else {
-                MessageBox(hwnd, L"Не удалось скачать изображение!", L"Ошибка", MB_OK | MB_ICONERROR);
-            }
-            SetTimer(hwnd, 1, 1000, NULL);  // Таймер обновления времени каждую секунду
-            return 0;
+    case WM_CREATE:
+        // Скачивание изображения
+        if (DownloadImageFromURL(L"https://i.pinimg.com/originals/56/cb/5f/56cb5ff3d83e4159c447b04d5d3a333e.jpg", L"background.bmp")) {
+            hBitmap = (HBITMAP)LoadImage(NULL, L"background.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
+        }
+        else {
+            MessageBox(hwnd, L"Не удалось скачать изображение!", L"Ошибка", MB_OK | MB_ICONERROR);
+        }
+        SetTimer(hwnd, 1, 1000, NULL);  // Таймер обновления времени каждую секунду
+        return 0;
 
-        case WM_TIMER:
-            now = std::chrono::system_clock::now();  // Получение текущего времени
-            nowTime = std::chrono::system_clock::to_time_t(now);
-            std::tm localTime;
-            localtime_s(&localTime, &nowTime);  // Преобразование времени в локальное
-            wcsftime(timeBuffer, sizeof(timeBuffer) / sizeof(wchar_t), L"%H:%M:%S", &localTime);  // Форматирование времени
-            InvalidateRect(hwnd, NULL, TRUE);  // Перерисовка окна
-            return 0;
+    case WM_TIMER:
+        now = std::chrono::system_clock::now();  // Получение текущего времени
+        nowTime = std::chrono::system_clock::to_time_t(now);
+        std::tm localTime;
+        localtime_s(&localTime, &nowTime);  // Преобразование времени в локальное
+        wcsftime(timeBuffer, sizeof(timeBuffer) / sizeof(wchar_t), L"%H:%M:%S", &localTime);  // Форматирование времени
+        InvalidateRect(hwnd, NULL, TRUE);  // Перерисовка окна
+        return 0;
 
-        case WM_PAINT: {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hwnd, &ps);
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
 
-            // Отображение фона (если изображение загружено)
-            if (hBitmap) {
-                HDC hdcMem = CreateCompatibleDC(hdc);
-                SelectObject(hdcMem, hBitmap);
+        // Отображение фона (если изображение загружено)
+        if (hBitmap) {
+            HDC hdcMem = CreateCompatibleDC(hdc);
+            SelectObject(hdcMem, hBitmap);
 
-                BITMAP bitmap;
-                GetObject(hBitmap, sizeof(bitmap), &bitmap);
-                StretchBlt(hdc, 0, 0, ps.rcPaint.right, ps.rcPaint.bottom, hdcMem, 0, 0, bitmap.bmWidth, bitmap.bmHeight, SRCCOPY);
+            BITMAP bitmap;
+            GetObject(hBitmap, sizeof(bitmap), &bitmap);
+            StretchBlt(hdc, 0, 0, ps.rcPaint.right, ps.rcPaint.bottom, hdcMem, 0, 0, bitmap.bmWidth, bitmap.bmHeight, SRCCOPY);
 
-                DeleteDC(hdcMem);
-            }
-
-            // Отображение времени поверх фона
-            SetTextColor(hdc, RGB(255, 255, 255));  // Белый цвет текста
-            SetBkMode(hdc, TRANSPARENT);  // Прозрачный фон для текста
-            HFONT hFont = CreateFont(30, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 
-                                     OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, 
-                                     DEFAULT_PITCH | FF_SWISS, L"Arial");
-            SelectObject(hdc, hFont);
-
-            RECT rect;
-            GetClientRect(hwnd, &rect);  // Получение размеров окна
-            DrawText(hdc, timeBuffer, -1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);  // Отображение времени по центру
-
-            DeleteObject(hFont);
-            EndPaint(hwnd, &ps);
-            return 0;
+            DeleteDC(hdcMem);
         }
 
-        case WM_DESTROY:
-            PostQuitMessage(0);  // Завершение приложения
-            return 0;
+        // Отображение времени поверх фона
+        SetTextColor(hdc, RGB(255, 255, 255));  // Белый цвет текста
+        SetBkMode(hdc, TRANSPARENT);  // Прозрачный фон для текста
+        HFONT hFont = CreateFont(30, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+            OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
+            DEFAULT_PITCH | FF_SWISS, L"Arial");
+        SelectObject(hdc, hFont);
 
-        default:
-            return DefWindowProc(hwnd, uMsg, wParam, lParam);  // Стандартная обработка сообщений
+        RECT rect;
+        GetClientRect(hwnd, &rect);  // Получение размеров окна
+        DrawText(hdc, timeBuffer, -1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);  // Отображение времени по центру
+
+        DeleteObject(hFont);
+        EndPaint(hwnd, &ps);
+        return 0;
+    }
+
+    case WM_DESTROY:
+        PostQuitMessage(0);  // Завершение приложения
+        return 0;
+
+    default:
+        return DefWindowProc(hwnd, uMsg, wParam, lParam);  // Стандартная обработка сообщений
     }
 }
 

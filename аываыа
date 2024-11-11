@@ -3,6 +3,7 @@
 #include <urlmon.h>
 #include <shlwapi.h> // Для функций работы с путями
 #include <string>
+#include <windowsx.h>
 
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "urlmon.lib")
@@ -90,8 +91,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             if (g_images[i]) {
                 // Масштабируем изображения и рисуем их
                 graphics.DrawImage(g_images[i], g_imagesRects[i].left, g_imagesRects[i].top,
-                                   g_imagesRects[i].right - g_imagesRects[i].left,
-                                   g_imagesRects[i].bottom - g_imagesRects[i].top);
+                    g_imagesRects[i].right - g_imagesRects[i].left,
+                    g_imagesRects[i].bottom - g_imagesRects[i].top);
             }
         }
 
@@ -219,3 +220,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return 0;
 }
+
+Сборка начата в 18:45...
+1>------ Сборка начата: проект: Browser, Конфигурация: Debug x64 ------
+1>Browser.cpp
+1>C:\Users\User\source\repos\Browser\Browser\Browser.cpp(93,26): error C2668: Gdiplus::Graphics::DrawImage: неоднозначный вызов перегруженной функции
+1>    C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\um\GdiplusGraphics.h(1576,12):
+1>    может быть "Gdiplus::Status Gdiplus::Graphics::DrawImage(Gdiplus::Image *,INT,INT,INT,INT)"
+1>    C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\um\GdiplusGraphics.h(1534,12):
+1>    или       "Gdiplus::Status Gdiplus::Graphics::DrawImage(Gdiplus::Image *,Gdiplus::REAL,Gdiplus::REAL,Gdiplus::REAL,Gdiplus::REAL)"
+1>    C:\Users\User\source\repos\Browser\Browser\Browser.cpp(93,26):
+1>    при попытке сопоставить список аргументов "(Gdiplus::Bitmap *, LONG, LONG, LONG, LONG)"
+1>Сборка проекта "Browser.vcxproj" завершена с ошибкой.
+========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
+========== Сборка завершено в 18:45 и заняло 00,630 с ==========

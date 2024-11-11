@@ -1,0 +1,138 @@
+#include <windows.h>
+#include <string>
+#include <sstream>
+#include <iomanip>
+#include <ctime>
+
+const wchar_t CLASS_NAME[] = L"BIOSLikeWindowClass";
+
+void DrawTextCenter(HDC hdc, RECT rect, const std::wstring& text, int fontSize = 48, COLORREF color = RGB(0, 255, 0)) {
+    HFONT hFont = CreateFont(
+        fontSize, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_OUTLINE_PRECIS, CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY, VARIABLE_PITCH, L"Consolas");
+    HFONT hOldFont = (HFONT)SelectObject(hdc, hFont);
+
+    SetTextColor(hdc, color);
+    SetBkMode(hdc, TRANSPARENT);
+    DrawTextW(hdc, text.c_str(), -1, &rect, DT_CENTER | DT_SINGLELINE);
+
+    SelectObject(hdc, hOldFont);
+    DeleteObject(hFont);
+}
+
+void DrawTextLeft(HDC hdc, int x, int y, const std::wstring& text, int fontSize = 24, COLORREF color = RGB(0, 255, 0)) {
+    HFONT hFont = CreateFont(
+        fontSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_OUTLINE_PRECIS, CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY, VARIABLE_PITCH, L"Consolas");
+    HFONT hOldFont = (HFONT)SelectObject(hdc, hFont);
+
+    SetTextColor(hdc, color);
+    SetBkMode(hdc, TRANSPARENT);
+    TextOutW(hdc, x, y, text.c_str(), text.length());
+
+    SelectObject(hdc, hOldFont);
+    DeleteObject(hFont);
+}
+
+std::wstring GetCurrentDateTime() {
+    std::wostringstream dateTimeStream;
+    auto now = std::time(nullptr);
+    std::tm localTime;
+    localtime_s(&localTime, &now);
+    dateTimeStream << std::put_time(&localTime, L"%Y-%m-%d %H:%M:%S");
+    return dateTimeStream.str();
+}
+
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    switch (uMsg) {
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        return 0;
+
+    case WM_KEYDOWN:
+        if (wParam == VK_ESCAPE) {
+            DestroyWindow(hwnd);
+        }
+        return 0;
+
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
+
+        RECT rect;
+        GetClientRect(hwnd, &rect);
+
+        HBRUSH blackBrush = CreateSolidBrush(RGB(0, 0, 0));
+        FillRect(hdc, &rect, blackBrush);
+        DeleteObject(blackBrush);
+
+        RECT headerRect = rect;
+        headerRect.top = 20;
+        DrawTextCenter(hdc, headerRect, L"BIOS Setup Utility - Version 1.0.0", 36);
+
+        int startY = 150;
+        DrawTextLeft(hdc, 50, startY, L"Processor: Intel(R) Core(TM) i7-10700K CPU @ 3.80GHz", 28);
+        DrawTextLeft(hdc, 50, startY + 40, L"Memory: 16 GB DDR4", 28);
+        DrawTextLeft(hdc, 50, startY + 80, L"Storage: 512 GB SSD", 28);
+
+        DrawTextLeft(hdc, 50, startY + 160, L"Current Date and Time: " + GetCurrentDateTime(), 28);
+
+        int optionsY = startY + 280;
+        DrawTextLeft(hdc, 50, optionsY, L"F1 System Information", 26);
+        DrawTextLeft(hdc, 50, optionsY + 40, L"F2 Advanced", 26);
+        DrawTextLeft(hdc, 50, optionsY + 80, L"F3 Boot", 26);
+        DrawTextLeft(hdc, 50, optionsY + 120, L"F4 Security", 26);
+        DrawTextLeft(hdc, 50, optionsY + 160, L"F10 Save and Exit", 26);
+
+        RECT footerRect = rect;
+        footerRect.bottom -= 50;
+        DrawTextCenter(hdc, footerRect, L"Press ESC to exit", 24, RGB(255, 0, 0));
+
+        EndPaint(hwnd, &ps);
+    }
+                 return 0;
+    }
+    return DefWindowProc(hwnd, uMsg, wParam, lParam);
+}
+
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
+    WNDCLASS wc = {};
+    wc.lpfnWndProc = WindowProc;
+    wc.hInstance = hInstance;
+    wc.lpszClassName = CLASS_NAME;
+    wc.hCursor = NULL;
+
+    RegisterClass(&wc);
+
+    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+    HWND hwnd = CreateWindowEx(
+        0,
+        CLASS_NAME,
+        L"BIOS-like Screen",
+        WS_POPUP,
+        0, 0, screenWidth, screenHeight,
+        NULL,
+        NULL,
+        hInstance,
+        NULL
+    );
+
+    if (hwnd == NULL) {
+        return 0;
+    }
+
+    ShowWindow(hwnd, SW_SHOW);
+    UpdateWindow(hwnd);
+
+    MSG msg = {};
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    return 0;
+}

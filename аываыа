@@ -102,7 +102,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
 
     // Загрузка изображения из URL
-    const wchar_t* imageURL = L"https://i.pinimg.com/originals/56/cb/5f/56cb5ff3d83e4159c447b04d5d3a333e.jpg";
+    const wchar_t* imageURL = L"https://i.pinimg.com/736x/44/ba/d5/44bad5b1b0839e5ab430433c6ddfb4be.jpg";
     g_image = LoadImageFromURL(imageURL);
     if (!g_image) {
         MessageBox(NULL, L"Не удалось загрузить изображение по указанному URL.", L"Ошибка", MB_ICONERROR);
@@ -129,7 +129,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     ReleaseDC(0, screen);
 
     // Размеры окна в миллиметрах
-    float widthMM = 74.1f;
+    float widthMM = 90.1f;
     float heightMM = 159.1f;
 
     // Преобразование размеров окна из миллиметров в пиксели

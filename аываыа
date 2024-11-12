@@ -106,7 +106,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             // Размер иконки
             int iconSize = iconSize_Wifi;
             // Сдвиг влево на 10 пикселей
-            int shiftLeft = 10; // Вы можете изменить это значение по необходимости
+            int shiftLeft = 50; // Вы можете изменить это значение по необходимости
             // Позиция (отступ от верхнего правого угла с учетом сдвига)
             int x = windowWidth - iconSize - margin - shiftLeft; // Сдвиг влево
             // Убедимся, что x не становится отрицательным
@@ -187,9 +187,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Определение URL-адресов иконок
     const wchar_t* wifiIconURL = L"https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Feather-core-wifi.svg/1200px-Feather-core-wifi.svg.png";
     const wchar_t* settingsIconURL = L"https://avatars.mds.yandex.net/i?id=d2ae9329c61bbacb21fabe356df4c70b_l-8209975-images-thumbs&n=13";
-    const wchar_t* filesIconURL = L"https://avatars.mds.yandex.net/i?id=d2ae9329c61bbacb21fabe356df4c70b_l-8209975-images-thumbs&n=13";
+    const wchar_t* filesIconURL = L"https://ltdfoto.ru/images/2024/11/12/nyc01temp__5w4tPKmHJwunW7xVwlLT.png";
     const wchar_t* cameraIconURL = L"https://avatars.mds.yandex.net/i?id=d2ae9329c61bbacb21fabe356df4c70b_l-8209975-images-thumbs&n=13";
-    const wchar_t* browserIconURL = L"https://imgur.com/a/3mAgP0o";
+    const wchar_t* browserIconURL = L"https://ltdfoto.ru/images/2024/11/12/Remove-bg.ai_1730637074101.png";
 
     // Загрузка дополнительных иконок из URL
     g_wifiIcon = LoadImageFromURL(wifiIconURL);

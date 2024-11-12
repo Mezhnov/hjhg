@@ -1,7 +1,7 @@
 #include <windows.h>
 #include <gdiplus.h>
 #include <urlmon.h>
-#include <shlwapi.h> // For path manipulation functions
+#include <shlwapi.h> // Для функций манипуляции путями
 #include <string>
 #include <ctime>
 #include <vector>
@@ -9,74 +9,80 @@
 
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "urlmon.lib")
-#pragma comment(lib, "shlwapi.lib") // For path manipulation functions
+#pragma comment(lib, "shlwapi.lib") // Для функций манипуляции путями
 
 using namespace Gdiplus;
 
-// Structure to store icon and its label
+// Структура для хранения иконки приложения и его метки
 struct AppIcon {
     Bitmap* image;
     std::wstring label;
 };
 
-// Global variables to store images
+// Глобальные переменные для хранения изображений
 Bitmap* g_mainImage = nullptr;
 Bitmap* g_wifiIcon = nullptr;
 
-// Vector to store application icons
+// Вектор для хранения иконок приложений
 std::vector<AppIcon> g_appIcons;
 
-// Globals for displaying time
+// Глобальные переменные для отображения времени и даты
 bool isDragging = false;
 POINT dragStartPoint = { 0, 0 };
 
-// Time position: adjust values to position the time
-RECT timeRect = { 50, 50, 300, 100 }; // Initial position and size of time
-Color timeColor = Color(255, 255, 255, 255); // White color by default
-float timeFontSize = 50.0f; // Initial font size
-std::wstring currentTime = L"00:00"; // Current time
+// Позиция времени и даты: настройте значения для позиционирования
+RECT timeRect = { 50, 50, 300, 100 }; // Начальная позиция и размер времени
+Color timeColor = Color(255, 255, 255, 255); // Белый цвет по умолчанию
+float timeFontSize = 50.0f; // Начальный размер шрифта времени
 
-// Function to convert millimeters to pixels based on screen DPI
+RECT dateRect = { 50, 110, 300, 150 }; // Начальная позиция и размер даты
+Color dateColor = Color(255, 255, 255, 255); // Белый цвет даты
+float dateFontSize = 20.0f; // Начальный размер шрифта даты
+
+std::wstring currentTime = L"00:00"; // Текущее время
+std::wstring currentDate = L"01 Сентябрь 2023"; // Текущая дата
+
+// Функция для преобразования миллиметров в пиксели на основе DPI экрана
 int mmToPixels(float mm, int dpi) {
-    return static_cast<int>(mm * dpi / 25.4f); // 1 inch = 25.4 mm
+    return static_cast<int>(mm * dpi / 25.4f); // 1 дюйм = 25.4 мм
 }
 
-// Function to load image from URL
+// Функция для загрузки изображения из URL
 Bitmap* LoadImageFromURL(const wchar_t* url) {
-    // Get temporary path
+    // Получить временный путь
     wchar_t tempPath[MAX_PATH];
     if (!GetTempPath(MAX_PATH, tempPath)) {
         return nullptr;
     }
 
-    // Create temporary file
+    // Создать временный файл
     wchar_t tempFile[MAX_PATH];
     if (!GetTempFileName(tempPath, L"IMG", 0, tempFile)) {
         return nullptr;
     }
 
-    // Download image to temporary file
+    // Скачать изображение во временный файл
     HRESULT hr = URLDownloadToFile(NULL, url, tempFile, 0, NULL);
     if (FAILED(hr)) {
-        // Delete temporary file if download failed
+        // Удалить временный файл, если загрузка не удалась
         DeleteFile(tempFile);
         return nullptr;
     }
 
-    // Load image using GDI+
+    // Загрузить изображение с помощью GDI+
     Bitmap* bmp = Bitmap::FromFile(tempFile);
     if (bmp && bmp->GetLastStatus() != Ok) {
         delete bmp;
         bmp = nullptr;
     }
 
-    // Delete temporary file
+    // Удалить временный файл
     DeleteFile(tempFile);
 
     return bmp;
 }
 
-// Function to get current time in "HH:MM" format
+// Функция для получения текущего времени в формате "HH:MM"
 std::wstring GetCurrentTimeString() {
     std::time_t t = std::time(nullptr);
     std::tm localTime;
@@ -86,7 +92,22 @@ std::wstring GetCurrentTimeString() {
     return std::wstring(buffer);
 }
 
-// Window message processing function
+// Функция для получения текущей даты в формате "ДД ММММ ГГГГ"
+std::wstring GetCurrentDateString() {
+    std::time_t t = std::time(nullptr);
+    std::tm localTime;
+    localtime_s(&localTime, &t);
+    
+    // Массив названий месяцев на русском языке
+    const wchar_t* months[] = { L"января", L"февраля", L"марта", L"апреля", L"мая", L"июня",
+                                 L"июля", L"августа", L"сентября", L"октября", L"ноября", L"декабря" };
+    
+    wchar_t buffer[100];
+    swprintf_s(buffer, 100, L"%02d %s %04d", localTime.tm_mday, months[localTime.tm_mon], 1900 + localTime.tm_year);
+    return std::wstring(buffer);
+}
+
+// Обработка сообщений окна
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
     case WM_DESTROY:
@@ -94,9 +115,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         return 0;
 
     case WM_TIMER: {
-        if (wParam == 1) { // Timer to update time every minute
+        if (wParam == 1) { // Таймер для обновления времени каждую минуту
             currentTime = GetCurrentTimeString();
-            InvalidateRect(hwnd, NULL, FALSE); // Redraw window
+            currentDate = GetCurrentDateString();
+            InvalidateRect(hwnd, NULL, FALSE); // Перерисовать окно
         }
         return 0;
     }
@@ -105,35 +127,35 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
 
-        // Initialize GDI+
+        // Инициализация GDI+
         Graphics graphics(hdc);
         graphics.SetSmoothingMode(SmoothingModeAntiAlias);
         graphics.SetTextRenderingHint(TextRenderingHintClearTypeGridFit);
 
-        // Get window client area size
+        // Получить размер клиентской области окна
         RECT rect;
         GetClientRect(hwnd, &rect);
         int windowWidth = rect.right - rect.left;
         int windowHeight = rect.bottom - rect.top;
 
-        // Draw main image (background)
+        // Нарисовать основное изображение (фон)
         if (g_mainImage) {
-            // Draw image scaled to window size
+            // Нарисовать изображение, масштабированное на размер окна
             graphics.DrawImage(g_mainImage, 0, 0, windowWidth, windowHeight);
         }
 
-        // Get DPI
+        // Получить DPI
         HDC screen = GetDC(hwnd);
         int dpiX = GetDeviceCaps(screen, LOGPIXELSX);
         int dpiY = GetDeviceCaps(screen, LOGPIXELSY);
         ReleaseDC(hwnd, screen);
 
-        // Calculate icon sizes considering DPI
-        int iconSizeMM_Wifi = 5; // 5 mm
-        int iconSizeMM_App = 10;   // 10 mm
-        int spacingMM = 10;        // 10 mm between icons
-        int marginMM = 5;          // 5 mm from window edge
-        int labelSpacingMM = 5;    // 5 mm between icon and label
+        // Рассчитать размеры иконок с учетом DPI
+        int iconSizeMM_Wifi = 5; // 5 мм
+        int iconSizeMM_App = 10;  // 10 мм
+        int spacingMM = 10;       // 10 мм между иконками
+        int marginMM = 5;         // 5 мм от края окна
+        int labelSpacingMM = 5;   // 5 мм между иконкой и меткой
 
         int iconSize_Wifi = mmToPixels(static_cast<float>(iconSizeMM_Wifi), dpiX);
         int iconSize_App = mmToPixels(static_cast<float>(iconSizeMM_App), dpiX);
@@ -141,10 +163,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         int margin = mmToPixels(static_cast<float>(marginMM), dpiX);
         int labelSpacing = mmToPixels(static_cast<float>(labelSpacingMM), dpiY);
 
-        // Draw WiFi icon at top-right corner with slight left shift
+        // Нарисовать иконку WiFi в правом верхнем углу с небольшим смещением влево
         if (g_wifiIcon) {
             int iconSize = iconSize_Wifi;
-            int shiftLeft = mmToPixels(5.0f, dpiX); // e.g., 5 mm shift
+            int shiftLeft = mmToPixels(5.0f, dpiX); // Например, смещение 5 мм влево
             int x = windowWidth - iconSize - margin - shiftLeft;
             if (x < margin) {
                 x = margin;
@@ -154,34 +176,33 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             graphics.DrawImage(g_wifiIcon, x, y, iconSize, iconSize);
         }
 
-        // Determine application icon sizes
-        int appIconSize = iconSize_App; // 10 mm
-        int appSpacingPixels = appSpacing; // 10 mm
+        // Определить размеры иконок приложений
+        int appIconSize = iconSize_App; // 10 мм
+        int appSpacingPixels = appSpacing; // 10 мм
 
-        // Set number of icons per row
-        int iconsPerRow = 4; // Number of icons in one row
+        // Установить количество иконок в строке
+        int iconsPerRow = 4; // Количество иконок в одной строке
         int totalApps = static_cast<int>(g_appIcons.size());
         int totalRows = (totalApps + iconsPerRow - 1) / iconsPerRow;
 
-        // Calculate row height based on maximum font size
-        // Assume max font size affects the row height
-        int maxFontHeight = static_cast<int>(timeFontSize) + labelSpacing; // Adjust as needed
-        int rowHeight = appIconSize + labelSpacing + mmToPixels(10.0f, dpiY); // Icon + label spacing + label height
+        // Рассчитать высоту строки на основе максимального размера шрифта
+        int maxFontHeight = static_cast<int>(timeFontSize) + labelSpacing; // При необходимости скорректируйте
+        int rowHeight = appIconSize + labelSpacing + mmToPixels(10.0f, dpiY); // Иконка + отступ метки + высота метки
 
-        // Initial Y position for drawing icons
-        int startY = windowHeight - rowHeight * totalRows - mmToPixels(-30.0f, dpiY); // 5 mm from bottom
+        // Начальная Y позиция для рисования иконок
+        int startY = windowHeight - rowHeight * totalRows - mmToPixels(5.0f, dpiY); // 5 мм от нижнего края
 
-        // Calculate number of icons in last row
+        // Рассчитать количество иконок в последней строке
         int iconsInLastRow = totalApps % iconsPerRow;
         if (iconsInLastRow == 0 && totalApps != 0) {
             iconsInLastRow = iconsPerRow;
         }
 
-        // Draw each application icon and its label
+        // Нарисовать каждую иконку приложения и её метку
         for (int row = 0; row < totalRows; ++row) {
             int iconsInThisRow = (row == totalRows - 1) ? iconsInLastRow : iconsPerRow;
             int totalWidth = iconsInThisRow * appIconSize + (iconsInThisRow - 1) * appSpacingPixels;
-            int startX = (windowWidth - totalWidth) / 2; // Center horizontally
+            int startX = (windowWidth - totalWidth) / 2; // Центрировать по горизонтали
 
             for (int i = 0; i < iconsInThisRow; ++i) {
                 int appIndex = row * iconsPerRow + i;
@@ -192,26 +213,25 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                     int x = startX + i * (appIconSize + appSpacingPixels);
                     int y = startY - row * rowHeight;
 
-                    // Draw the application icon
+                    // Нарисовать иконку приложения
                     graphics.DrawImage(app.image, x, y, appIconSize, appIconSize);
 
-                    // Draw the label
+                    // Нарисовать метку
                     const wchar_t* text = app.label.c_str();
-                    FontFamily fontFamily(L"Segoe UI");
-                    // Adjust font size as needed
-                    float labelFontSize = 12.0f; // Example font size
+                    FontFamily fontFamily(L"Segoe UI"); // Современный шрифт
+                    float labelFontSize = 12.0f; // Размер шрифта метки
                     Font font(&fontFamily, labelFontSize, FontStyleRegular, UnitPixel);
-                    SolidBrush brush(Color(255, 255, 255, 255)); // White text
+                    SolidBrush brush(Color(255, 255, 255, 255)); // Белый текст
 
-                    // Calculate label rectangle with increased width to prevent wrapping
-                    float labelWidth = static_cast<float>(appIconSize) * 1.2f; // 20% wider
-                    float labelHeight = mmToPixels(10.0f, dpiY); // 10 mm height
+                    // Рассчитать прямоугольник для метки с увеличенной шириной, чтобы предотвратить перенос
+                    float labelWidth = static_cast<float>(appIconSize) * 1.2f; // 20% шире
+                    float labelHeight = mmToPixels(10.0f, dpiY); // Высота метки 10 мм
                     RectF layoutRect(static_cast<float>(x - (labelWidth - appIconSize) / 2),
                         static_cast<float>(y + appIconSize + labelSpacing),
                         labelWidth,
                         labelHeight);
 
-                    // Set StringFormat to prevent wrapping and center text
+                    // Установить форматирование строки: центрирование и отсутствие переноса
                     StringFormat format;
                     format.SetAlignment(StringAlignmentCenter);
                     format.SetLineAlignment(StringAlignmentCenter);
@@ -230,36 +250,36 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             }
         }
 
-        // Display the current time
-        // Create font
-        FontFamily timeFontFamily(L"Segoe UI"); // More modern font
+        // Отображение текущего времени
+        // Создать шрифт
+        FontFamily timeFontFamily(L"Segoe UI Semibold"); // Более современный шрифт
         Font timeFont(&timeFontFamily, timeFontSize, FontStyleBold, UnitPixel);
 
-        // Create brush for text
+        // Создать кисть для текста
         SolidBrush timeBrush(timeColor);
 
-        // Set text alignment to center
+        // Установить выравнивание текста по центру
         StringFormat timeFormat;
         timeFormat.SetAlignment(StringAlignmentCenter);
         timeFormat.SetLineAlignment(StringAlignmentCenter);
         timeFormat.SetFormatFlags(StringFormatFlagsNoWrap);
         timeFormat.SetTrimming(StringTrimmingEllipsisCharacter);
 
-        // Calculate time position (e.g., center of top panel)
-        int verticalOffset = mmToPixels(10.0f, dpiY); // 10 mm down
+        // Рассчитать позицию времени (например, центр верхней панели)
+        int verticalOffset = mmToPixels(10.0f, dpiY); // 10 мм вниз
 
-        // Define time rectangle with sufficient width
-        float timeRectWidth = mmToPixels(40.0f, dpiX); // 40 mm width
-        float timeRectHeight = mmToPixels(20.0f, dpiY); // 20 mm height
-        float timeRectX = (windowWidth - timeRectWidth) / 2.0f; // Center horizontally
-        float timeRectY = margin + verticalOffset;
+        // Определить прямоугольник для времени с достаточной шириной
+        float timeRectWidth = mmToPixels(40.0f, dpiX); // Ширина 40 мм
+        float timeRectHeight = mmToPixels(20.0f, dpiY); // Высота 20 мм
+        float timeRectX = (windowWidth - timeRectWidth) / 2.0f; // Центрировать по горизонтали
+        float timeRectY = mmToPixels(5.0f, dpiY) + verticalOffset; // Отступ от верхнего края
 
         RectF currentTimeRect(static_cast<float>(timeRectX),
             static_cast<float>(timeRectY),
             static_cast<float>(timeRectWidth),
             static_cast<float>(timeRectHeight));
 
-        // Draw the current time
+        // Нарисовать текущее время
         graphics.DrawString(
             currentTime.c_str(),
             -1,
@@ -269,19 +289,66 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             &timeBrush
         );
 
+        // Отображение текущей даты под временем
+        // Создать шрифт для даты
+        FontFamily dateFontFamily(L"Segoe UI"); // Современный шрифт
+        Font dateFont(&dateFontFamily, dateFontSize, FontStyleRegular, UnitPixel);
+
+        // Создать кисть для даты
+        SolidBrush dateBrush(dateColor);
+
+        // Установить выравнивание текста по центру
+        StringFormat dateFormat;
+        dateFormat.SetAlignment(StringAlignmentCenter);
+        dateFormat.SetLineAlignment(StringAlignmentCenter);
+        dateFormat.SetFormatFlags(StringFormatFlagsNoWrap);
+        dateFormat.SetTrimming(StringTrimmingEllipsisCharacter);
+
+        // Рассчитать позицию даты
+        float dateRectWidth = mmToPixels(40.0f, dpiX); // Ширина 40 мм
+        float dateRectHeight = mmToPixels(15.0f, dpiY); // Высота 15 мм
+        float dateRectX = (windowWidth - dateRectWidth) / 2.0f; // Центрировать по горизонтали
+        float dateRectY = timeRectY + timeRectHeight + mmToPixels(5.0f, dpiY); // Отступ 5 мм от времени
+
+        RectF currentDateRect(static_cast<float>(dateRectX),
+            static_cast<float>(dateRectY),
+            static_cast<float>(dateRectWidth),
+            static_cast<float>(dateRectHeight));
+
+        // Нарисовать текущую дату
+        graphics.DrawString(
+            currentDate.c_str(),
+            -1,
+            &dateFont,
+            currentDateRect,
+            &dateFormat,
+            &dateBrush
+        );
+
         EndPaint(hwnd, &ps);
         return 0;
     }
 
     case WM_LBUTTONDOWN: {
-        // Check if click is within time area
+        // Проверить, находится ли клик в области времени или даты
         int xPos = GET_X_LPARAM(lParam);
         int yPos = GET_Y_LPARAM(lParam);
-        if (xPos >= timeRect.left && xPos <= timeRect.right &&
-            yPos >= timeRect.top && yPos <= timeRect.bottom) {
+        if ((xPos >= timeRect.left && xPos <= timeRect.right &&
+             yPos >= timeRect.top && yPos <= timeRect.bottom) ||
+            (xPos >= dateRect.left && xPos <= dateRect.right &&
+             yPos >= dateRect.top && yPos <= dateRect.bottom)) {
             isDragging = true;
-            dragStartPoint.x = xPos - timeRect.left;
-            dragStartPoint.y = yPos - timeRect.top;
+            // Определить, в какую область был клик
+            if (xPos >= timeRect.left && xPos <= timeRect.right &&
+                yPos >= timeRect.top && yPos <= timeRect.bottom) {
+                dragStartPoint.x = xPos - timeRect.left;
+                dragStartPoint.y = yPos - timeRect.top;
+                // Обновить прямоугольник даты относительно нового положения времени
+                dateRect.left = timeRect.left;
+                dateRect.top = timeRect.bottom + mmToPixels(5.0f, GetDeviceCaps(GetDC(hwnd), LOGPIXELSY));
+                dateRect.right = timeRect.right;
+                dateRect.bottom = dateRect.top + (dateRect.bottom - dateRect.top);
+            }
             SetCapture(hwnd);
         }
         return 0;
@@ -292,17 +359,25 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             int xPos = GET_X_LPARAM(lParam);
             int yPos = GET_Y_LPARAM(lParam);
 
-            // New position for time
+            // Новая позиция для времени
             int newLeft = xPos - dragStartPoint.x;
             int newTop = yPos - dragStartPoint.y;
 
-            // Update RECT for time
+            // Обновить RECT для времени
             int width = timeRect.right - timeRect.left;
             int height = timeRect.bottom - timeRect.top;
             timeRect.left = newLeft;
             timeRect.top = newTop;
             timeRect.right = newLeft + width;
             timeRect.bottom = newTop + height;
+
+            // Обновить RECT для даты, чтобы она оставалась под временем
+            int dateWidth = dateRect.right - dateRect.left;
+            int dateHeight = dateRect.bottom - dateRect.top;
+            dateRect.left = newLeft;
+            dateRect.top = newTop + height + mmToPixels(5.0f, GetDeviceCaps(GetDC(hwnd), LOGPIXELSY));
+            dateRect.right = newLeft + dateWidth;
+            dateRect.bottom = dateRect.top + dateHeight;
 
             InvalidateRect(hwnd, NULL, FALSE);
         }
@@ -318,12 +393,16 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     }
 
     case WM_RBUTTONDOWN: {
-        // Add context menu to change time color and size
+        // Добавить контекстное меню для изменения цвета и размера времени и даты
         HMENU hMenu = CreatePopupMenu();
         if (hMenu) {
-            AppendMenu(hMenu, MF_STRING, 1001, L"Change Time Color");
-            AppendMenu(hMenu, MF_STRING, 1002, L"Increase Time Size");
-            AppendMenu(hMenu, MF_STRING, 1003, L"Decrease Time Size");
+            AppendMenu(hMenu, MF_STRING, 1001, L"Изменить цвет времени");
+            AppendMenu(hMenu, MF_STRING, 1002, L"Увеличить размер времени");
+            AppendMenu(hMenu, MF_STRING, 1003, L"Уменьшить размер времени");
+            AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
+            AppendMenu(hMenu, MF_STRING, 1004, L"Изменить цвет даты");
+            AppendMenu(hMenu, MF_STRING, 1005, L"Увеличить размер даты");
+            AppendMenu(hMenu, MF_STRING, 1006, L"Уменьшить размер даты");
 
             POINT cursorPos;
             GetCursorPos(&cursorPos);
@@ -335,8 +414,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
     case WM_COMMAND: {
         switch (LOWORD(wParam)) {
-        case 1001: { // Change time color
-            // Example: change to random color
+        case 1001: { // Изменить цвет времени
+            // Пример: изменить на случайный цвет
             BYTE r = rand() % 256;
             BYTE g = rand() % 256;
             BYTE b = rand() % 256;
@@ -344,14 +423,35 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             InvalidateRect(hwnd, NULL, FALSE);
             break;
         }
-        case 1002: { // Increase time size
-            timeFontSize += 2.0f; // Increase font size by 2 pixels
+        case 1002: { // Увеличить размер времени
+            timeFontSize += 2.0f; // Увеличить размер шрифта на 2 пикселя
             InvalidateRect(hwnd, NULL, FALSE);
             break;
         }
-        case 1003: { // Decrease time size
-            if (timeFontSize > 12.0f) { // Minimum font size
-                timeFontSize -= 2.0f; // Decrease font size by 2 pixels
+        case 1003: { // Уменьшить размер времени
+            if (timeFontSize > 20.0f) { // Минимальный размер шрифта
+                timeFontSize -= 2.0f; // Уменьшить размер шрифта на 2 пикселя
+                InvalidateRect(hwnd, NULL, FALSE);
+            }
+            break;
+        }
+        case 1004: { // Изменить цвет даты
+            // Пример: изменить на случайный цвет
+            BYTE r = rand() % 256;
+            BYTE g = rand() % 256;
+            BYTE b = rand() % 256;
+            dateColor = Color(255, r, g, b);
+            InvalidateRect(hwnd, NULL, FALSE);
+            break;
+        }
+        case 1005: { // Увеличить размер даты
+            dateFontSize += 2.0f; // Увеличить размер шрифта на 2 пикселя
+            InvalidateRect(hwnd, NULL, FALSE);
+            break;
+        }
+        case 1006: { // Уменьшить размер даты
+            if (dateFontSize > 10.0f) { // Минимальный размер шрифта
+                dateFontSize -= 2.0f; // Уменьшить размер шрифта на 2 пикселя
                 InvalidateRect(hwnd, NULL, FALSE);
             }
             break;
@@ -367,46 +467,46 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     }
 }
 
-// Main function for Windows applications
+// Основная функция для приложений Windows
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-    // Initialize GDI+
+    // Инициализировать GDI+
     GdiplusStartupInput gdiplusStartupInput;
     ULONG_PTR gdiplusToken;
     if (GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL) != Ok) {
-        MessageBox(NULL, L"Failed to initialize GDI+.", L"Error", MB_ICONERROR);
+        MessageBox(NULL, L"Не удалось инициализировать GDI+.", L"Ошибка", MB_ICONERROR);
         return 0;
     }
 
-    // Load main image from URL
+    // Загрузить основное изображение из URL
     const wchar_t* mainImageURL = L"https://i.pinimg.com/736x/44/ba/d5/44bad5b1b0839e5ab430433c6ddfb4be.jpg";
     g_mainImage = LoadImageFromURL(mainImageURL);
     if (!g_mainImage) {
-        MessageBox(NULL, L"Failed to load main image from the specified URL.", L"Error", MB_ICONERROR);
+        MessageBox(NULL, L"Не удалось загрузить основное изображение по указанному URL.", L"Ошибка", MB_ICONERROR);
         GdiplusShutdown(gdiplusToken);
         return 0;
     }
 
-    // Load WiFi icon
+    // Загрузить иконку WiFi
     const wchar_t* wifiIconURL = L"https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Feather-core-wifi.svg/1200px-Feather-core-wifi.svg.png";
     g_wifiIcon = LoadImageFromURL(wifiIconURL);
     if (!g_wifiIcon) {
-        MessageBox(NULL, L"Failed to load WiFi icon from the internet.", L"Error", MB_ICONERROR);
-        // Continue without WiFi icon
+        MessageBox(NULL, L"Не удалось загрузить иконку WiFi из интернета.", L"Ошибка", MB_ICONERROR);
+        // Продолжить без иконки WiFi
     }
 
-    // Define application icon URLs
+    // Определить URL иконок приложений
     const wchar_t* settingsIconURL = L"https://cdn-icons-png.flaticon.com/512/2099/2099058.png";
     const wchar_t* filesIconURL = L"https://cdn-icons-png.flaticon.com/512/727/727399.png";
     const wchar_t* cameraIconURL = L"https://cdn-icons-png.flaticon.com/512/633/633759.png";
     const wchar_t* browserIconURL = L"https://cdn-icons-png.flaticon.com/512/2702/2702602.png";
 
-    // Define additional application icon URLs
-    const wchar_t* mailIconURL = L"https://cdn-icons-png.flaticon.com/512/561/561127.png";       // Example: Mail
-    const wchar_t* musicIconURL = L"https://cdn-icons-png.flaticon.com/512/727/727245.png";     // Example: Music
-    const wchar_t* calendarIconURL = L"https://cdn-icons-png.flaticon.com/512/747/747376.png"; // Example: Calendar
-    const wchar_t* notesIconURL = L"https://cdn-icons-png.flaticon.com/512/1827/1827372.png";    // Example: Notes
+    // Определить дополнительные URL иконок приложений
+    const wchar_t* mailIconURL = L"https://cdn-icons-png.flaticon.com/512/561/561127.png";       // Почта
+    const wchar_t* musicIconURL = L"https://cdn-icons-png.flaticon.com/512/727/727245.png";     // Музыка
+    const wchar_t* calendarIconURL = L"https://cdn-icons-png.flaticon.com/512/747/747376.png"; // Календарь
+    const wchar_t* notesIconURL = L"https://cdn-icons-png.flaticon.com/512/1827/1827372.png";    // Заметки
 
-    // Function to add icon and its label
+    // Функция для добавления иконки приложения и её метки
     auto AddAppIcon = [&](const wchar_t* url, const std::wstring& label) {
         Bitmap* bmp = LoadImageFromURL(url);
         if (bmp) {
@@ -417,63 +517,63 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         }
         else {
             wchar_t errorMsg[256];
-            swprintf_s(errorMsg, 256, L"Failed to load icon \"%s\" from the internet.", label.c_str());
-            MessageBox(NULL, errorMsg, L"Error", MB_ICONERROR);
-            // Continue without this icon
+            swprintf_s(errorMsg, 256, L"Не удалось загрузить иконку \"%s\" из интернета.", label.c_str());
+            MessageBox(NULL, errorMsg, L"Ошибка", MB_ICONERROR);
+            // Продолжить без этой иконки
         }
-        };
+    };
 
-    // Add main application icons
-    AddAppIcon(settingsIconURL, L"");
-    AddAppIcon(filesIconURL, L"");
-    AddAppIcon(cameraIconURL, L"");
-    AddAppIcon(browserIconURL, L"");
+    // Добавить основные иконки приложений
+    AddAppIcon(settingsIconURL, L"Настройки");
+    AddAppIcon(filesIconURL, L"Файлы");
+    AddAppIcon(cameraIconURL, L"Камера");
+    AddAppIcon(browserIconURL, L"Браузер");
 
-    // Add additional application icons with labels
-    AddAppIcon(mailIconURL, L"Почта");      // Mail
-    AddAppIcon(musicIconURL, L"Store");    // Music
-    AddAppIcon(calendarIconURL, L"Календарь"); // Calendar
-    AddAppIcon(notesIconURL, L"Заметки");    // Notes
+    // Добавить дополнительные иконки приложений с метками
+    AddAppIcon(mailIconURL, L"Почта");        // Почта
+    AddAppIcon(musicIconURL, L"Музыка");      // Музыка
+    AddAppIcon(calendarIconURL, L"Календарь"); // Календарь
+    AddAppIcon(notesIconURL, L"Заметки");      // Заметки
 
-    // Window parameters
+    // Параметры окна
     const wchar_t CLASS_NAME[] = L"Sample Window Class";
 
-    // Register window class
+    // Зарегистрировать класс окна
     WNDCLASS wc = {};
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
-    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1); // Default background color
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1); // Цвет фона по умолчанию
     wc.lpszClassName = CLASS_NAME;
 
     RegisterClass(&wc);
 
-    // Get screen DPI
+    // Получить DPI экрана
     HDC screenDC = GetDC(NULL);
     int dpiX = GetDeviceCaps(screenDC, LOGPIXELSX);
     int dpiY = GetDeviceCaps(screenDC, LOGPIXELSY);
     ReleaseDC(NULL, screenDC);
 
-    // Window size in millimeters
+    // Размер окна в миллиметрах
     float widthMM = 90.1f;
     float heightMM = 159.1f;
 
-    // Convert window size from millimeters to pixels
+    // Перевести размер окна из миллиметров в пиксели
     int width = mmToPixels(widthMM, dpiX);
     int height = mmToPixels(heightMM, dpiY);
 
-    // Adjust window size to include borders
+    // Подогнать размер окна с учетом границ
     RECT wr = { 0, 0, width, height };
-    DWORD style = WS_POPUP; // Borderless window style
+    DWORD style = WS_POPUP; // Стиль окна без рамок
     AdjustWindowRectEx(&wr, style, FALSE, 0);
     int adjustedWidth = wr.right - wr.left;
     int adjustedHeight = wr.bottom - wr.top;
 
-    // Create window without borders and control buttons
+    // Создать окно без рамок и кнопок управления
     HWND hwnd = CreateWindowEx(
         0,
         CLASS_NAME,
         L"My OS Design",
-        style, // Window style without borders and control buttons
+        style, // Стиль окна без рамок и кнопок управления
         CW_USEDEFAULT, CW_USEDEFAULT, adjustedWidth, adjustedHeight,
         NULL,
         NULL,
@@ -482,7 +582,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     );
 
     if (hwnd == NULL) {
-        // Release resources before exiting
+        // Освободить ресурсы перед выходом
         if (g_mainImage) delete g_mainImage;
         if (g_wifiIcon) delete g_wifiIcon;
         for (auto& app : g_appIcons) {
@@ -494,28 +594,29 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     ShowWindow(hwnd, nCmdShow);
 
-    // Set timer to update time every minute
-    SetTimer(hwnd, 1, 60000, NULL); // Timer ID = 1, interval = 60,000 ms (1 minute)
+    // Установить таймер для обновления времени каждую минуту
+    SetTimer(hwnd, 1, 60000, NULL); // ID таймера = 1, интервал = 60 000 мс (1 минута)
 
-    // Initial time setup
+    // Начальная установка времени и даты
     currentTime = GetCurrentTimeString();
+    currentDate = GetCurrentDateString();
     InvalidateRect(hwnd, NULL, FALSE);
 
-    // Message loop
+    // Цикл сообщений
     MSG msg = {};
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
-    // Release resources
+    // Освободить ресурсы
     if (g_mainImage) delete g_mainImage;
     if (g_wifiIcon) delete g_wifiIcon;
     for (auto& app : g_appIcons) {
         if (app.image) delete app.image;
     }
 
-    // Shutdown GDI+
+    // Завершить работу GDI+
     GdiplusShutdown(gdiplusToken);
 
     return 0;

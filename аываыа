@@ -3,6 +3,7 @@
 #include <urlmon.h>
 #include <shlwapi.h> // Для функций работы с путями
 #include <string>
+#include <ctime>
 
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "urlmon.lib")
@@ -17,6 +18,13 @@ Bitmap* g_settingsIcon = nullptr;
 Bitmap* g_filesIcon = nullptr;
 Bitmap* g_cameraIcon = nullptr;
 Bitmap* g_browserIcon = nullptr;
+
+// Глобальные переменные для отображения времени
+bool isDragging = false;
+POINT dragStartPoint = { 0, 0 };
+RECT timeRect = { 50, 50, 300, 100 }; // Начальная позиция и размер времени
+Color timeColor = Color(255, 255, 255, 255); // Белый цвет по умолчанию
+float timeFontSize = 24.0f; // Начальный размер шрифта
 
 // Функция для перевода миллиметров в пиксели в зависимости от DPI экрана
 int mmToPixels(float mm, int dpi) {
@@ -58,6 +66,18 @@ Bitmap* LoadImageFromURL(const wchar_t* url) {
     return bmp;
 }
 
+// Функция для получения текущего времени в формате "HH:MM"
+std::wstring GetCurrentTimeString() {
+    TIME_ZONE_INFORMATION tz;
+    GetTimeZoneInformation(&tz);
+    std::time_t t = std::time(nullptr);
+    std::tm localTime;
+    localtime_s(&localTime, &t);
+    wchar_t buffer[6];
+    swprintf_s(buffer, 6, L"%02d:%02d", localTime.tm_hour, localTime.tm_min);
+    return std::wstring(buffer);
+}
+
 // Функция обработки сообщений окна
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
@@ -65,12 +85,20 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         PostQuitMessage(0);
         return 0;
 
+    case WM_TIMER: {
+        if (wParam == 1) { // Таймер для обновления времени
+            InvalidateRect(hwnd, NULL, FALSE); // Перерисовать окно
+        }
+        return 0;
+    }
+
     case WM_PAINT: {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
 
         // Инициализация GDI+
         Graphics graphics(hdc);
+        graphics.SetSmoothingMode(SmoothingModeAntiAlias);
 
         // Получение размеров клиентской области окна
         RECT rect;
@@ -84,17 +112,17 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             graphics.DrawImage(g_mainImage, 0, 0, windowWidth, windowHeight);
         }
 
+        // Получение DPI
+        HDC screen = GetDC(hwnd);
+        int dpiX = GetDeviceCaps(screen, LOGPIXELSX);
+        int dpiY = GetDeviceCaps(screen, LOGPIXELSY);
+        ReleaseDC(hwnd, screen);
+
         // Расчет размеров иконок с учетом DPI
         int iconSizeMM_Wifi = 5; // 5 мм
         int iconSizeMM_App = 15;   // 15 мм
         int spacingMM = 10;         // 10 мм между иконками
         int marginMM = 5;          // 5 мм от края окна
-
-        // Получение DPI
-        HDC screen = GetDC(0);
-        int dpiX = GetDeviceCaps(screen, LOGPIXELSX);
-        int dpiY = GetDeviceCaps(screen, LOGPIXELSY);
-        ReleaseDC(0, screen);
 
         int iconSize_Wifi = mmToPixels(static_cast<float>(iconSizeMM_Wifi), dpiX); // Используем DPI-X
         int iconSize_App = mmToPixels(static_cast<float>(iconSizeMM_App), dpiX);
@@ -105,7 +133,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         if (g_wifiIcon) {
             // Размер иконки
             int iconSize = iconSize_Wifi;
-            // Сдвиг влево на 10 пикселей
+            // Сдвиг влево на 50 пикселей
             int shiftLeft = 50; // Вы можете изменить это значение по необходимости
             // Позиция (отступ от верхнего правого угла с учетом сдвига)
             int x = windowWidth - iconSize - margin - shiftLeft; // Сдвиг влево
@@ -156,7 +184,138 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             // startX += appIconSize + appSpacingPixels; // Не требуется после последней иконки
         }
 
+        // Отображение времени
+        if (!g_mainImage) { // Если фон не загружен, установить белый фон для текста
+            graphics.Clear(Color::White);
+        }
+
+        // Создание шрифта
+        FontFamily fontFamily(L"Arial");
+        Font font(&fontFamily, timeFontSize, FontStyleRegular, UnitPixel);
+
+        // Создание кисти для текста
+        SolidBrush brush(timeColor);
+
+        // Получение текущего времени
+        std::wstring currentTime = GetCurrentTimeString();
+
+        // Установка выравнивания текста по центру
+        StringFormat format;
+        format.SetAlignment(StringAlignmentCenter);
+        format.SetLineAlignment(StringAlignmentCenter);
+
+        // Рисование текста времени
+        graphics.DrawString(
+            currentTime.c_str(),
+            -1,
+            &font,
+            RectF(static_cast<float>(timeRect.left), static_cast<float>(timeRect.top),
+                  static_cast<float>(timeRect.right - timeRect.left),
+                  static_cast<float>(timeRect.bottom - timeRect.top)),
+            &format,
+            &brush
+        );
+
         EndPaint(hwnd, &ps);
+        return 0;
+    }
+
+    case WM_LBUTTONDOWN: {
+        // Проверка, попадает ли клик в область времени
+        int xPos = GET_X_LPARAM(lParam);
+        int yPos = GET_Y_LPARAM(lParam);
+        if (xPos >= timeRect.left && xPos <= timeRect.right &&
+            yPos >= timeRect.top && yPos <= timeRect.bottom) {
+            isDragging = true;
+            dragStartPoint.x = xPos - timeRect.left;
+            dragStartPoint.y = yPos - timeRect.top;
+            SetCapture(hwnd);
+        }
+        return 0;
+    }
+
+    case WM_MOUSEMOVE: {
+        if (isDragging) {
+            int xPos = GET_X_LPARAM(lParam);
+            int yPos = GET_Y_LPARAM(lParam);
+
+            // Новая позиция времени
+            int newLeft = xPos - dragStartPoint.x;
+            int newTop = yPos - dragStartPoint.y;
+
+            // Обновление RECT времени
+            int width = timeRect.right - timeRect.left;
+            int height = timeRect.bottom - timeRect.top;
+            timeRect.left = newLeft;
+            timeRect.top = newTop;
+            timeRect.right = newLeft + width;
+            timeRect.bottom = newTop + height;
+
+            InvalidateRect(hwnd, NULL, FALSE);
+        }
+        return 0;
+    }
+
+    case WM_LBUTTONUP: {
+        if (isDragging) {
+            isDragging = false;
+            ReleaseCapture();
+        }
+        return 0;
+    }
+
+    case WM_RBUTTONDOWN: {
+        // Добавим контекстное меню для изменения цвета и размера времени
+        HMENU hMenu = CreatePopupMenu();
+        if (hMenu) {
+            AppendMenu(hMenu, MF_STRING, 1001, L"Сменить цвет времени");
+            AppendMenu(hMenu, MF_STRING, 1002, L"Увеличить размер времени");
+            AppendMenu(hMenu, MF_STRING, 1003, L"Уменьшить размер времени");
+
+            POINT cursorPos;
+            GetCursorPos(&cursorPos);
+            TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, cursorPos.x, cursorPos.y, 0, hwnd, NULL);
+            DestroyMenu(hMenu);
+        }
+        return 0;
+    }
+
+    case WM_COMMAND: {
+        switch (LOWORD(wParam)) {
+        case 1001: { // Сменить цвет времени
+            // Пример: смена цвета на случайный
+            BYTE r = rand() % 256;
+            BYTE g = rand() % 256;
+            BYTE b = rand() % 256;
+            timeColor = Color(255, r, g, b);
+            InvalidateRect(hwnd, NULL, FALSE);
+            break;
+        }
+        case 1002: { // Увеличить размер времени
+            timeFontSize += 2.0f; // Увеличить размер шрифта на 2 пикселя
+            // Обновить размер RECT времени
+            int width = static_cast<int>(timeFontSize * 7); // Примерное вычисление ширины
+            int height = static_cast<int>(timeFontSize * 1.5f); // Примерное вычисление высоты
+            timeRect.right = timeRect.left + width;
+            timeRect.bottom = timeRect.top + height;
+            InvalidateRect(hwnd, NULL, FALSE);
+            break;
+        }
+        case 1003: { // Уменьшить размер времени
+            if (timeFontSize > 8.0f) { // Минимальный размер шрифта
+                timeFontSize -= 2.0f; // Уменьшить размер шрифта на 2 пикселя
+                // Обновить размер RECT времени
+                int width = static_cast<int>(timeFontSize * 7); // Примерное вычисление ширины
+                int height = static_cast<int>(timeFontSize * 1.5f); // Примерное вычисление высоты
+                timeRect.right = timeRect.left + width;
+                timeRect.bottom = timeRect.top + height;
+                InvalidateRect(hwnd, NULL, FALSE);
+            }
+            break;
+        }
+        default:
+            break;
+        }
         return 0;
     }
 
@@ -235,10 +394,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     RegisterClass(&wc);
 
     // Получение DPI экрана
-    HDC screenDC = GetDC(0);
+    HDC screenDC = GetDC(NULL);
     int dpiX = GetDeviceCaps(screenDC, LOGPIXELSX);
     int dpiY = GetDeviceCaps(screenDC, LOGPIXELSY);
-    ReleaseDC(0, screenDC);
+    ReleaseDC(NULL, screenDC);
 
     // Размеры окна в миллиметрах
     float widthMM = 90.1f;
@@ -250,7 +409,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     // Настройка размеров окна с учётом рамок
     RECT wr = { 0, 0, width, height };
-    DWORD style = WS_POPUP; // Бессмысленные рамки и кнопки
+    DWORD style = WS_POPUP; // Без рамки и кнопок управления
     AdjustWindowRectEx(&wr, style, FALSE, 0);
     int adjustedWidth = wr.right - wr.left;
     int adjustedHeight = wr.bottom - wr.top;
@@ -281,6 +440,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
 
     ShowWindow(hwnd, nCmdShow);
+
+    // Установить таймер для обновления времени каждую минуту
+    SetTimer(hwnd, 1, 60000, NULL); // ID таймера = 1, интервал = 60 000 мс (1 минута)
+
+    // Начальная инвалидация для отображения времени сразу
+    InvalidateRect(hwnd, NULL, FALSE);
 
     // Цикл обработки сообщений
     MSG msg = {};

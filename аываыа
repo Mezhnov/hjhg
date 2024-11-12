@@ -126,7 +126,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         // Расчет размеров иконок с учетом DPI
         int iconSizeMM_Wifi = 5; // 5 мм
-        int iconSizeMM_App = 15;   // 15 мм
+        int iconSizeMM_App = 10;   // 15 мм
         int spacingMM = 10;         // 10 мм между иконками
         int marginMM = 5;          // 5 мм от края окна
 

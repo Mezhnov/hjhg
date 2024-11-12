@@ -19,35 +19,22 @@ struct AppIcon {
     std::wstring label;
 };
 
-// Structure for draggable status icons
-struct StatusIcon {
-    Bitmap* image;
-    RECT rect;
-    bool isDragging;
-    POINT dragStartPoint;
-};
-
 // Global variables to store images
 Bitmap* g_mainImage = nullptr;
-Bitmap* g_batteryIcon = nullptr;
-Bitmap* g_signalIcon = nullptr;
-
-// Status icons
-StatusIcon g_batteryStatus = { nullptr, {0, 0, 0, 0}, false, {0, 0} };
-StatusIcon g_signalStatus = { nullptr, {0, 0, 0, 0}, false, {0, 0} };
+Bitmap* g_wifiIcon = nullptr;
 
 // Vector to store application icons
 std::vector<AppIcon> g_appIcons;
 
-// Globals for displaying time and date
-bool isDraggingTime = false;
-POINT dragStartPointTime = { 0, 0 };
+// Globals for displaying time
+bool isDragging = false;
+POINT dragStartPoint = { 0, 0 };
+
+// Time position: adjust values to position the time
 RECT timeRect = { 50, 50, 300, 100 }; // Initial position and size of time
-RECT dateRect = { 50, 120, 300, 160 }; // Initial position and size of date
 Color timeColor = Color(255, 255, 255, 255); // White color by default
 float timeFontSize = 50.0f; // Initial font size
 std::wstring currentTime = L"00:00"; // Current time
-std::wstring currentDate = L"01.01.2023"; // Current date
 
 // Function to convert millimeters to pixels based on screen DPI
 int mmToPixels(float mm, int dpi) {
@@ -99,16 +86,6 @@ std::wstring GetCurrentTimeString() {
     return std::wstring(buffer);
 }
 
-// Function to get current date in "DD.MM.YYYY" format
-std::wstring GetCurrentDateString() {
-    std::time_t t = std::time(nullptr);
-    std::tm localTime;
-    localtime_s(&localTime, &t);
-    wchar_t buffer[11];
-    swprintf_s(buffer, 11, L"%02d.%02d.%04d", localTime.tm_mday, localTime.tm_mon + 1, localTime.tm_year + 1900);
-    return std::wstring(buffer);
-}
-
 // Window message processing function
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
@@ -117,9 +94,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         return 0;
 
     case WM_TIMER: {
-        if (wParam == 1) { // Timer to update time and date every minute
+        if (wParam == 1) { // Timer to update time every minute
             currentTime = GetCurrentTimeString();
-            currentDate = GetCurrentDateString();
             InvalidateRect(hwnd, NULL, FALSE); // Redraw window
         }
         return 0;
@@ -154,61 +130,32 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         // Calculate icon sizes considering DPI
         int iconSizeMM_Wifi = 5; // 5 mm
-        int iconSizeMM_Battery = 5; // 5 mm
-        int iconSizeMM_Signal = 5; // 5 mm
+        int iconSizeMM_App = 10;   // 10 mm
         int spacingMM = 10;        // 10 mm between icons
         int marginMM = 5;          // 5 mm from window edge
         int labelSpacingMM = 5;    // 5 mm between icon and label
 
         int iconSize_Wifi = mmToPixels(static_cast<float>(iconSizeMM_Wifi), dpiX);
-        int iconSize_Battery = mmToPixels(static_cast<float>(iconSizeMM_Battery), dpiX);
-        int iconSize_Signal = mmToPixels(static_cast<float>(iconSizeMM_Signal), dpiX);
+        int iconSize_App = mmToPixels(static_cast<float>(iconSizeMM_App), dpiX);
         int appSpacing = mmToPixels(static_cast<float>(spacingMM), dpiX);
         int margin = mmToPixels(static_cast<float>(marginMM), dpiX);
         int labelSpacing = mmToPixels(static_cast<float>(labelSpacingMM), dpiY);
 
-        // Draw status icons (Battery, Signal)
-        // Define status icon sizes
-        int statusIconSizeMM = 5; // 5 mm
-        int statusIconSize = mmToPixels(static_cast<float>(statusIconSizeMM), dpiX);
+        // Draw WiFi icon at top-right corner with slight left shift
+        if (g_wifiIcon) {
+            int iconSize = iconSize_Wifi;
+            int shiftLeft = mmToPixels(5.0f, dpiX); // e.g., 5 mm shift
+            int x = windowWidth - iconSize - margin - shiftLeft;
+            if (x < margin) {
+                x = margin;
+            }
+            int y = margin;
 
-        // Define spacing between status icons
-        int statusSpacingMM = 2; // 2 mm
-        int statusSpacing = mmToPixels(static_cast<float>(statusSpacingMM), dpiX);
-
-        // Define margin from top and side
-        int statusMarginMM = 5; // 5 mm
-        int statusMargin = mmToPixels(static_cast<float>(statusMarginMM), dpiX);
-
-        // Initial X position for status icons
-        int statusX = windowWidth - margin - (statusIconSize * 2 + statusSpacing);
-        int statusY = margin;
-
-        // Draw Battery icon
-        if (g_batteryIcon) {
-            g_batteryStatus.rect.left = statusX;
-            g_batteryStatus.rect.top = statusY;
-            g_batteryStatus.rect.right = statusX + statusIconSize;
-            g_batteryStatus.rect.bottom = statusY + statusIconSize;
-
-            graphics.DrawImage(g_batteryIcon, statusX, statusY, statusIconSize, statusIconSize);
-            statusX += statusIconSize + statusSpacing;
+            graphics.DrawImage(g_wifiIcon, x, y, iconSize, iconSize);
         }
 
-        // Draw Signal icon
-        if (g_signalIcon) {
-            g_signalStatus.rect.left = statusX;
-            g_signalStatus.rect.top = statusY;
-            g_signalStatus.rect.right = statusX + statusIconSize;
-            g_signalStatus.rect.bottom = statusY + statusIconSize;
-
-            graphics.DrawImage(g_signalIcon, statusX, statusY, statusIconSize, statusIconSize);
-            // statusX += statusIconSize + statusSpacing;
-        }
-
-        // Draw application icons
         // Determine application icon sizes
-        int appIconSize = mmToPixels(static_cast<float>(10.0f), dpiX); // 10 mm
+        int appIconSize = iconSize_App; // 10 mm
         int appSpacingPixels = appSpacing; // 10 mm
 
         // Set number of icons per row
@@ -217,10 +164,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         int totalRows = (totalApps + iconsPerRow - 1) / iconsPerRow;
 
         // Calculate row height based on maximum font size
+        // Assume max font size affects the row height
+        int maxFontHeight = static_cast<int>(timeFontSize) + labelSpacing; // Adjust as needed
         int rowHeight = appIconSize + labelSpacing + mmToPixels(10.0f, dpiY); // Icon + label spacing + label height
 
         // Initial Y position for drawing icons
-        int startY = windowHeight - rowHeight * totalRows - mmToPixels(5.0f, dpiY); // 5 mm from bottom
+        int startY = windowHeight - rowHeight * totalRows - mmToPixels(-30.0f, dpiY); // 5 mm from bottom
 
         // Calculate number of icons in last row
         int iconsInLastRow = totalApps % iconsPerRow;
@@ -248,37 +197,35 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
                     // Draw the label
                     const wchar_t* text = app.label.c_str();
-                    if (!app.label.empty()) {
-                        FontFamily fontFamily(L"Segoe UI");
-                        // Adjust font size as needed
-                        float labelFontSize = 12.0f; // Example font size
-                        Font font(&fontFamily, labelFontSize, FontStyleRegular, UnitPixel);
-                        SolidBrush brush(Color(255, 255, 255, 255)); // White text
+                    FontFamily fontFamily(L"Segoe UI");
+                    // Adjust font size as needed
+                    float labelFontSize = 12.0f; // Example font size
+                    Font font(&fontFamily, labelFontSize, FontStyleRegular, UnitPixel);
+                    SolidBrush brush(Color(255, 255, 255, 255)); // White text
 
-                        // Calculate label rectangle with increased width to prevent wrapping
-                        float labelWidth = static_cast<float>(appIconSize) * 1.2f; // 20% wider
-                        float labelHeight = mmToPixels(10.0f, dpiY); // 10 mm height
-                        RectF layoutRect(static_cast<float>(x - (labelWidth - appIconSize) / 2),
-                            static_cast<float>(y + appIconSize + labelSpacing),
-                            labelWidth,
-                            labelHeight);
+                    // Calculate label rectangle with increased width to prevent wrapping
+                    float labelWidth = static_cast<float>(appIconSize) * 1.2f; // 20% wider
+                    float labelHeight = mmToPixels(10.0f, dpiY); // 10 mm height
+                    RectF layoutRect(static_cast<float>(x - (labelWidth - appIconSize) / 2),
+                        static_cast<float>(y + appIconSize + labelSpacing),
+                        labelWidth,
+                        labelHeight);
 
-                        // Set StringFormat to prevent wrapping and center text
-                        StringFormat format;
-                        format.SetAlignment(StringAlignmentCenter);
-                        format.SetLineAlignment(StringAlignmentCenter);
-                        format.SetFormatFlags(StringFormatFlagsNoWrap);
-                        format.SetTrimming(StringTrimmingEllipsisCharacter);
+                    // Set StringFormat to prevent wrapping and center text
+                    StringFormat format;
+                    format.SetAlignment(StringAlignmentCenter);
+                    format.SetLineAlignment(StringAlignmentCenter);
+                    format.SetFormatFlags(StringFormatFlagsNoWrap);
+                    format.SetTrimming(StringTrimmingEllipsisCharacter);
 
-                        graphics.DrawString(
-                            text,
-                            -1,
-                            &font,
-                            layoutRect,
-                            &format,
-                            &brush
-                        );
-                    }
+                    graphics.DrawString(
+                        text,
+                        -1,
+                        &font,
+                        layoutRect,
+                        &format,
+                        &brush
+                    );
                 }
             }
         }
@@ -298,11 +245,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         timeFormat.SetFormatFlags(StringFormatFlagsNoWrap);
         timeFormat.SetTrimming(StringTrimmingEllipsisCharacter);
 
-        // Calculate time position
+        // Calculate time position (e.g., center of top panel)
+        int verticalOffset = mmToPixels(10.0f, dpiY); // 10 mm down
+
+        // Define time rectangle with sufficient width
         float timeRectWidth = mmToPixels(40.0f, dpiX); // 40 mm width
         float timeRectHeight = mmToPixels(20.0f, dpiY); // 20 mm height
-        float timeRectX = static_cast<float>(timeRect.left);
-        float timeRectY = static_cast<float>(timeRect.top);
+        float timeRectX = (windowWidth - timeRectWidth) / 2.0f; // Center horizontally
+        float timeRectY = margin + verticalOffset;
 
         RectF currentTimeRect(static_cast<float>(timeRectX),
             static_cast<float>(timeRectY),
@@ -319,172 +269,52 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             &timeBrush
         );
 
-        // Display the current date
-        // Create font
-        FontFamily dateFontFamily(L"Segoe UI");
-        Font dateFont(&dateFontFamily, 20.0f, FontStyleRegular, UnitPixel);
-        SolidBrush dateBrush(Color(255, 255, 255, 255)); // White text
-
-        // Set text alignment to center
-        StringFormat dateFormat;
-        dateFormat.SetAlignment(StringAlignmentCenter);
-        dateFormat.SetLineAlignment(StringAlignmentCenter);
-        dateFormat.SetFormatFlags(StringFormatFlagsNoWrap);
-        dateFormat.SetTrimming(StringTrimmingEllipsisCharacter);
-
-        // Calculate date position
-        float dateRectWidth = mmToPixels(40.0f, dpiX); // 40 mm width
-        float dateRectHeight = mmToPixels(15.0f, dpiY); // 15 mm height
-        float dateRectX = static_cast<float>(dateRect.left);
-        float dateRectY = static_cast<float>(dateRect.top);
-
-        RectF currentDateRect(static_cast<float>(dateRectX),
-            static_cast<float>(dateRectY),
-            static_cast<float>(dateRectWidth),
-            static_cast<float>(dateRectHeight));
-
-        // Draw the current date
-        graphics.DrawString(
-            currentDate.c_str(),
-            -1,
-            &dateFont,
-            currentDateRect,
-            &dateFormat,
-            &dateBrush
-        );
-
         EndPaint(hwnd, &ps);
         return 0;
     }
 
     case WM_LBUTTONDOWN: {
+        // Check if click is within time area
         int xPos = GET_X_LPARAM(lParam);
         int yPos = GET_Y_LPARAM(lParam);
-
-        // Check if click is within time area
         if (xPos >= timeRect.left && xPos <= timeRect.right &&
             yPos >= timeRect.top && yPos <= timeRect.bottom) {
-            isDraggingTime = true;
-            dragStartPointTime.x = xPos - timeRect.left;
-            dragStartPointTime.y = yPos - timeRect.top;
+            isDragging = true;
+            dragStartPoint.x = xPos - timeRect.left;
+            dragStartPoint.y = yPos - timeRect.top;
             SetCapture(hwnd);
-            return 0;
         }
-
-        // Check if click is within Battery icon
-        if (g_batteryIcon &&
-            xPos >= g_batteryStatus.rect.left && xPos <= g_batteryStatus.rect.right &&
-            yPos >= g_batteryStatus.rect.top && yPos <= g_batteryStatus.rect.bottom) {
-            g_batteryStatus.isDragging = true;
-            g_batteryStatus.dragStartPoint.x = xPos - g_batteryStatus.rect.left;
-            g_batteryStatus.dragStartPoint.y = yPos - g_batteryStatus.rect.top;
-            SetCapture(hwnd);
-            return 0;
-        }
-
-        // Check if click is within Signal icon
-        if (g_signalIcon &&
-            xPos >= g_signalStatus.rect.left && xPos <= g_signalStatus.rect.right &&
-            yPos >= g_signalStatus.rect.top && yPos <= g_signalStatus.rect.bottom) {
-            g_signalStatus.isDragging = true;
-            g_signalStatus.dragStartPoint.x = xPos - g_signalStatus.rect.left;
-            g_signalStatus.dragStartPoint.y = yPos - g_signalStatus.rect.top;
-            SetCapture(hwnd);
-            return 0;
-        }
-
-        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+        return 0;
     }
 
     case WM_MOUSEMOVE: {
-        int xPos = GET_X_LPARAM(lParam);
-        int yPos = GET_Y_LPARAM(lParam);
+        if (isDragging) {
+            int xPos = GET_X_LPARAM(lParam);
+            int yPos = GET_Y_LPARAM(lParam);
 
-        // Dragging Time
-        if (isDraggingTime) {
-            int newLeft = xPos - dragStartPointTime.x;
-            int newTop = yPos - dragStartPointTime.y;
+            // New position for time
+            int newLeft = xPos - dragStartPoint.x;
+            int newTop = yPos - dragStartPoint.y;
 
-            // Ensure within window bounds
-            if (newLeft < 0) newLeft = 0;
-            if (newTop < 0) newTop = 0;
-
+            // Update RECT for time
+            int width = timeRect.right - timeRect.left;
+            int height = timeRect.bottom - timeRect.top;
             timeRect.left = newLeft;
             timeRect.top = newTop;
-            timeRect.right = newLeft + (timeRect.right - timeRect.left);
-            timeRect.bottom = newTop + (timeRect.bottom - timeRect.top);
-
-            // Update dateRect to follow timeRect
-            int dateOffset = mmToPixels(5.0f, GetDeviceCaps(GetDC(hwnd), LOGPIXELSY)); // 5 mm below
-            dateRect.left = timeRect.left;
-            dateRect.top = timeRect.bottom + dateOffset;
-            dateRect.right = timeRect.left + (timeRect.right - timeRect.left);
-            dateRect.bottom = dateRect.top + (dateRect.bottom - dateRect.top);
+            timeRect.right = newLeft + width;
+            timeRect.bottom = newTop + height;
 
             InvalidateRect(hwnd, NULL, FALSE);
-            return 0;
         }
-
-        // Dragging Battery Icon
-        if (g_batteryStatus.isDragging) {
-            int newLeft = xPos - g_batteryStatus.dragStartPoint.x;
-            int newTop = yPos - g_batteryStatus.dragStartPoint.y;
-
-            // Ensure within window bounds
-            if (newLeft < 0) newLeft = 0;
-            if (newTop < 0) newTop = 0;
-
-            g_batteryStatus.rect.left = newLeft;
-            g_batteryStatus.rect.top = newTop;
-            g_batteryStatus.rect.right = newLeft + (g_batteryStatus.rect.right - g_batteryStatus.rect.left);
-            g_batteryStatus.rect.bottom = newTop + (g_batteryStatus.rect.bottom - g_batteryStatus.rect.top);
-
-            InvalidateRect(hwnd, NULL, FALSE);
-            return 0;
-        }
-
-        // Dragging Signal Icon
-        if (g_signalStatus.isDragging) {
-            int newLeft = xPos - g_signalStatus.dragStartPoint.x;
-            int newTop = yPos - g_signalStatus.dragStartPoint.y;
-
-            // Ensure within window bounds
-            if (newLeft < 0) newLeft = 0;
-            if (newTop < 0) newTop = 0;
-
-            g_signalStatus.rect.left = newLeft;
-            g_signalStatus.rect.top = newTop;
-            g_signalStatus.rect.right = newLeft + (g_signalStatus.rect.right - g_signalStatus.rect.left);
-            g_signalStatus.rect.bottom = newTop + (g_signalStatus.rect.bottom - g_signalStatus.rect.top);
-
-            InvalidateRect(hwnd, NULL, FALSE);
-            return 0;
-        }
-
-        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+        return 0;
     }
 
     case WM_LBUTTONUP: {
-        // Stop dragging
-        if (isDraggingTime) {
-            isDraggingTime = false;
+        if (isDragging) {
+            isDragging = false;
             ReleaseCapture();
-            return 0;
         }
-
-        if (g_batteryStatus.isDragging) {
-            g_batteryStatus.isDragging = false;
-            ReleaseCapture();
-            return 0;
-        }
-
-        if (g_signalStatus.isDragging) {
-            g_signalStatus.isDragging = false;
-            ReleaseCapture();
-            return 0;
-        }
-
-        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+        return 0;
     }
 
     case WM_RBUTTONDOWN: {
@@ -556,20 +386,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         return 0;
     }
 
-    // Load Battery icon
-    const wchar_t* batteryIconURL = L"https://cdn-icons-png.flaticon.com/512/1829/1829402.png"; // Example battery icon URL
-    g_batteryIcon = LoadImageFromURL(batteryIconURL);
-    if (!g_batteryIcon) {
-        MessageBox(NULL, L"Failed to load Battery icon from the internet.", L"Error", MB_ICONERROR);
-        // Continue without Battery icon
-    }
-
-    // Load Signal icon
-    const wchar_t* signalIconURL = L"https://cdn-icons-png.flaticon.com/512/1384/1384060.png"; // Example Signal icon URL
-    g_signalIcon = LoadImageFromURL(signalIconURL);
-    if (!g_signalIcon) {
-        MessageBox(NULL, L"Failed to load Signal icon from the internet.", L"Error", MB_ICONERROR);
-        // Continue without Signal icon
+    // Load WiFi icon
+    const wchar_t* wifiIconURL = L"https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Feather-core-wifi.svg/1200px-Feather-core-wifi.svg.png";
+    g_wifiIcon = LoadImageFromURL(wifiIconURL);
+    if (!g_wifiIcon) {
+        MessageBox(NULL, L"Failed to load WiFi icon from the internet.", L"Error", MB_ICONERROR);
+        // Continue without WiFi icon
     }
 
     // Define application icon URLs
@@ -595,23 +417,23 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         }
         else {
             wchar_t errorMsg[256];
-            swprintf_s(errorMsg, 256, L"Failed to load icon \"%ls\" from the internet.", label.empty() ? L"Unnamed" : label.c_str());
+            swprintf_s(errorMsg, 256, L"Failed to load icon \"%s\" from the internet.", label.c_str());
             MessageBox(NULL, errorMsg, L"Error", MB_ICONERROR);
             // Continue without this icon
         }
-    };
+        };
 
     // Add main application icons
-    AddAppIcon(settingsIconURL, L"Настройки");    // Settings
-    AddAppIcon(filesIconURL, L"Файлы");           // Files
-    AddAppIcon(cameraIconURL, L"Камера");         // Camera
-    AddAppIcon(browserIconURL, L"Браузер");       // Browser
+    AddAppIcon(settingsIconURL, L"");
+    AddAppIcon(filesIconURL, L"");
+    AddAppIcon(cameraIconURL, L"");
+    AddAppIcon(browserIconURL, L"");
 
     // Add additional application icons with labels
-    AddAppIcon(mailIconURL, L"Почта");            // Mail
-    AddAppIcon(musicIconURL, L"Музыка");         // Music
-    AddAppIcon(calendarIconURL, L"Календарь");    // Calendar
-    AddAppIcon(notesIconURL, L"Заметки");         // Notes
+    AddAppIcon(mailIconURL, L"Почта");      // Mail
+    AddAppIcon(musicIconURL, L"Store");    // Music
+    AddAppIcon(calendarIconURL, L"Календарь"); // Calendar
+    AddAppIcon(notesIconURL, L"Заметки");    // Notes
 
     // Window parameters
     const wchar_t CLASS_NAME[] = L"Sample Window Class";
@@ -662,8 +484,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     if (hwnd == NULL) {
         // Release resources before exiting
         if (g_mainImage) delete g_mainImage;
-        if (g_batteryIcon) delete g_batteryIcon;
-        if (g_signalIcon) delete g_signalIcon;
+        if (g_wifiIcon) delete g_wifiIcon;
         for (auto& app : g_appIcons) {
             if (app.image) delete app.image;
         }
@@ -673,12 +494,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     ShowWindow(hwnd, nCmdShow);
 
-    // Set timer to update time and date every minute
+    // Set timer to update time every minute
     SetTimer(hwnd, 1, 60000, NULL); // Timer ID = 1, interval = 60,000 ms (1 minute)
 
-    // Initial time and date setup
+    // Initial time setup
     currentTime = GetCurrentTimeString();
-    currentDate = GetCurrentDateString();
     InvalidateRect(hwnd, NULL, FALSE);
 
     // Message loop
@@ -690,8 +510,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     // Release resources
     if (g_mainImage) delete g_mainImage;
-    if (g_batteryIcon) delete g_batteryIcon;
-    if (g_signalIcon) delete g_signalIcon;
+    if (g_wifiIcon) delete g_wifiIcon;
     for (auto& app : g_appIcons) {
         if (app.image) delete app.image;
     }

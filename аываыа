@@ -1,77 +1,490 @@
-case WM_PAINT: {
-    PAINTSTRUCT ps;
-    HDC hdc = BeginPaint(hwnd, &ps);
+#include <windows.h>
+#include <gdiplus.h>
+#include <urlmon.h>
+#include <shlwapi.h> // Для функций работы с путями
+#include <string>
+#include <ctime>
+#include <windowsx.h>
 
-    // Инициализация GDI+
-    Graphics graphics(hdc);
-    graphics.SetSmoothingMode(SmoothingModeAntiAlias);
-    graphics.SetTextRenderingHint(TextRenderingHintClearTypeGridFit);
+#pragma comment(lib, "gdiplus.lib")
+#pragma comment(lib, "urlmon.lib")
+#pragma comment(lib, "shlwapi.lib") // Для функций работы с путями
 
-    // Получение размеров клиентской области окна
-    RECT rect;
-    GetClientRect(hwnd, &rect);
-    int windowWidth = rect.right - rect.left;
-    int windowHeight = rect.bottom - rect.top;
+using namespace Gdiplus;
 
-    // Основное изображение (фон)
-    if (g_mainImage) {
-        graphics.DrawImage(g_mainImage, 0, 0, windowWidth, windowHeight);
+// Глобальные переменные для хранения изображений
+Bitmap* g_mainImage = nullptr;
+Bitmap* g_wifiIcon = nullptr;
+Bitmap* g_settingsIcon = nullptr;
+Bitmap* g_filesIcon = nullptr;
+Bitmap* g_cameraIcon = nullptr;
+Bitmap* g_browserIcon = nullptr;
+
+// Глобальные переменные для отображения времени
+bool isDragging = false;
+POINT dragStartPoint = { 0, 0 };
+
+// Позиция времени: изменяйте значения для расположения времени
+// Например, для верхнего левого угла: left=10, top=10
+// Для верхнего правого угла: left=windowWidth - width - 10, top=10 и т.д.
+RECT timeRect = { 50, 50, 300, 100 }; // Начальная позиция и размер времени
+Color timeColor = Color(255, 255, 255, 255); // Белый цвет по умолчанию
+float timeFontSize = 50.0f; // Начальный размер шрифта
+std::wstring currentTime = L"00:00"; // Текущее время
+
+// Функция для перевода миллиметров в пиксели в зависимости от DPI экрана
+int mmToPixels(float mm, int dpi) {
+    return static_cast<int>(mm * dpi / 25.4f); // 1 дюйм = 25.4 мм
+}
+
+// Функция для загрузки изображения из URL
+Bitmap* LoadImageFromURL(const wchar_t* url) {
+    // Получение временного пути
+    wchar_t tempPath[MAX_PATH];
+    if (!GetTempPath(MAX_PATH, tempPath)) {
+        return nullptr;
     }
 
-    // Получение DPI
-    HDC screen = GetDC(hwnd);
-    int dpiX = GetDeviceCaps(screen, LOGPIXELSX);
-    int dpiY = GetDeviceCaps(screen, LOGPIXELSY);
-    ReleaseDC(hwnd, screen);
+    // Создание временного файла
+    wchar_t tempFile[MAX_PATH];
+    if (!GetTempFileName(tempPath, L"IMG", 0, tempFile)) {
+        return nullptr;
+    }
 
-    // Расчет размеров иконок с учетом DPI
-    int iconSizeMM_Wifi = 5; // 5 мм
-    int iconSizeMM_App = 15;   // 15 мм
-    int spacingMM = 10;         // 10 мм между иконками
-    int marginMM = 5;          // 5 мм от края окна
+    // Скачивание изображения во временный файл
+    HRESULT hr = URLDownloadToFile(NULL, url, tempFile, 0, NULL);
+    if (FAILED(hr)) {
+        // Удаление временного файла, если скачивание не удалось
+        DeleteFile(tempFile);
+        return nullptr;
+    }
 
-    int iconSize_Wifi = mmToPixels(static_cast<float>(iconSizeMM_Wifi), dpiX); // Используем DPI-X
-    int iconSize_App = mmToPixels(static_cast<float>(iconSizeMM_App), dpiX);
-    int appSpacing = mmToPixels(static_cast<float>(spacingMM), dpiX);
-    int margin = mmToPixels(static_cast<float>(marginMM), dpiX);
+    // Загрузка изображения с помощью GDI+
+    Bitmap* bmp = Bitmap::FromFile(tempFile);
+    if (bmp && bmp->GetLastStatus() != Ok) {
+        delete bmp;
+        bmp = nullptr;
+    }
 
-    // Отображение иконок (код опущен для краткости)
+    // Удаление временного файла
+    DeleteFile(tempFile);
 
-    // Отображение времени
-    FontFamily fontFamily(L"Segoe UI"); // Более современный шрифт
-    Font font(&fontFamily, timeFontSize, FontStyleBold, UnitPixel);
-    SolidBrush brush(timeColor);
-    StringFormat format;
-    format.SetAlignment(StringAlignmentCenter);
-    format.SetLineAlignment(StringAlignmentCenter);
+    return bmp;
+}
 
+// Функция для получения текущего времени в формате "HH:MM"
+std::wstring GetCurrentTimeString() {
+    std::time_t t = std::time(nullptr);
+    std::tm localTime;
+    localtime_s(&localTime, &t);
+    wchar_t buffer[6];
+    swprintf_s(buffer, 6, L"%02d:%02d", localTime.tm_hour, localTime.tm_min);
+    return std::wstring(buffer);
+}
+
+// Функция обработки сообщений окна
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    switch (uMsg) {
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        return 0;
+
+    case WM_TIMER: {
+        if (wParam == 1) { // Таймер для обновления времени каждую минуту
+            currentTime = GetCurrentTimeString();
+            InvalidateRect(hwnd, NULL, FALSE); // Перерисовать окно
+        }
+        return 0;
+    }
+
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
+
+        // Инициализация GDI+
+        Graphics graphics(hdc);
+        graphics.SetSmoothingMode(SmoothingModeAntiAlias);
+        graphics.SetTextRenderingHint(TextRenderingHintClearTypeGridFit);
+
+        // Получение размеров клиентской области окна
+        RECT rect;
+        GetClientRect(hwnd, &rect);
+        int windowWidth = rect.right - rect.left;
+        int windowHeight = rect.bottom - rect.top;
+
+        // Основное изображение (фон)
+        if (g_mainImage) {
+            // Рисование изображения, масштабированного под размер окна
+            graphics.DrawImage(g_mainImage, 0, 0, windowWidth, windowHeight);
+        }
+
+        // Получение DPI
+        HDC screen = GetDC(hwnd);
+        int dpiX = GetDeviceCaps(screen, LOGPIXELSX);
+        int dpiY = GetDeviceCaps(screen, LOGPIXELSY);
+        ReleaseDC(hwnd, screen);
+
+        // Расчет размеров иконок с учетом DPI
+        int iconSizeMM_Wifi = 5; // 5 мм
+        int iconSizeMM_App = 15;   // 15 мм
+        int spacingMM = 10;         // 10 мм между иконками
+        int marginMM = 5;          // 5 мм от края окна
+
+        int iconSize_Wifi = mmToPixels(static_cast<float>(iconSizeMM_Wifi), dpiX); // Используем DPI-X
+        int iconSize_App = mmToPixels(static_cast<float>(iconSizeMM_App), dpiX);
+        int appSpacing = mmToPixels(static_cast<float>(spacingMM), dpiX);
+        int margin = mmToPixels(static_cast<float>(marginMM), dpiX);
+
+        // Отображение WiFi-иконки в верхнем правом углу с небольшим сдвигом влево
+        if (g_wifiIcon) {
+            // Размер иконки
+            int iconSize = iconSize_Wifi;
+            // Сдвиг влево на 50 пикселей
+            int shiftLeft = mmToPixels(5.0f, dpiX); // Например, 5 мм сдвига
+            // Позиция (отступ от верхнего правого угла с учетом сдвига)
+            int x = windowWidth - iconSize - margin - shiftLeft; // Сдвиг влево
+            // Убедимся, что x не становится отрицательным
+            if (x < margin) {
+                x = margin;
+            }
+            int y = margin; // 5 мм от верхнего края
+
+            graphics.DrawImage(g_wifiIcon, x, y, iconSize, iconSize);
+        }
+
+        // Определение размеров иконок приложений
+        int appIconSize = iconSize_App; // 15 мм
+        int appSpacingPixels = appSpacing; // 10 мм
+
+        // Позиция для начала рисования иконок приложений
+        int totalApps = 4;
+        int totalWidth = totalApps * appIconSize + (totalApps - 1) * appSpacingPixels;
+        int startX = (windowWidth - totalWidth) / 2;
+        int startY = windowHeight - appIconSize - mmToPixels(5.0f, dpiY); // 5 мм от нижнего края
+
+        // Отображение иконки Настроек
+        if (g_settingsIcon) {
+            int x = startX;
+            graphics.DrawImage(g_settingsIcon, x, startY, appIconSize, appIconSize);
+            startX += appIconSize + appSpacingPixels;
+        }
+
+        // Отображение иконки Файлов
+        if (g_filesIcon) {
+            int x = startX;
+            graphics.DrawImage(g_filesIcon, x, startY, appIconSize, appIconSize);
+            startX += appIconSize + appSpacingPixels;
+        }
+
+        // Отображение иконки Камеры
+        if (g_cameraIcon) {
+            int x = startX;
+            graphics.DrawImage(g_cameraIcon, x, startY, appIconSize, appIconSize);
+            startX += appIconSize + appSpacingPixels;
+        }
+
+        // Отображение иконки Браузера
+        if (g_browserIcon) {
+            int x = startX;
+            graphics.DrawImage(g_browserIcon, x, startY, appIconSize, appIconSize);
+            // startX += appIconSize + appSpacingPixels; // Не требуется после последней иконки
+        }
+
+        // Отображение времени
+        // Создание шрифта
+        FontFamily fontFamily(L"Segoe UI"); // Более современный шрифт
+        Font font(&fontFamily, timeFontSize, FontStyleBold, UnitPixel);
+
+        // Создание кисти для текста
+        SolidBrush brush(timeColor);
+
+        // Установка выравнивания текста по центру
+        StringFormat format;
+        format.SetAlignment(StringAlignmentCenter);
+        format.SetLineAlignment(StringAlignmentCenter);
+
+        // Расчет положения времени
+        // timeRect определяет область отображения времени
+        // Вы можете изменить координаты timeRect для изменения положения времени
+        // Например:
+        // Верхний левый угол: RECT timeRect = { 10, 10, 200, 60 };
+        // Верхний правый угол: RECT timeRect = { windowWidth - 200 - 10, 10, windowWidth - 10, 60 };
+        // Нижний левый угол: RECT timeRect = { 10, windowHeight - 60 - 10, 200, windowHeight - 10 };
+        // Нижний правый угол: RECT timeRect = { windowWidth - 200 - 10, windowHeight - 60 - 10, windowWidth - 10, windowHeight - 10 };
+
+        // Пример: отображение времени в центре верхней панели
+        // Вы можете изменить значения для перемещения времени в нужное место
+        // Например, для верхнего центрального расположения:
     // Сдвиг времени вниз на 10 мм
-    int verticalOffset = mmToPixels(10.0f, dpiY); // Сдвиг вниз на 10 мм
+        int verticalOffset = mmToPixels(40.0f, dpiY); // Сдвиг вниз на 10 мм
 
-    RECT currentTimeRect;
-    currentTimeRect.left = (windowWidth / 2) - mmToPixels(20.0f, dpiX); // 40 мм ширина области
-    currentTimeRect.top = margin + verticalOffset;
-    currentTimeRect.right = currentTimeRect.left + mmToPixels(40.0f, dpiX);
-    currentTimeRect.bottom = currentTimeRect.top + mmToPixels(20.0f, dpiY);
+        RECT currentTimeRect;
+        currentTimeRect.left = (windowWidth / 2) - mmToPixels(20.0f, dpiX); // 40 мм ширина области
+        currentTimeRect.top = margin + verticalOffset;
+        currentTimeRect.right = currentTimeRect.left + mmToPixels(40.0f, dpiX);
+        currentTimeRect.bottom = currentTimeRect.top + mmToPixels(20.0f, dpiY);
 
-    // Обновление timeRect для корректного перетаскивания
-    timeRect.left = currentTimeRect.left;
-    timeRect.top = currentTimeRect.top;
-    timeRect.right = currentTimeRect.right;
-    timeRect.bottom = currentTimeRect.bottom;
+        // Рисование текста времени
+        graphics.DrawString(
+            currentTime.c_str(),
+            -1,
+            &font,
+            RectF(static_cast<float>(currentTimeRect.left), static_cast<float>(currentTimeRect.top),
+                static_cast<float>(currentTimeRect.right - currentTimeRect.left),
+                static_cast<float>(currentTimeRect.bottom - currentTimeRect.top)),
+            &format,
+            &brush
+        );
 
-    // Рисование текста времени
-    graphics.DrawString(
-        currentTime.c_str(),
-        -1,
-        &font,
-        RectF(static_cast<float>(currentTimeRect.left), static_cast<float>(currentTimeRect.top),
-              static_cast<float>(currentTimeRect.right - currentTimeRect.left),
-              static_cast<float>(currentTimeRect.bottom - currentTimeRect.top)),
-        &format,
-        &brush
+        EndPaint(hwnd, &ps);
+        return 0;
+    }
+
+    case WM_LBUTTONDOWN: {
+        // Проверка, попадает ли клик в область времени
+        int xPos = GET_X_LPARAM(lParam);
+        int yPos = GET_Y_LPARAM(lParam);
+        if (xPos >= timeRect.left && xPos <= timeRect.right &&
+            yPos >= timeRect.top && yPos <= timeRect.bottom) {
+            isDragging = true;
+            dragStartPoint.x = xPos - timeRect.left;
+            dragStartPoint.y = yPos - timeRect.top;
+            SetCapture(hwnd);
+        }
+        return 0;
+    }
+
+    case WM_MOUSEMOVE: {
+        if (isDragging) {
+            int xPos = GET_X_LPARAM(lParam);
+            int yPos = GET_Y_LPARAM(lParam);
+
+            // Новая позиция времени
+            int newLeft = xPos - dragStartPoint.x;
+            int newTop = yPos - dragStartPoint.y;
+
+            // Обновление RECT времени
+            int width = timeRect.right - timeRect.left;
+            int height = timeRect.bottom - timeRect.top;
+            timeRect.left = newLeft;
+            timeRect.top = newTop;
+            timeRect.right = newLeft + width;
+            timeRect.bottom = newTop + height;
+
+            InvalidateRect(hwnd, NULL, FALSE);
+        }
+        return 0;
+    }
+
+    case WM_LBUTTONUP: {
+        if (isDragging) {
+            isDragging = false;
+            ReleaseCapture();
+        }
+        return 0;
+    }
+
+    case WM_RBUTTONDOWN: {
+        // Добавим контекстное меню для изменения цвета и размера времени
+        HMENU hMenu = CreatePopupMenu();
+        if (hMenu) {
+            AppendMenu(hMenu, MF_STRING, 1001, L"Сменить цвет времени");
+            AppendMenu(hMenu, MF_STRING, 1002, L"Увеличить размер времени");
+            AppendMenu(hMenu, MF_STRING, 1003, L"Уменьшить размер времени");
+
+            POINT cursorPos;
+            GetCursorPos(&cursorPos);
+            TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, cursorPos.x, cursorPos.y, 0, hwnd, NULL);
+            DestroyMenu(hMenu);
+        }
+        return 0;
+    }
+
+    case WM_COMMAND: {
+        switch (LOWORD(wParam)) {
+        case 1001: { // Сменить цвет времени
+            // Пример: смена цвета на случайный
+            BYTE r = rand() % 256;
+            BYTE g = rand() % 256;
+            BYTE b = rand() % 256;
+            timeColor = Color(255, r, g, b);
+            InvalidateRect(hwnd, NULL, FALSE);
+            break;
+        }
+        case 1002: { // Увеличить размер времени
+            timeFontSize += 2.0f; // Увеличить размер шрифта на 2 пикселя
+            // Обновить размер RECT времени (примерные расчёты)
+            int width = mmToPixels(40.0f, 96); // 40 мм ширина области (можно адаптировать)
+            int height = mmToPixels(20.0f, 96); // 20 мм высота области
+            timeRect.right = timeRect.left + width;
+            timeRect.bottom = timeRect.top + height;
+            InvalidateRect(hwnd, NULL, FALSE);
+            break;
+        }
+        case 1003: { // Уменьшить размер времени
+            if (timeFontSize > 12.0f) { // Минимальный размер шрифта
+                timeFontSize -= 2.0f; // Уменьшить размер шрифта на 2 пикселя
+                // Обновить размер RECT времени (примерные расчёты)
+                int width = mmToPixels(40.0f, 96); // 40 мм ширина области (можно адаптировать)
+                int height = mmToPixels(20.0f, 96); // 20 мм высота области
+                timeRect.right = timeRect.left + width;
+                timeRect.bottom = timeRect.top + height;
+                InvalidateRect(hwnd, NULL, FALSE);
+            }
+            break;
+        }
+        default:
+            break;
+        }
+        return 0;
+    }
+
+    default:
+        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }
+}
+
+// Основная функция для оконных приложений на Windows
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+    // Инициализация GDI+
+    GdiplusStartupInput gdiplusStartupInput;
+    ULONG_PTR gdiplusToken;
+    if (GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL) != Ok) {
+        MessageBox(NULL, L"Не удалось инициализировать GDI+.", L"Ошибка", MB_ICONERROR);
+        return 0;
+    }
+
+    // Загрузка основного изображения из URL
+    const wchar_t* mainImageURL = L"https://i.pinimg.com/736x/44/ba/d5/44bad5b1b0839e5ab430433c6ddfb4be.jpg";
+    g_mainImage = LoadImageFromURL(mainImageURL);
+    if (!g_mainImage) {
+        MessageBox(NULL, L"Не удалось загрузить основное изображение по указанному URL.", L"Ошибка", MB_ICONERROR);
+        GdiplusShutdown(gdiplusToken);
+        return 0;
+    }
+
+    // Определение URL-адресов иконок
+    const wchar_t* wifiIconURL = L"https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Feather-core-wifi.svg/1200px-Feather-core-wifi.svg.png";
+    const wchar_t* settingsIconURL = L"https://cdn-icons-png.flaticon.com/512/2099/2099058.png";
+    const wchar_t* filesIconURL = L"https://cdn-icons-png.flaticon.com/512/727/727399.png";
+    const wchar_t* cameraIconURL = L"https://cdn-icons-png.flaticon.com/512/633/633759.png";
+    const wchar_t* browserIconURL = L"https://cdn-icons-png.flaticon.com/512/2702/2702602.png";
+
+    // Загрузка дополнительных иконок из URL
+    g_wifiIcon = LoadImageFromURL(wifiIconURL);
+    if (!g_wifiIcon) {
+        MessageBox(NULL, L"Не удалось загрузить WiFi-иконку из интернета.", L"Ошибка", MB_ICONERROR);
+        // Продолжаем без иконки WiFi
+    }
+
+    g_settingsIcon = LoadImageFromURL(settingsIconURL);
+    if (!g_settingsIcon) {
+        MessageBox(NULL, L"Не удалось загрузить иконку Настроек из интернета.", L"Ошибка", MB_ICONERROR);
+        // Продолжаем без данной иконки
+    }
+
+    g_filesIcon = LoadImageFromURL(filesIconURL);
+    if (!g_filesIcon) {
+        MessageBox(NULL, L"Не удалось загрузить иконку Файлов из интернета.", L"Ошибка", MB_ICONERROR);
+        // Продолжаем без данной иконки
+    }
+
+    g_cameraIcon = LoadImageFromURL(cameraIconURL);
+    if (!g_cameraIcon) {
+        MessageBox(NULL, L"Не удалось загрузить иконку Камеры из интернета.", L"Ошибка", MB_ICONERROR);
+        // Продолжаем без данной иконки
+    }
+
+    g_browserIcon = LoadImageFromURL(browserIconURL);
+    if (!g_browserIcon) {
+        MessageBox(NULL, L"Не удалось загрузить иконку Браузера из интернета.", L"Ошибка", MB_ICONERROR);
+        // Продолжаем без данной иконки
+    }
+
+    // Параметры окна
+    const wchar_t CLASS_NAME[] = L"Sample Window Class";
+
+    // Регистрация класса окна
+    WNDCLASS wc = {};
+    wc.lpfnWndProc = WindowProc;
+    wc.hInstance = hInstance;
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1); // Установка фонового цвета по умолчанию
+    wc.lpszClassName = CLASS_NAME;
+
+    RegisterClass(&wc);
+
+    // Получение DPI экрана
+    HDC screenDC = GetDC(NULL);
+    int dpiX = GetDeviceCaps(screenDC, LOGPIXELSX);
+    int dpiY = GetDeviceCaps(screenDC, LOGPIXELSY);
+    ReleaseDC(NULL, screenDC);
+
+    // Размеры окна в миллиметрах
+    float widthMM = 90.1f;
+    float heightMM = 159.1f;
+
+    // Преобразование размеров окна из миллиметров в пиксели
+    int width = mmToPixels(widthMM, dpiX);
+    int height = mmToPixels(heightMM, dpiY);
+
+    // Настройка размеров окна с учётом рамок
+    RECT wr = { 0, 0, width, height };
+    DWORD style = WS_POPUP; // Без рамки и кнопок управления
+    AdjustWindowRectEx(&wr, style, FALSE, 0);
+    int adjustedWidth = wr.right - wr.left;
+    int adjustedHeight = wr.bottom - wr.top;
+
+    // Создание окна без рамки и кнопок управления
+    HWND hwnd = CreateWindowEx(
+        0,
+        CLASS_NAME,
+        L"My OS Design",
+        style, // Стиль окна без рамок и кнопок управления
+        CW_USEDEFAULT, CW_USEDEFAULT, adjustedWidth, adjustedHeight,
+        NULL,
+        NULL,
+        hInstance,
+        NULL
     );
 
-    EndPaint(hwnd, &ps);
+    if (hwnd == NULL) {
+        // Освобождение ресурсов перед выходом
+        if (g_mainImage) delete g_mainImage;
+        if (g_wifiIcon) delete g_wifiIcon;
+        if (g_settingsIcon) delete g_settingsIcon;
+        if (g_filesIcon) delete g_filesIcon;
+        if (g_cameraIcon) delete g_cameraIcon;
+        if (g_browserIcon) delete g_browserIcon;
+        GdiplusShutdown(gdiplusToken);
+        return 0;
+    }
+
+    ShowWindow(hwnd, nCmdShow);
+
+    // Установить таймер для обновления времени каждую минуту
+    SetTimer(hwnd, 1, 60000, NULL); // ID таймера = 1, интервал = 60 000 мс (1 минута)
+
+    // Начальная установка времени
+    currentTime = GetCurrentTimeString();
+    InvalidateRect(hwnd, NULL, FALSE);
+
+    // Цикл обработки сообщений
+    MSG msg = {};
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    // Освобождение ресурсов
+    if (g_mainImage) delete g_mainImage;
+    if (g_wifiIcon) delete g_wifiIcon;
+    if (g_settingsIcon) delete g_settingsIcon;
+    if (g_filesIcon) delete g_filesIcon;
+    if (g_cameraIcon) delete g_cameraIcon;
+    if (g_browserIcon) delete g_browserIcon;
+
+    // Завершение работы с GDI+
+    GdiplusShutdown(gdiplusToken);
+
     return 0;
 }

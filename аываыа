@@ -5,6 +5,7 @@
 #include <string>
 #include <ctime>
 #include <vector>
+#include <windowsx.h>
 
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "urlmon.lib")
@@ -170,7 +171,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         int rowHeight = appIconSize + labelSpacing + mmToPixels(10.0f, dpiY); // Иконка + подпись + отступ
 
         // Начальная позиция Y для отрисовки иконок
-        int startY = windowHeight - rowHeight * totalRows - mmToPixels(5.0f, dpiY); // 5 мм от нижнего края
+        int startY = windowHeight - rowHeight * totalRows - mmToPixels(-30.0f, dpiY); // 5 мм от нижнего края
 
         // Расчет общих размеров для центрирования иконок
         int iconsInLastRow = totalApps % iconsPerRow;
@@ -199,12 +200,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                     // Рисование подписи
                     const wchar_t* text = app.label.c_str();
                     FontFamily fontFamily(L"Segoe UI");
-                    Font font(&fontFamily, 14.0f, FontStyleRegular, UnitPixel); // Размер шрифта 14 пикселей
+                    Font font(&fontFamily, 5.0f, FontStyleRegular, UnitPixel); // Размер шрифта 14 пикселей
                     SolidBrush brush(Color(255, 255, 255, 255)); // Белый цвет текста
 
                     // Вычисление позиции текста
                     RectF layoutRect(static_cast<float>(x), static_cast<float>(y + appIconSize + labelSpacing),
-                                    static_cast<float>(appIconSize), static_cast<float>(mmToPixels(10.0f, dpiY)));
+                        static_cast<float>(appIconSize), static_cast<float>(mmToPixels(10.0f, dpiY)));
 
                     StringFormat format;
                     format.SetAlignment(StringAlignmentCenter);
@@ -230,7 +231,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         // Расчет положения времени
         // Пример: отображение времени в центре верхней панели
-        int verticalOffset = mmToPixels(10.0f, dpiY); // Сдвиг вниз на 10 мм
+        int verticalOffset = mmToPixels(50.0f, dpiY); // Сдвиг вниз на 10 мм
 
         RECT currentTimeRect;
         currentTimeRect.left = (windowWidth / 2) - mmToPixels(20.0f, dpiX); // 40 мм ширина области
@@ -406,13 +407,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             MessageBox(NULL, errorMsg, L"Ошибка", MB_ICONERROR);
             // Продолжаем без данной иконки
         }
-    };
+        };
 
     // Добавление основных иконок приложений
-    AddAppIcon(settingsIconURL, L"Настройки");
-    AddAppIcon(filesIconURL, L"Файлы");
-    AddAppIcon(cameraIconURL, L"Камера");
-    AddAppIcon(browserIconURL, L"Браузер");
+    AddAppIcon(settingsIconURL, L"");
+    AddAppIcon(filesIconURL, L"");
+    AddAppIcon(cameraIconURL, L"");
+    AddAppIcon(browserIconURL, L"");
 
     // Добавление дополнительных иконок приложений
     AddAppIcon(mailIconURL, L"Почта");

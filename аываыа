@@ -85,10 +85,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         }
 
         // Расчет размеров иконок с учетом DPI
-        int iconSizeMM_Wifi = 10; // 10 мм
+        int iconSizeMM_Wifi = 5; // 10 мм
         int iconSizeMM_App = 15;   // 15 мм
         int spacingMM = 10;         // 10 мм между иконками
-        int marginMM = 10;          // 10 мм от края окна
+        int marginMM = 5;          // 10 мм от края окна
 
         // Получение DPI
         HDC screen = GetDC(0);
@@ -120,7 +120,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         int totalApps = 4;
         int totalWidth = totalApps * appIconSize + (totalApps - 1) * appSpacingPixels;
         int startX = (windowWidth - totalWidth) / 2;
-        int startY = windowHeight - appIconSize - mmToPixels(20.0f, dpiY); // 20 мм от нижнего края
+        int startY = windowHeight - appIconSize - mmToPixels(5.0f, dpiY); // 20 мм от нижнего края
 
         // Отображение иконки Настроек
         if (g_settingsIcon) {
@@ -179,11 +179,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
 
     // Определение URL-адресов иконок
-    const wchar_t* wifiIconURL = L"https://example.com/icons/wifi.png";
-    const wchar_t* settingsIconURL = L"https://example.com/icons/settings.png";
-    const wchar_t* filesIconURL = L"https://example.com/icons/files.png";
-    const wchar_t* cameraIconURL = L"https://example.com/icons/camera.png";
-    const wchar_t* browserIconURL = L"https://example.com/icons/browser.png";
+    const wchar_t* wifiIconURL = L"https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Feather-core-wifi.svg/1200px-Feather-core-wifi.svg.png";
+    const wchar_t* settingsIconURL = L"https://avatars.mds.yandex.net/i?id=d2ae9329c61bbacb21fabe356df4c70b_l-8209975-images-thumbs&n=13";
+    const wchar_t* filesIconURL = L"https://avatars.mds.yandex.net/i?id=d2ae9329c61bbacb21fabe356df4c70b_l-8209975-images-thumbs&n=13";
+    const wchar_t* cameraIconURL = L"https://avatars.mds.yandex.net/i?id=d2ae9329c61bbacb21fabe356df4c70b_l-8209975-images-thumbs&n=13";
+    const wchar_t* browserIconURL = L"https://imgur.com/a/3mAgP0o";
 
     // Загрузка дополнительных иконок из URL
     g_wifiIcon = LoadImageFromURL(wifiIconURL);

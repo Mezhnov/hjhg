@@ -20,6 +20,10 @@ Bitmap* g_filesIcon = nullptr;
 Bitmap* g_cameraIcon = nullptr;
 Bitmap* g_browserIcon = nullptr;
 
+// Новые иконки
+Bitmap* g_musicIcon = nullptr;
+Bitmap* g_calculatorIcon = nullptr;
+
 // Глобальные переменные для отображения времени
 bool isDragging = false;
 POINT dragStartPoint = { 0, 0 };
@@ -31,6 +35,10 @@ RECT timeRect = { 50, 50, 300, 100 }; // Начальная позиция и р
 Color timeColor = Color(255, 255, 255, 255); // Белый цвет по умолчанию
 float timeFontSize = 50.0f; // Начальный размер шрифта
 std::wstring currentTime = L"00:00"; // Текущее время
+
+// Текстовые метки для новых иконок
+std::wstring g_musicLabel = L"Музыка";
+std::wstring g_calculatorLabel = L"Калькулятор";
 
 // Функция для перевода миллиметров в пиксели в зависимости от DPI экрана
 int mmToPixels(float mm, int dpi) {
@@ -126,20 +134,22 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         // Расчет размеров иконок с учетом DPI
         int iconSizeMM_Wifi = 5; // 5 мм
-        int iconSizeMM_App = 10;   // 15 мм
+        int iconSizeMM_App = 10;   // 10 мм
         int spacingMM = 10;         // 10 мм между иконками
         int marginMM = 5;          // 5 мм от края окна
+        int labelSpacingMM = 2;    // 2 мм между иконкой и меткой
 
         int iconSize_Wifi = mmToPixels(static_cast<float>(iconSizeMM_Wifi), dpiX); // Используем DPI-X
         int iconSize_App = mmToPixels(static_cast<float>(iconSizeMM_App), dpiX);
         int appSpacing = mmToPixels(static_cast<float>(spacingMM), dpiX);
         int margin = mmToPixels(static_cast<float>(marginMM), dpiX);
+        int labelSpacing = mmToPixels(static_cast<float>(labelSpacingMM), dpiY);
 
         // Отображение WiFi-иконки в верхнем правом углу с небольшим сдвигом влево
         if (g_wifiIcon) {
             // Размер иконки
             int iconSize = iconSize_Wifi;
-            // Сдвиг влево на 50 пикселей
+            // Сдвиг влево на 5 мм
             int shiftLeft = mmToPixels(5.0f, dpiX); // Например, 5 мм сдвига
             // Позиция (отступ от верхнего правого угла с учетом сдвига)
             int x = windowWidth - iconSize - margin - shiftLeft; // Сдвиг влево
@@ -153,55 +163,193 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         }
 
         // Определение размеров иконок приложений
-        int appIconSize = iconSize_App; // 15 мм
+        int appIconSize = iconSize_App; // 10 мм
         int appSpacingPixels = appSpacing; // 10 мм
 
-        // Позиция для начала рисования иконок приложений
-        int totalApps = 4;
-        int totalWidth = totalApps * appIconSize + (totalApps - 1) * appSpacingPixels;
-        int startX = (windowWidth - totalWidth) / 2;
-        int startY = windowHeight - appIconSize - mmToPixels(5.0f, dpiY); // 5 мм от нижнего края
+        // Общее количество иконок и их меток
+        const int totalApps = 6; // 4 существующие + 2 новые
+        const int appsPerRow = 4; // Иконок в первой строке
+
+        // Вычисление общего ширины первой строки и размещение центра
+        int totalWidthFirstRow = 4 * appIconSize + 3 * appSpacingPixels;
+        int startXFirstRow = (windowWidth - totalWidthFirstRow) / 2;
+        int startYFirstRow = windowHeight - appIconSize - mmToPixels(5.0f, dpiY) - labelSpacing - mmToPixels(20.0f, dpiY); // 5 мм от нижнего края
+
+        // Отображение иконок первой строки
+        int currentX = startXFirstRow;
+        int currentY = startYFirstRow;
 
         // Отображение иконки Настроек
         if (g_settingsIcon) {
-            int x = startX;
-            graphics.DrawImage(g_settingsIcon, x, startY, appIconSize, appIconSize);
-            startX += appIconSize + appSpacingPixels;
+            graphics.DrawImage(g_settingsIcon, currentX, currentY, appIconSize, appIconSize);
+
+            // Рисование метки под иконкой
+            FontFamily fontFamily(L"Segoe UI");
+            Font font(&fontFamily, 12.0f, FontStyleRegular, UnitPixel);
+            SolidBrush brush(Color(255, 255, 255, 255));
+            StringFormat format;
+            format.SetAlignment(StringAlignmentCenter);
+            RectF layoutRect(static_cast<float>(currentX), static_cast<float>(currentY + appIconSize + labelSpacing),
+                static_cast<float>(appIconSize), 20.0f);
+
+            graphics.DrawString(
+                L"Настройки",
+                -1,
+                &font,
+                layoutRect,
+                &format,
+                &brush
+            );
+
+            currentX += appIconSize + appSpacingPixels;
         }
 
         // Отображение иконки Файлов
         if (g_filesIcon) {
-            int x = startX;
-            graphics.DrawImage(g_filesIcon, x, startY, appIconSize, appIconSize);
-            startX += appIconSize + appSpacingPixels;
+            graphics.DrawImage(g_filesIcon, currentX, currentY, appIconSize, appIconSize);
+
+            // Рисование метки под иконкой
+            FontFamily fontFamily(L"Segoe UI");
+            Font font(&fontFamily, 12.0f, FontStyleRegular, UnitPixel);
+            SolidBrush brush(Color(255, 255, 255, 255));
+            StringFormat format;
+            format.SetAlignment(StringAlignmentCenter);
+            RectF layoutRect(static_cast<float>(currentX), static_cast<float>(currentY + appIconSize + labelSpacing),
+                static_cast<float>(appIconSize), 20.0f);
+
+            graphics.DrawString(
+                L"Файлы",
+                -1,
+                &font,
+                layoutRect,
+                &format,
+                &brush
+            );
+
+            currentX += appIconSize + appSpacingPixels;
         }
 
         // Отображение иконки Камеры
         if (g_cameraIcon) {
-            int x = startX;
-            graphics.DrawImage(g_cameraIcon, x, startY, appIconSize, appIconSize);
-            startX += appIconSize + appSpacingPixels;
+            graphics.DrawImage(g_cameraIcon, currentX, currentY, appIconSize, appIconSize);
+
+            // Рисование метки под иконкой
+            FontFamily fontFamily(L"Segoe UI");
+            Font font(&fontFamily, 12.0f, FontStyleRegular, UnitPixel);
+            SolidBrush brush(Color(255, 255, 255, 255));
+            StringFormat format;
+            format.SetAlignment(StringAlignmentCenter);
+            RectF layoutRect(static_cast<float>(currentX), static_cast<float>(currentY + appIconSize + labelSpacing),
+                static_cast<float>(appIconSize), 20.0f);
+
+            graphics.DrawString(
+                L"Камера",
+                -1,
+                &font,
+                layoutRect,
+                &format,
+                &brush
+            );
+
+            currentX += appIconSize + appSpacingPixels;
         }
 
         // Отображение иконки Браузера
         if (g_browserIcon) {
-            int x = startX;
-            graphics.DrawImage(g_browserIcon, x, startY, appIconSize, appIconSize);
-            // startX += appIconSize + appSpacingPixels; // Не требуется после последней иконки
+            graphics.DrawImage(g_browserIcon, currentX, currentY, appIconSize, appIconSize);
+
+            // Рисование метки под иконкой
+            FontFamily fontFamily(L"Segoe UI");
+            Font font(&fontFamily, 12.0f, FontStyleRegular, UnitPixel);
+            SolidBrush brush(Color(255, 255, 255, 255));
+            StringFormat format;
+            format.SetAlignment(StringAlignmentCenter);
+            RectF layoutRect(static_cast<float>(currentX), static_cast<float>(currentY + appIconSize + labelSpacing),
+                static_cast<float>(appIconSize), 20.0f);
+
+            graphics.DrawString(
+                L"Браузер",
+                -1,
+                &font,
+                layoutRect,
+                &format,
+                &brush
+            );
+
+            // currentX += appIconSize + appSpacingPixels; // Не требуется после последней иконки первой строки
+        }
+
+        // Отображение иконок второй строки
+        // Вычисление позиций для второй строки
+        int totalWidthSecondRow = 2 * appIconSize + 1 * appSpacingPixels;
+        int startXSecondRow = (windowWidth - totalWidthSecondRow) / 2;
+        int startYSecondRow = startYFirstRow + appIconSize + labelSpacing + mmToPixels(10.0f, dpiY); // 10 мм между строками
+
+        currentX = startXSecondRow;
+        currentY = startYSecondRow;
+
+        // Отображение иконки Музыки
+        if (g_musicIcon) {
+            graphics.DrawImage(g_musicIcon, currentX, currentY, appIconSize, appIconSize);
+
+            // Рисование метки под иконкой
+            FontFamily fontFamily(L"Segoe UI");
+            Font font(&fontFamily, 12.0f, FontStyleRegular, UnitPixel);
+            SolidBrush brush(Color(255, 255, 255, 255));
+            StringFormat format;
+            format.SetAlignment(StringAlignmentCenter);
+            RectF layoutRect(static_cast<float>(currentX), static_cast<float>(currentY + appIconSize + labelSpacing),
+                static_cast<float>(appIconSize), 20.0f);
+
+            graphics.DrawString(
+                g_musicLabel.c_str(),
+                -1,
+                &font,
+                layoutRect,
+                &format,
+                &brush
+            );
+
+            currentX += appIconSize + appSpacingPixels;
+        }
+
+        // Отображение иконки Калькулятора
+        if (g_calculatorIcon) {
+            graphics.DrawImage(g_calculatorIcon, currentX, currentY, appIconSize, appIconSize);
+
+            // Рисование метки под иконкой
+            FontFamily fontFamily(L"Segoe UI");
+            Font font(&fontFamily, 12.0f, FontStyleRegular, UnitPixel);
+            SolidBrush brush(Color(255, 255, 255, 255));
+            StringFormat format;
+            format.SetAlignment(StringAlignmentCenter);
+            RectF layoutRect(static_cast<float>(currentX), static_cast<float>(currentY + appIconSize + labelSpacing),
+                static_cast<float>(appIconSize), 20.0f);
+
+            graphics.DrawString(
+                g_calculatorLabel.c_str(),
+                -1,
+                &font,
+                layoutRect,
+                &format,
+                &brush
+            );
+
+            // currentX += appIconSize + appSpacingPixels; // Не требуется после последней иконки второй строки
         }
 
         // Отображение времени
         // Создание шрифта
-        FontFamily fontFamily(L"Segoe UI"); // Более современный шрифт
-        Font font(&fontFamily, timeFontSize, FontStyleBold, UnitPixel);
+        FontFamily timeFontFamily(L"Segoe UI"); // Более современный шрифт
+        Font timeFont(&timeFontFamily, timeFontSize, FontStyleBold, UnitPixel);
 
         // Создание кисти для текста
-        SolidBrush brush(timeColor);
+        SolidBrush timeBrush(timeColor);
 
         // Установка выравнивания текста по центру
-        StringFormat format;
-        format.SetAlignment(StringAlignmentCenter);
-        format.SetLineAlignment(StringAlignmentCenter);
+        StringFormat timeFormat;
+        timeFormat.SetAlignment(StringAlignmentCenter);
+        timeFormat.SetLineAlignment(StringAlignmentCenter);
 
         // Расчет положения времени
         // timeRect определяет область отображения времени
@@ -215,8 +363,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         // Пример: отображение времени в центре верхней панели
         // Вы можете изменить значения для перемещения времени в нужное место
         // Например, для верхнего центрального расположения:
-    // Сдвиг времени вниз на 10 мм
-        int verticalOffset = mmToPixels(40.0f, dpiY); // Сдвиг вниз на 10 мм
+        // Сдвиг времени вниз на 40 мм
+        int verticalOffset = mmToPixels(40.0f, dpiY); // Сдвиг вниз на 40 мм
 
         RECT currentTimeRect;
         currentTimeRect.left = (windowWidth / 2) - mmToPixels(20.0f, dpiX); // 40 мм ширина области
@@ -228,12 +376,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         graphics.DrawString(
             currentTime.c_str(),
             -1,
-            &font,
+            &timeFont,
             RectF(static_cast<float>(currentTimeRect.left), static_cast<float>(currentTimeRect.top),
                 static_cast<float>(currentTimeRect.right - currentTimeRect.left),
                 static_cast<float>(currentTimeRect.bottom - currentTimeRect.top)),
-            &format,
-            &brush
+            &timeFormat,
+            &timeBrush
         );
 
         EndPaint(hwnd, &ps);
@@ -370,6 +518,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     const wchar_t* cameraIconURL = L"https://cdn-icons-png.flaticon.com/512/633/633759.png";
     const wchar_t* browserIconURL = L"https://cdn-icons-png.flaticon.com/512/2702/2702602.png";
 
+    // Новые URL-адреса иконок
+    const wchar_t* musicIconURL = L"https://cdn-icons-png.flaticon.com/512/727/727245.png"; // Пример URL для иконки Музыки
+    const wchar_t* calculatorIconURL = L"https://cdn-icons-png.flaticon.com/512/25/25325.png"; // Пример URL для иконки Калькулятора
+
     // Загрузка дополнительных иконок из URL
     g_wifiIcon = LoadImageFromURL(wifiIconURL);
     if (!g_wifiIcon) {
@@ -399,6 +551,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     if (!g_browserIcon) {
         MessageBox(NULL, L"Не удалось загрузить иконку Браузера из интернета.", L"Ошибка", MB_ICONERROR);
         // Продолжаем без данной иконки
+    }
+
+    // Загрузка новых иконок
+    g_musicIcon = LoadImageFromURL(musicIconURL);
+    if (!g_musicIcon) {
+        MessageBox(NULL, L"Не удалось загрузить иконку Музыки из интернета.", L"Ошибка", MB_ICONERROR);
+        // Продолжаем без иконки Музыки
+    }
+
+    g_calculatorIcon = LoadImageFromURL(calculatorIconURL);
+    if (!g_calculatorIcon) {
+        MessageBox(NULL, L"Не удалось загрузить иконку Калькулятора из интернета.", L"Ошибка", MB_ICONERROR);
+        // Продолжаем без иконки Калькулятора
     }
 
     // Параметры окна
@@ -455,6 +620,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         if (g_filesIcon) delete g_filesIcon;
         if (g_cameraIcon) delete g_cameraIcon;
         if (g_browserIcon) delete g_browserIcon;
+        if (g_musicIcon) delete g_musicIcon;
+        if (g_calculatorIcon) delete g_calculatorIcon;
         GdiplusShutdown(gdiplusToken);
         return 0;
     }
@@ -482,6 +649,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     if (g_filesIcon) delete g_filesIcon;
     if (g_cameraIcon) delete g_cameraIcon;
     if (g_browserIcon) delete g_browserIcon;
+    if (g_musicIcon) delete g_musicIcon;
+    if (g_calculatorIcon) delete g_calculatorIcon;
 
     // Завершение работы с GDI+
     GdiplusShutdown(gdiplusToken);

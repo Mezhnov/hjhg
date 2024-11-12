@@ -169,7 +169,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         int rowHeight = appIconSize + labelSpacing + mmToPixels(10.0f, dpiY); // Icon + label spacing + label height
 
         // Initial Y position for drawing icons
-        int startY = windowHeight - rowHeight * totalRows - mmToPixels(5.0f, dpiY); // 5 mm from bottom
+        int startY = windowHeight - rowHeight * totalRows - mmToPixels(-30.0f, dpiY); // 5 mm from bottom
 
         // Calculate number of icons in last row
         int iconsInLastRow = totalApps % iconsPerRow;
@@ -421,17 +421,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             MessageBox(NULL, errorMsg, L"Error", MB_ICONERROR);
             // Continue without this icon
         }
-    };
+        };
 
     // Add main application icons
-    AddAppIcon(settingsIconURL, L"Settings");
-    AddAppIcon(filesIconURL, L"Files");
-    AddAppIcon(cameraIconURL, L"Camera");
-    AddAppIcon(browserIconURL, L"Browser");
+    AddAppIcon(settingsIconURL, L"");
+    AddAppIcon(filesIconURL, L"");
+    AddAppIcon(cameraIconURL, L"");
+    AddAppIcon(browserIconURL, L"");
 
     // Add additional application icons with labels
     AddAppIcon(mailIconURL, L"Почта");      // Mail
-    AddAppIcon(musicIconURL, L"Музыка");    // Music
+    AddAppIcon(musicIconURL, L"Store");    // Music
     AddAppIcon(calendarIconURL, L"Календарь"); // Calendar
     AddAppIcon(notesIconURL, L"Заметки");    // Notes
 

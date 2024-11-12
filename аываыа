@@ -85,10 +85,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         }
 
         // Расчет размеров иконок с учетом DPI
-        int iconSizeMM_Wifi = 5; // 10 мм
+        int iconSizeMM_Wifi = 5; // 5 мм
         int iconSizeMM_App = 15;   // 15 мм
         int spacingMM = 10;         // 10 мм между иконками
-        int marginMM = 5;          // 10 мм от края окна
+        int marginMM = 5;          // 5 мм от края окна
 
         // Получение DPI
         HDC screen = GetDC(0);
@@ -101,13 +101,19 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         int appSpacing = mmToPixels(static_cast<float>(spacingMM), dpiX);
         int margin = mmToPixels(static_cast<float>(marginMM), dpiX);
 
-        // Отображение WiFi-иконки в верхнем правом углу
+        // Отображение WiFi-иконки в верхнем правом углу с небольшим сдвигом влево
         if (g_wifiIcon) {
             // Размер иконки
             int iconSize = iconSize_Wifi;
-            // Позиция (отступ от верхнего правого угла)
-            int x = windowWidth - iconSize - margin; // 10 мм от правого края
-            int y = margin; // 10 мм от верхнего края
+            // Сдвиг влево на 10 пикселей
+            int shiftLeft = 10; // Вы можете изменить это значение по необходимости
+            // Позиция (отступ от верхнего правого угла с учетом сдвига)
+            int x = windowWidth - iconSize - margin - shiftLeft; // Сдвиг влево
+            // Убедимся, что x не становится отрицательным
+            if (x < margin) {
+                x = margin;
+            }
+            int y = margin; // 5 мм от верхнего края
 
             graphics.DrawImage(g_wifiIcon, x, y, iconSize, iconSize);
         }
@@ -120,7 +126,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         int totalApps = 4;
         int totalWidth = totalApps * appIconSize + (totalApps - 1) * appSpacingPixels;
         int startX = (windowWidth - totalWidth) / 2;
-        int startY = windowHeight - appIconSize - mmToPixels(5.0f, dpiY); // 20 мм от нижнего края
+        int startY = windowHeight - appIconSize - mmToPixels(5.0f, dpiY); // 5 мм от нижнего края
 
         // Отображение иконки Настроек
         if (g_settingsIcon) {

@@ -22,9 +22,14 @@ Bitmap* g_browserIcon = nullptr;
 // Глобальные переменные для отображения времени
 bool isDragging = false;
 POINT dragStartPoint = { 0, 0 };
+
+// Позиция времени: изменяйте значения для расположения времени
+// Например, для верхнего левого угла: left=10, top=10
+// Для верхнего правого угла: left=windowWidth - width - 10, top=10 и т.д.
 RECT timeRect = { 50, 50, 300, 100 }; // Начальная позиция и размер времени
 Color timeColor = Color(255, 255, 255, 255); // Белый цвет по умолчанию
-float timeFontSize = 24.0f; // Начальный размер шрифта
+float timeFontSize = 36.0f; // Начальный размер шрифта
+std::wstring currentTime = L"00:00"; // Текущее время
 
 // Функция для перевода миллиметров в пиксели в зависимости от DPI экрана
 int mmToPixels(float mm, int dpi) {
@@ -68,8 +73,6 @@ Bitmap* LoadImageFromURL(const wchar_t* url) {
 
 // Функция для получения текущего времени в формате "HH:MM"
 std::wstring GetCurrentTimeString() {
-    TIME_ZONE_INFORMATION tz;
-    GetTimeZoneInformation(&tz);
     std::time_t t = std::time(nullptr);
     std::tm localTime;
     localtime_s(&localTime, &t);
@@ -86,7 +89,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         return 0;
 
     case WM_TIMER: {
-        if (wParam == 1) { // Таймер для обновления времени
+        if (wParam == 1) { // Таймер для обновления времени каждую минуту
+            currentTime = GetCurrentTimeString();
             InvalidateRect(hwnd, NULL, FALSE); // Перерисовать окно
         }
         return 0;
@@ -99,6 +103,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         // Инициализация GDI+
         Graphics graphics(hdc);
         graphics.SetSmoothingMode(SmoothingModeAntiAlias);
+        graphics.SetTextRenderingHint(TextRenderingHintClearTypeGridFit);
 
         // Получение размеров клиентской области окна
         RECT rect;
@@ -134,7 +139,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             // Размер иконки
             int iconSize = iconSize_Wifi;
             // Сдвиг влево на 50 пикселей
-            int shiftLeft = 50; // Вы можете изменить это значение по необходимости
+            int shiftLeft = mmToPixels(5.0f, dpiX); // Например, 5 мм сдвига
             // Позиция (отступ от верхнего правого угла с учетом сдвига)
             int x = windowWidth - iconSize - margin - shiftLeft; // Сдвиг влево
             // Убедимся, что x не становится отрицательным
@@ -185,33 +190,44 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         }
 
         // Отображение времени
-        if (!g_mainImage) { // Если фон не загружен, установить белый фон для текста
-            graphics.Clear(Color::White);
-        }
-
         // Создание шрифта
-        FontFamily fontFamily(L"Arial");
-        Font font(&fontFamily, timeFontSize, FontStyleRegular, UnitPixel);
+        FontFamily fontFamily(L"Segoe UI"); // Более современный шрифт
+        Font font(&fontFamily, timeFontSize, FontStyleBold, UnitPixel);
 
         // Создание кисти для текста
         SolidBrush brush(timeColor);
-
-        // Получение текущего времени
-        std::wstring currentTime = GetCurrentTimeString();
 
         // Установка выравнивания текста по центру
         StringFormat format;
         format.SetAlignment(StringAlignmentCenter);
         format.SetLineAlignment(StringAlignmentCenter);
 
+        // Расчет положения времени
+        // timeRect определяет область отображения времени
+        // Вы можете изменить координаты timeRect для изменения положения времени
+        // Например:
+        // Верхний левый угол: RECT timeRect = { 10, 10, 200, 60 };
+        // Верхний правый угол: RECT timeRect = { windowWidth - 200 - 10, 10, windowWidth - 10, 60 };
+        // Нижний левый угол: RECT timeRect = { 10, windowHeight - 60 - 10, 200, windowHeight - 10 };
+        // Нижний правый угол: RECT timeRect = { windowWidth - 200 - 10, windowHeight - 60 - 10, windowWidth - 10, windowHeight - 10 };
+
+        // Пример: отображение времени в центре верхней панели
+        // Вы можете изменить значения для перемещения времени в нужное место
+        // Например, для верхнего центрального расположения:
+        RECT currentTimeRect;
+        currentTimeRect.left = (windowWidth / 2) - mmToPixels(20.0f, dpiX); // 40 мм ширина области
+        currentTimeRect.top = margin;
+        currentTimeRect.right = currentTimeRect.left + mmToPixels(40.0f, dpiX);
+        currentTimeRect.bottom = currentTimeRect.top + mmToPixels(20.0f, dpiY);
+
         // Рисование текста времени
         graphics.DrawString(
             currentTime.c_str(),
             -1,
             &font,
-            RectF(static_cast<float>(timeRect.left), static_cast<float>(timeRect.top),
-                  static_cast<float>(timeRect.right - timeRect.left),
-                  static_cast<float>(timeRect.bottom - timeRect.top)),
+            RectF(static_cast<float>(currentTimeRect.left), static_cast<float>(currentTimeRect.top),
+                  static_cast<float>(currentTimeRect.right - currentTimeRect.left),
+                  static_cast<float>(currentTimeRect.bottom - currentTimeRect.top)),
             &format,
             &brush
         );
@@ -293,20 +309,20 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         }
         case 1002: { // Увеличить размер времени
             timeFontSize += 2.0f; // Увеличить размер шрифта на 2 пикселя
-            // Обновить размер RECT времени
-            int width = static_cast<int>(timeFontSize * 7); // Примерное вычисление ширины
-            int height = static_cast<int>(timeFontSize * 1.5f); // Примерное вычисление высоты
+            // Обновить размер RECT времени (примерные расчёты)
+            int width = mmToPixels(40.0f, 96); // 40 мм ширина области (можно адаптировать)
+            int height = mmToPixels(20.0f, 96); // 20 мм высота области
             timeRect.right = timeRect.left + width;
             timeRect.bottom = timeRect.top + height;
             InvalidateRect(hwnd, NULL, FALSE);
             break;
         }
         case 1003: { // Уменьшить размер времени
-            if (timeFontSize > 8.0f) { // Минимальный размер шрифта
+            if (timeFontSize > 12.0f) { // Минимальный размер шрифта
                 timeFontSize -= 2.0f; // Уменьшить размер шрифта на 2 пикселя
-                // Обновить размер RECT времени
-                int width = static_cast<int>(timeFontSize * 7); // Примерное вычисление ширины
-                int height = static_cast<int>(timeFontSize * 1.5f); // Примерное вычисление высоты
+                // Обновить размер RECT времени (примерные расчёты)
+                int width = mmToPixels(40.0f, 96); // 40 мм ширина области (можно адаптировать)
+                int height = mmToPixels(20.0f, 96); // 20 мм высота области
                 timeRect.right = timeRect.left + width;
                 timeRect.bottom = timeRect.top + height;
                 InvalidateRect(hwnd, NULL, FALSE);
@@ -345,10 +361,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     // Определение URL-адресов иконок
     const wchar_t* wifiIconURL = L"https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Feather-core-wifi.svg/1200px-Feather-core-wifi.svg.png";
-    const wchar_t* settingsIconURL = L"https://avatars.mds.yandex.net/i?id=d2ae9329c61bbacb21fabe356df4c70b_l-8209975-images-thumbs&n=13";
-    const wchar_t* filesIconURL = L"https://ltdfoto.ru/images/2024/11/12/nyc01temp__5w4tPKmHJwunW7xVwlLT.png";
-    const wchar_t* cameraIconURL = L"https://avatars.mds.yandex.net/i?id=d2ae9329c61bbacb21fabe356df4c70b_l-8209975-images-thumbs&n=13";
-    const wchar_t* browserIconURL = L"https://ltdfoto.ru/images/2024/11/12/Remove-bg.ai_1730637074101.png";
+    const wchar_t* settingsIconURL = L"https://cdn-icons-png.flaticon.com/512/2099/2099058.png";
+    const wchar_t* filesIconURL = L"https://cdn-icons-png.flaticon.com/512/727/727399.png";
+    const wchar_t* cameraIconURL = L"https://cdn-icons-png.flaticon.com/512/633/633759.png";
+    const wchar_t* browserIconURL = L"https://cdn-icons-png.flaticon.com/512/2702/2702602.png";
 
     // Загрузка дополнительных иконок из URL
     g_wifiIcon = LoadImageFromURL(wifiIconURL);
@@ -444,7 +460,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Установить таймер для обновления времени каждую минуту
     SetTimer(hwnd, 1, 60000, NULL); // ID таймера = 1, интервал = 60 000 мс (1 минута)
 
-    // Начальная инвалидация для отображения времени сразу
+    // Начальная установка времени
+    currentTime = GetCurrentTimeString();
     InvalidateRect(hwnd, NULL, FALSE);
 
     // Цикл обработки сообщений

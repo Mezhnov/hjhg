@@ -104,10 +104,10 @@ std::wstring GetCurrentDateString() {
 
     // Массив названий месяцев на русском языке
     const wchar_t* months[] = { L"января", L"февраля", L"марта", L"апреля", L"мая", L"июня",
-                                 L"июля", L"августа", L"сентября", L"октября", L"ноября", L"декабря" };
+                                 L"июля", L"августа", L"сентября", L"октября", L"11", L"декабря" };
 
     wchar_t buffer[100];
-    swprintf_s(buffer, 100, L"%02d %s %04d", localTime.tm_mday, months[localTime.tm_mon], 1900 + localTime.tm_year);
+    swprintf_s(buffer, 100, L"%02d.%s.%04d", localTime.tm_mday, months[localTime.tm_mon], 1900 + localTime.tm_year);
     return std::wstring(buffer);
 }
 
@@ -155,7 +155,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         ReleaseDC(hwnd, screen);
 
         // Рассчитать размеры иконок с учетом DPI
-        int iconSizeMM_Wifi = 5; // 5 мм
+        int iconSizeMM_Wifi = 4; // 5 мм
         int iconSizeMM_Battery = 5; // 5 мм
         int iconSizeMM_Signal = 5; // 5 мм
         int iconSizeMM_Internet = 5; // 5 мм
@@ -337,7 +337,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         float dateRectWidth = mmToPixels(40.0f, dpiX); // Ширина 40 мм
         float dateRectHeight = mmToPixels(15.0f, dpiY); // Высота 15 мм
         float dateRectX = (windowWidth - dateRectWidth) / 2.0f; // Центрировать по горизонтали
-        float dateRectY = timeRectY + timeRectHeight + mmToPixels(5.0f, dpiY); // Отступ 5 мм от времени
+        float dateRectY = timeRectY + timeRectHeight + mmToPixels(-6.0f, dpiY); // Отступ 5 мм от времени
 
         RectF currentDateRect(static_cast<float>(dateRectX),
             static_cast<float>(dateRectY),
@@ -548,14 +548,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
 
     // Определить URL иконок приложений
-    const wchar_t* settingsIconURL = L"https://cdn-icons-png.flaticon.com/512/2099/2099058.png";
-    const wchar_t* filesIconURL = L"https://cdn-icons-png.flaticon.com/512/727/727399.png";
-    const wchar_t* cameraIconURL = L"https://cdn-icons-png.flaticon.com/512/633/633759.png";
-    const wchar_t* browserIconURL = L"https://cdn-icons-png.flaticon.com/512/2702/2702602.png";
+    const wchar_t* settingsIconURL = L"https://s2.radikal.cloud/2024/11/13/Remove-bg.ai_1731525142042.png";
+    const wchar_t* filesIconURL = L"https://s2.radikal.cloud/2024/11/13/nyc01temp__5w4tPKmHJwunW7xVwlLT.png";
+    const wchar_t* cameraIconURL = L"https://s2.radikal.cloud/2024/11/13/localqGJ6hAAKkQqIUfMK5Ruz--fotor-bg-remover-2024111321504.png";
+    const wchar_t* browserIconURL = L"https://i.postimg.cc/qgVxqq8N/Remove-bg-ai-1730637074101.png";
 
     // Определить дополнительные URL иконок приложений
-    const wchar_t* mailIconURL = L"https://cdn-icons-png.flaticon.com/512/561/561127.png";        // Почта
-    const wchar_t* musicIconURL = L"https://cdn-icons-png.flaticon.com/512/727/727245.png";      // Музыка
+    const wchar_t* mailIconURL = L"https://s2.radikal.cloud/2024/11/13/localnkbwzab3ouepucggin8uc.-1_batcheditor_fotor-fotor-bg-remover-20241113223052.png";        // Почта
+    const wchar_t* musicIconURL = L"https://i.postimg.cc/X7WMDrgp/Remove-bg-ai-1730624299550.png";      // Музыка
     const wchar_t* calendarIconURL = L"https://cdn-icons-png.flaticon.com/512/747/747376.png";  // Календарь
     const wchar_t* notesIconURL = L"https://cdn-icons-png.flaticon.com/512/1827/1827372.png";     // Заметки
 
@@ -574,7 +574,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             MessageBox(NULL, errorMsg, L"Ошибка", MB_ICONERROR);
             // Продолжить без этой иконки
         }
-    };
+        };
 
     // Добавить основные иконки приложений
     AddAppIcon(settingsIconURL, L"Настройки");

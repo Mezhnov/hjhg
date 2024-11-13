@@ -14,11 +14,10 @@
 
 using namespace Gdiplus;
 
-// Структура для хранения иконки приложения, его метки и масштаба
+// Структура для хранения иконки приложения и его метки
 struct AppIcon {
     Bitmap* image;
     std::wstring label;
-    float scale; // Масштаб иконки (1.0f - обычный размер)
 };
 
 // Глобальные переменные для хранения изображений
@@ -105,15 +104,12 @@ std::wstring GetCurrentDateString() {
 
     // Массив названий месяцев на русском языке
     const wchar_t* months[] = { L"января", L"февраля", L"марта", L"апреля", L"мая", L"июня",
-                                 L"июля", L"августа", L"сентября", L"октября", L"ноября", L"декабря" };
+                                 L"июля", L"августа", L"сентября", L"октября", L"11", L"декабря" };
 
     wchar_t buffer[100];
-    swprintf_s(buffer, 100, L"%02d %s %04d", localTime.tm_mday, months[localTime.tm_mon], 1900 + localTime.tm_year);
+    swprintf_s(buffer, 100, L"%02d.%s.%04d", localTime.tm_mday, months[localTime.tm_mon], 1900 + localTime.tm_year);
     return std::wstring(buffer);
 }
-
-// Переменные для отслеживания выбранной иконки
-int selectedAppIndex = -1; // Индекс выбранной иконки (-1 если ни одна не выбрана)
 
 // Обработка сообщений окна
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -159,11 +155,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         ReleaseDC(hwnd, screen);
 
         // Рассчитать размеры иконок с учетом DPI
-        int iconSizeMM_Wifi = 4; // 4 мм
+        int iconSizeMM_Wifi = 4; // 5 мм
         int iconSizeMM_Battery = 5; // 5 мм
         int iconSizeMM_Signal = 5; // 5 мм
         int iconSizeMM_Internet = 5; // 5 мм
-        int iconSizeMM_App = 10;  // 10 мм
+        int iconSizeMM_App = 13;  // 10 мм
         int spacingMM = 10;       // 10 мм между иконками
         int marginMM = 5;         // 5 мм от края окна
         int labelSpacingMM = 5;   // 5 мм между иконкой и меткой
@@ -210,7 +206,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         }
 
         // Определить размеры иконок приложений
-        // Учесть индивидуальный масштаб каждой иконки
+        int appIconSize = iconSize_App; // 10 мм
         int appSpacing = mmToPixels(static_cast<float>(spacingMM), dpiX); // 10 мм
 
         // Установить количество иконок в строке
@@ -220,7 +216,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         // Рассчитать высоту строки на основе максимального размера шрифта
         int maxFontHeight = static_cast<int>(timeFontSize) + labelSpacing; // При необходимости скорректируйте
-        int rowHeight = mmToPixels(10.0f, dpiY); // Высота строки (можно настроить)
+        int rowHeight = appIconSize + labelSpacing + mmToPixels(10.0f, dpiY); // Иконка + отступ метки + высота метки
 
         // Начальная Y позиция для рисования иконок
         int startY = windowHeight - rowHeight * totalRows - mmToPixels(5.0f, dpiY); // 5 мм от нижнего края
@@ -234,14 +230,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         // Нарисовать каждую иконку приложения и её метку
         for (int row = 0; row < totalRows; ++row) {
             int iconsInThisRow = (row == totalRows - 1) ? iconsInLastRow : iconsPerRow;
-            int totalWidth = 0;
-            for (int i = 0; i < iconsInThisRow; ++i) {
-                int appIndex = row * iconsPerRow + i;
-                if (appIndex >= totalApps) break;
-                float scale = g_appIcons[appIndex].scale;
-                totalWidth += static_cast<int>(iconSize_App * scale) + appSpacing;
-            }
-            totalWidth -= appSpacing; // Убрать последнее пространство
+            int totalWidth = iconsInThisRow * appIconSize + (iconsInThisRow - 1) * appSpacing;
             int startX = (windowWidth - totalWidth) / 2; // Центрировать по горизонтали
 
             for (int i = 0; i < iconsInThisRow; ++i) {
@@ -250,13 +239,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
                 AppIcon& app = g_appIcons[appIndex];
                 if (app.image) {
-                    float scale = app.scale;
-                    int currentIconSize = static_cast<int>(iconSize_App * scale);
-                    int x = startX;
+                    int x = startX + i * (appIconSize + appSpacing);
                     int y = startY - row * rowHeight;
 
                     // Нарисовать иконку приложения
-                    graphics.DrawImage(app.image, x, y, currentIconSize, currentIconSize);
+                    graphics.DrawImage(app.image, x, y, appIconSize, appIconSize);
 
                     // Нарисовать метку
                     const wchar_t* text = app.label.c_str();
@@ -266,10 +253,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                     SolidBrush brush(Color(255, 255, 255, 255)); // Белый текст
 
                     // Рассчитать прямоугольник для метки с увеличенной шириной, чтобы предотвратить перенос
-                    float labelWidth = static_cast<float>(currentIconSize) * 1.2f; // 20% шире
+                    float labelWidth = static_cast<float>(appIconSize) * 1.2f; // 20% шире
                     float labelHeight = mmToPixels(10.0f, dpiY); // Высота метки 10 мм
-                    RectF layoutRect(static_cast<float>(x - (labelWidth - currentIconSize) / 2),
-                        static_cast<float>(y + currentIconSize + labelSpacing),
+                    RectF layoutRect(static_cast<float>(x - (labelWidth - appIconSize) / 2),
+                        static_cast<float>(y + appIconSize + labelSpacing),
                         labelWidth,
                         labelHeight);
 
@@ -288,13 +275,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                         &format,
                         &brush
                     );
-
-                    // Сохранить область иконки для обработки кликов
-                    // (Это можно использовать для определения, на какую иконку был клик)
                 }
-
-                // Обновить startX для следующей иконки
-                startX += static_cast<int>(iconSize_App * app.scale) + appSpacing;
             }
         }
 
@@ -356,7 +337,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         float dateRectWidth = mmToPixels(40.0f, dpiX); // Ширина 40 мм
         float dateRectHeight = mmToPixels(15.0f, dpiY); // Высота 15 мм
         float dateRectX = (windowWidth - dateRectWidth) / 2.0f; // Центрировать по горизонтали
-        float dateRectY = timeRectY + timeRectHeight + mmToPixels(5.0f, dpiY); // Отступ 5 мм от времени
+        float dateRectY = timeRectY + timeRectHeight + mmToPixels(-6.0f, dpiY); // Отступ 5 мм от времени
 
         RectF currentDateRect(static_cast<float>(dateRectX),
             static_cast<float>(dateRectY),
@@ -378,10 +359,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     }
 
     case WM_LBUTTONDOWN: {
+        // Проверить, находится ли клик в области времени или даты
         int xPos = GET_X_LPARAM(lParam);
         int yPos = GET_Y_LPARAM(lParam);
-
-        // Проверить, нажата ли системная область (время или дата)
         if ((xPos >= timeRect.left && xPos <= timeRect.right &&
             yPos >= timeRect.top && yPos <= timeRect.bottom) ||
             (xPos >= dateRect.left && xPos <= dateRect.right &&
@@ -399,77 +379,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 dateRect.bottom = dateRect.top + (dateRect.bottom - dateRect.top);
             }
             SetCapture(hwnd);
-            return 0;
         }
-
-        // Проверить, нажата ли какая-либо иконка приложения
-        // Необходимо пройтись по всем иконкам и определить, находится ли клик внутри одной из них
-        int dpiX = GetDeviceCaps(GetDC(hwnd), LOGPIXELSX);
-        int dpiY = GetDeviceCaps(GetDC(hwnd), LOGPIXELSY);
-        ReleaseDC(hwnd, GetDC(hwnd));
-
-        int iconSizeMM_App = 10; // 10 мм
-        int spacingMM = 10; // 10 мм
-        int appSpacing = mmToPixels(static_cast<float>(spacingMM), dpiX); // 10 мм
-        int iconSize_App = mmToPixels(static_cast<float>(iconSizeMM_App), dpiX);
-
-        // Установить количество иконок в строке
-        int iconsPerRow = 4; // Количество иконок в одной строке
-        int totalApps = static_cast<int>(g_appIcons.size());
-        int totalRows = (totalApps + iconsPerRow - 1) / iconsPerRow;
-
-        // Рассчитать высоту строки на основе максимального размера шрифта
-        int rowHeight = mmToPixels(10.0f, dpiY); // Высота строки (можно настроить)
-
-        // Начальная Y позиция для рисования иконок
-        RECT rectClient;
-        GetClientRect(hwnd, &rectClient);
-        int windowWidth = rectClient.right - rectClient.left;
-        int windowHeight = rectClient.bottom - rectClient.top;
-        int startY = windowHeight - rowHeight * totalRows - mmToPixels(5.0f, dpiY); // 5 мм от нижнего края
-
-        for (int row = 0; row < totalRows; ++row) {
-            int iconsInThisRow = (row == totalRows - 1) ? (totalApps % iconsPerRow) : iconsPerRow;
-            if (iconsInThisRow == 0 && totalApps != 0) iconsInThisRow = iconsPerRow;
-            int totalWidth = 0;
-            for (int i = 0; i < iconsInThisRow; ++i) {
-                int appIndex = row * iconsPerRow + i;
-                if (appIndex >= totalApps) break;
-                float scale = g_appIcons[appIndex].scale;
-                totalWidth += static_cast<int>(appSpacing * scale) + mmToPixels(10.0f, dpiX) * scale;
-            }
-            totalWidth -= appSpacing; // Убрать последнее пространство
-            int startX = (windowWidth - totalWidth) / 2; // Центрировать по горизонтали
-
-            for (int i = 0; i < iconsInThisRow; ++i) {
-                int appIndex = row * iconsPerRow + i;
-                if (appIndex >= totalApps) break;
-
-                AppIcon& app = g_appIcons[appIndex];
-                if (app.image) {
-                    float scale = app.scale;
-                    int currentIconSize = static_cast<int>(iconSize_App * scale);
-                    RECT iconRect = { startX, startY - row * rowHeight, startX + currentIconSize, startY - row * rowHeight + currentIconSize };
-                    if (xPos >= iconRect.left && xPos <= iconRect.right &&
-                        yPos >= iconRect.top && yPos <= iconRect.bottom) {
-                        selectedAppIndex = appIndex;
-                        // Показать контекстное меню для изменения размера
-                        HMENU hMenu = CreatePopupMenu();
-                        if (hMenu) {
-                            AppendMenu(hMenu, MF_STRING, 2001, L"Увеличить размер");
-                            AppendMenu(hMenu, MF_STRING, 2002, L"Уменьшить размер");
-                            POINT cursorPos;
-                            GetCursorPos(&cursorPos);
-                            TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, cursorPos.x, cursorPos.y, 0, hwnd, NULL);
-                            DestroyMenu(hMenu);
-                        }
-                        break;
-                    }
-                    startX += static_cast<int>(currentIconSize) + appSpacing;
-                }
-            }
-        }
-
         return 0;
     }
 
@@ -575,23 +485,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             }
             break;
         }
-        // Обработка команд для изменения размера иконок приложений
-        case 2001: { // Увеличить размер выбранной иконки
-            if (selectedAppIndex >= 0 && selectedAppIndex < g_appIcons.size()) {
-                g_appIcons[selectedAppIndex].scale += 0.1f; // Увеличить масштаб на 10%
-                InvalidateRect(hwnd, NULL, FALSE);
-            }
-            break;
-        }
-        case 2002: { // Уменьшить размер выбранной иконки
-            if (selectedAppIndex >= 0 && selectedAppIndex < g_appIcons.size()) {
-                if (g_appIcons[selectedAppIndex].scale > 0.5f) { // Минимальный масштаб 50%
-                    g_appIcons[selectedAppIndex].scale -= 0.1f; // Уменьшить масштаб на 10%
-                    InvalidateRect(hwnd, NULL, FALSE);
-                }
-            }
-            break;
-        }
         default:
             break;
         }
@@ -666,14 +559,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     const wchar_t* calendarIconURL = L"https://cdn-icons-png.flaticon.com/512/747/747376.png";  // Календарь
     const wchar_t* notesIconURL = L"https://cdn-icons-png.flaticon.com/512/1827/1827372.png";     // Заметки
 
-    // Функция для добавления иконки приложения и её метки с инициализацией масштаба
+    // Функция для добавления иконки приложения и её метки
     auto AddAppIcon = [&](const wchar_t* url, const std::wstring& label) {
         Bitmap* bmp = LoadImageFromURL(url);
         if (bmp) {
             AppIcon app;
             app.image = bmp;
             app.label = label;
-            app.scale = 1.0f; // Стартовый масштаб 1.0
             g_appIcons.push_back(app);
         }
         else {
@@ -682,7 +574,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             MessageBox(NULL, errorMsg, L"Ошибка", MB_ICONERROR);
             // Продолжить без этой иконки
         }
-    };
+        };
 
     // Добавить основные иконки приложений
     AddAppIcon(settingsIconURL, L"Настройки");

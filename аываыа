@@ -30,7 +30,7 @@ std::vector<AppIcon> g_appIcons;
 bool isDragging = false;
 POINT dragStartPoint = { 0, 0 };
 
-// Позиция времени и даты: настройте значения для позиционирования
+// Позиция времени и даты
 RECT timeRect = { 50, 50, 300, 100 }; // Начальная позиция и размер времени
 Color timeColor = Color(255, 255, 255, 255); // Белый цвет по умолчанию
 float timeFontSize = 50.0f; // Начальный размер шрифта времени
@@ -40,7 +40,7 @@ Color dateColor = Color(255, 255, 255, 255); // Белый цвет даты
 float dateFontSize = 20.0f; // Начальный размер шрифта даты
 
 std::wstring currentTime = L"00:00"; // Текущее время
-std::wstring currentDate = L"01 Сентябрь 2023"; // Текущая дата
+std::wstring currentDate = L"01 Сентября 2023"; // Текущая дата
 
 // Функция для преобразования миллиметров в пиксели на основе DPI экрана
 int mmToPixels(float mm, int dpi) {
@@ -186,7 +186,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         int totalRows = (totalApps + iconsPerRow - 1) / iconsPerRow;
 
         // Рассчитать высоту строки на основе максимального размера шрифта
-        int maxFontHeight = static_cast<int>(timeFontSize) + labelSpacing; // При необходимости скорректируйте
         int rowHeight = appIconSize + labelSpacing + mmToPixels(10.0f, dpiY); // Иконка + отступ метки + высота метки
 
         // Начальная Y позиция для рисования иконок
@@ -227,9 +226,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                     float labelWidth = static_cast<float>(appIconSize) * 1.2f; // 20% шире
                     float labelHeight = mmToPixels(10.0f, dpiY); // Высота метки 10 мм
                     RectF layoutRect(static_cast<float>(x - (labelWidth - appIconSize) / 2),
-                        static_cast<float>(y + appIconSize + labelSpacing),
-                        labelWidth,
-                        labelHeight);
+                                    static_cast<float>(y + appIconSize + labelSpacing),
+                                    labelWidth,
+                                    labelHeight);
 
                     // Установить форматирование строки: центрирование и отсутствие переноса
                     StringFormat format;
@@ -270,14 +269,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         // Определить прямоугольник для времени с достаточной шириной
         float timeRectWidth = mmToPixels(40.0f, dpiX); // Ширина 40 мм
-        float timeRectHeight = mmToPixels(20.0f, dpiY); // Высота 20 мм
+        float timeRectHeight = mmToPixels(25.0f, dpiY); // Высота 25 мм
         float timeRectX = (windowWidth - timeRectWidth) / 2.0f; // Центрировать по горизонтали
         float timeRectY = mmToPixels(5.0f, dpiY) + verticalOffset; // Отступ от верхнего края
 
         RectF currentTimeRect(static_cast<float>(timeRectX),
-            static_cast<float>(timeRectY),
-            static_cast<float>(timeRectWidth),
-            static_cast<float>(timeRectHeight));
+                              static_cast<float>(timeRectY),
+                              static_cast<float>(timeRectWidth),
+                              static_cast<float>(timeRectHeight));
 
         // Нарисовать текущее время
         graphics.DrawString(
@@ -311,9 +310,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         float dateRectY = timeRectY + timeRectHeight + mmToPixels(5.0f, dpiY); // Отступ 5 мм от времени
 
         RectF currentDateRect(static_cast<float>(dateRectX),
-            static_cast<float>(dateRectY),
-            static_cast<float>(dateRectWidth),
-            static_cast<float>(dateRectHeight));
+                              static_cast<float>(dateRectY),
+                              static_cast<float>(dateRectWidth),
+                              static_cast<float>(dateRectHeight));
 
         // Нарисовать текущую дату
         graphics.DrawString(
@@ -343,11 +342,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 yPos >= timeRect.top && yPos <= timeRect.bottom) {
                 dragStartPoint.x = xPos - timeRect.left;
                 dragStartPoint.y = yPos - timeRect.top;
-                // Обновить прямоугольник даты относительно нового положения времени
-                dateRect.left = timeRect.left;
-                dateRect.top = timeRect.bottom + mmToPixels(5.0f, GetDeviceCaps(GetDC(hwnd), LOGPIXELSY));
-                dateRect.right = timeRect.right;
-                dateRect.bottom = dateRect.top + (dateRect.bottom - dateRect.top);
+            } else if (xPos >= dateRect.left && xPos <= dateRect.right &&
+                       yPos >= dateRect.top && yPos <= dateRect.bottom) {
+                dragStartPoint.x = xPos - dateRect.left;
+                dragStartPoint.y = yPos - dateRect.top;
             }
             SetCapture(hwnd);
         }
@@ -359,23 +357,25 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             int xPos = GET_X_LPARAM(lParam);
             int yPos = GET_Y_LPARAM(lParam);
 
-            // Новая позиция для времени
+            // Новая позиция для времени или даты
             int newLeft = xPos - dragStartPoint.x;
             int newTop = yPos - dragStartPoint.y;
 
-            // Обновить RECT для времени
-            int width = timeRect.right - timeRect.left;
-            int height = timeRect.bottom - timeRect.top;
-            timeRect.left = newLeft;
-            timeRect.top = newTop;
-            timeRect.right = newLeft + width;
-            timeRect.bottom = newTop + height;
-
-            // Обновить RECT для даты, чтобы она оставалась под временем
+            // Обновить RECT для времени и даты
+            int timeWidth = timeRect.right - timeRect.left;
+            int timeHeight = timeRect.bottom - timeRect.top;
             int dateWidth = dateRect.right - dateRect.left;
             int dateHeight = dateRect.bottom - dateRect.top;
+
+            // Перемещаем время
+            timeRect.left = newLeft;
+            timeRect.top = newTop;
+            timeRect.right = newLeft + timeWidth;
+            timeRect.bottom = newTop + timeHeight;
+
+            // Перемещаем дату соответственно
             dateRect.left = newLeft;
-            dateRect.top = newTop + height + mmToPixels(5.0f, GetDeviceCaps(GetDC(hwnd), LOGPIXELSY));
+            dateRect.top = newTop + timeHeight + mmToPixels(5.0f, GetDeviceCaps(GetDC(hwnd), LOGPIXELSY));
             dateRect.right = newLeft + dateWidth;
             dateRect.bottom = dateRect.top + dateHeight;
 
@@ -530,10 +530,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     AddAppIcon(browserIconURL, L"Браузер");
 
     // Добавить дополнительные иконки приложений с метками
-    AddAppIcon(mailIconURL, L"Почта");        // Почта
-    AddAppIcon(musicIconURL, L"Музыка");      // Музыка
-    AddAppIcon(calendarIconURL, L"Календарь"); // Календарь
-    AddAppIcon(notesIconURL, L"Заметки");      // Заметки
+    AddAppIcon(mailIconURL, L"Почта");
+    AddAppIcon(musicIconURL, L"Музыка");
+    AddAppIcon(calendarIconURL, L"Календарь");
+    AddAppIcon(notesIconURL, L"Заметки");
 
     // Параметры окна
     const wchar_t CLASS_NAME[] = L"Sample Window Class";

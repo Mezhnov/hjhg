@@ -6,6 +6,7 @@
 #include <ctime>
 #include <vector>
 #include <windowsx.h>
+#include <cstdlib> // Для rand()
 
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "urlmon.lib")
@@ -22,6 +23,9 @@ struct AppIcon {
 // Глобальные переменные для хранения изображений
 Bitmap* g_mainImage = nullptr;
 Bitmap* g_wifiIcon = nullptr;
+Bitmap* g_batteryIcon = nullptr;
+Bitmap* g_signalIcon = nullptr;
+Bitmap* g_internetIcon = nullptr;
 
 // Вектор для хранения иконок приложений
 std::vector<AppIcon> g_appIcons;
@@ -100,10 +104,10 @@ std::wstring GetCurrentDateString() {
 
     // Массив названий месяцев на русском языке
     const wchar_t* months[] = { L"января", L"февраля", L"марта", L"апреля", L"мая", L"июня",
-                                 L"июля", L"августа", L"сентября", L"октября", L"11", L"декабря" };
+                                 L"июля", L"августа", L"сентября", L"октября", L"ноября", L"декабря" };
 
     wchar_t buffer[100];
-    swprintf_s(buffer, 100, L"%02d.%s.%04d", localTime.tm_mday, months[localTime.tm_mon], 1900 + localTime.tm_year);
+    swprintf_s(buffer, 100, L"%02d %s %04d", localTime.tm_mday, months[localTime.tm_mon], 1900 + localTime.tm_year);
     return std::wstring(buffer);
 }
 
@@ -152,33 +156,58 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         // Рассчитать размеры иконок с учетом DPI
         int iconSizeMM_Wifi = 5; // 5 мм
+        int iconSizeMM_Battery = 5; // 5 мм
+        int iconSizeMM_Signal = 5; // 5 мм
+        int iconSizeMM_Internet = 5; // 5 мм
         int iconSizeMM_App = 10;  // 10 мм
         int spacingMM = 10;       // 10 мм между иконками
         int marginMM = 5;         // 5 мм от края окна
         int labelSpacingMM = 5;   // 5 мм между иконкой и меткой
 
         int iconSize_Wifi = mmToPixels(static_cast<float>(iconSizeMM_Wifi), dpiX);
+        int iconSize_Battery = mmToPixels(static_cast<float>(iconSizeMM_Battery), dpiX);
+        int iconSize_Signal = mmToPixels(static_cast<float>(iconSizeMM_Signal), dpiX);
+        int iconSize_Internet = mmToPixels(static_cast<float>(iconSizeMM_Internet), dpiX);
         int iconSize_App = mmToPixels(static_cast<float>(iconSizeMM_App), dpiX);
-        int appSpacing = mmToPixels(static_cast<float>(spacingMM), dpiX);
+        int spacing = mmToPixels(static_cast<float>(spacingMM), dpiX);
         int margin = mmToPixels(static_cast<float>(marginMM), dpiX);
         int labelSpacing = mmToPixels(static_cast<float>(labelSpacingMM), dpiY);
 
-        // Нарисовать иконку WiFi в правом верхнем углу с небольшим смещением влево
-        if (g_wifiIcon) {
-            int iconSize = iconSize_Wifi;
-            int shiftLeft = mmToPixels(5.0f, dpiX); // Например, смещение 5 мм влево
-            int x = windowWidth - iconSize - margin - shiftLeft;
-            if (x < margin) {
-                x = margin;
-            }
-            int y = margin;
+        // Нарисовать системные иконки (WiFi, Батарея, Сигнал, Интернет) в правом верхнем углу
+        int iconsStartX = windowWidth - margin;
+        int iconY = margin;
 
-            graphics.DrawImage(g_wifiIcon, x, y, iconSize, iconSize);
+        // WiFi
+        if (g_wifiIcon) {
+            int x = iconsStartX - iconSize_Wifi;
+            graphics.DrawImage(g_wifiIcon, x, iconY, iconSize_Wifi, iconSize_Wifi);
+            iconsStartX -= (iconSize_Wifi + spacing);
+        }
+
+        // Батарея
+        if (g_batteryIcon) {
+            int x = iconsStartX - iconSize_Battery;
+            graphics.DrawImage(g_batteryIcon, x, iconY, iconSize_Battery, iconSize_Battery);
+            iconsStartX -= (iconSize_Battery + spacing);
+        }
+
+        // Сигнал
+        if (g_signalIcon) {
+            int x = iconsStartX - iconSize_Signal;
+            graphics.DrawImage(g_signalIcon, x, iconY, iconSize_Signal, iconSize_Signal);
+            iconsStartX -= (iconSize_Signal + spacing);
+        }
+
+        // Интернет
+        if (g_internetIcon) {
+            int x = iconsStartX - iconSize_Internet;
+            graphics.DrawImage(g_internetIcon, x, iconY, iconSize_Internet, iconSize_Internet);
+            iconsStartX -= (iconSize_Internet + spacing);
         }
 
         // Определить размеры иконок приложений
         int appIconSize = iconSize_App; // 10 мм
-        int appSpacingPixels = appSpacing; // 10 мм
+        int appSpacing = mmToPixels(static_cast<float>(spacingMM), dpiX); // 10 мм
 
         // Установить количество иконок в строке
         int iconsPerRow = 4; // Количество иконок в одной строке
@@ -201,7 +230,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         // Нарисовать каждую иконку приложения и её метку
         for (int row = 0; row < totalRows; ++row) {
             int iconsInThisRow = (row == totalRows - 1) ? iconsInLastRow : iconsPerRow;
-            int totalWidth = iconsInThisRow * appIconSize + (iconsInThisRow - 1) * appSpacingPixels;
+            int totalWidth = iconsInThisRow * appIconSize + (iconsInThisRow - 1) * appSpacing;
             int startX = (windowWidth - totalWidth) / 2; // Центрировать по горизонтали
 
             for (int i = 0; i < iconsInThisRow; ++i) {
@@ -210,7 +239,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
                 AppIcon& app = g_appIcons[appIndex];
                 if (app.image) {
-                    int x = startX + i * (appIconSize + appSpacingPixels);
+                    int x = startX + i * (appIconSize + appSpacing);
                     int y = startY - row * rowHeight;
 
                     // Нарисовать иконку приложения
@@ -308,7 +337,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         float dateRectWidth = mmToPixels(40.0f, dpiX); // Ширина 40 мм
         float dateRectHeight = mmToPixels(15.0f, dpiY); // Высота 15 мм
         float dateRectX = (windowWidth - dateRectWidth) / 2.0f; // Центрировать по горизонтали
-        float dateRectY = timeRectY + timeRectHeight + mmToPixels(-6.0f, dpiY); // Отступ 5 мм от времени
+        float dateRectY = timeRectY + timeRectHeight + mmToPixels(5.0f, dpiY); // Отступ 5 мм от времени
 
         RectF currentDateRect(static_cast<float>(dateRectX),
             static_cast<float>(dateRectY),
@@ -494,6 +523,30 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         // Продолжить без иконки WiFi
     }
 
+    // Загрузить иконку Батареи
+    const wchar_t* batteryIconURL = L"https://cdn-icons-png.flaticon.com/512/545/545680.png"; // Пример URL, замените при необходимости
+    g_batteryIcon = LoadImageFromURL(batteryIconURL);
+    if (!g_batteryIcon) {
+        MessageBox(NULL, L"Не удалось загрузить иконку Батареи из интернета.", L"Ошибка", MB_ICONERROR);
+        // Продолжить без иконки Батареи
+    }
+
+    // Загрузить иконку Сигнала
+    const wchar_t* signalIconURL = L"https://cdn-icons-png.flaticon.com/512/1828/1828665.png"; // Пример URL, замените при необходимости
+    g_signalIcon = LoadImageFromURL(signalIconURL);
+    if (!g_signalIcon) {
+        MessageBox(NULL, L"Не удалось загрузить иконку Сигнала из интернета.", L"Ошибка", MB_ICONERROR);
+        // Продолжить без иконки Сигнала
+    }
+
+    // Загрузить иконку Интернет
+    const wchar_t* internetIconURL = L"https://cdn-icons-png.flaticon.com/512/3754/3754433.png"; // Пример URL, замените при необходимости
+    g_internetIcon = LoadImageFromURL(internetIconURL);
+    if (!g_internetIcon) {
+        MessageBox(NULL, L"Не удалось загрузить иконку Интернет из интернета.", L"Ошибка", MB_ICONERROR);
+        // Продолжить без иконки Интернет
+    }
+
     // Определить URL иконок приложений
     const wchar_t* settingsIconURL = L"https://cdn-icons-png.flaticon.com/512/2099/2099058.png";
     const wchar_t* filesIconURL = L"https://cdn-icons-png.flaticon.com/512/727/727399.png";
@@ -501,10 +554,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     const wchar_t* browserIconURL = L"https://cdn-icons-png.flaticon.com/512/2702/2702602.png";
 
     // Определить дополнительные URL иконок приложений
-    const wchar_t* mailIconURL = L"https://cdn-icons-png.flaticon.com/512/561/561127.png";       // Почта
-    const wchar_t* musicIconURL = L"https://cdn-icons-png.flaticon.com/512/727/727245.png";     // Музыка
-    const wchar_t* calendarIconURL = L"https://cdn-icons-png.flaticon.com/512/747/747376.png"; // Календарь
-    const wchar_t* notesIconURL = L"https://cdn-icons-png.flaticon.com/512/1827/1827372.png";    // Заметки
+    const wchar_t* mailIconURL = L"https://cdn-icons-png.flaticon.com/512/561/561127.png";        // Почта
+    const wchar_t* musicIconURL = L"https://cdn-icons-png.flaticon.com/512/727/727245.png";      // Музыка
+    const wchar_t* calendarIconURL = L"https://cdn-icons-png.flaticon.com/512/747/747376.png";  // Календарь
+    const wchar_t* notesIconURL = L"https://cdn-icons-png.flaticon.com/512/1827/1827372.png";     // Заметки
 
     // Функция для добавления иконки приложения и её метки
     auto AddAppIcon = [&](const wchar_t* url, const std::wstring& label) {
@@ -521,7 +574,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             MessageBox(NULL, errorMsg, L"Ошибка", MB_ICONERROR);
             // Продолжить без этой иконки
         }
-        };
+    };
 
     // Добавить основные иконки приложений
     AddAppIcon(settingsIconURL, L"Настройки");
@@ -585,6 +638,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         // Освободить ресурсы перед выходом
         if (g_mainImage) delete g_mainImage;
         if (g_wifiIcon) delete g_wifiIcon;
+        if (g_batteryIcon) delete g_batteryIcon;
+        if (g_signalIcon) delete g_signalIcon;
+        if (g_internetIcon) delete g_internetIcon;
         for (auto& app : g_appIcons) {
             if (app.image) delete app.image;
         }
@@ -612,6 +668,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Освободить ресурсы
     if (g_mainImage) delete g_mainImage;
     if (g_wifiIcon) delete g_wifiIcon;
+    if (g_batteryIcon) delete g_batteryIcon;
+    if (g_signalIcon) delete g_signalIcon;
+    if (g_internetIcon) delete g_internetIcon;
     for (auto& app : g_appIcons) {
         if (app.image) delete app.image;
     }

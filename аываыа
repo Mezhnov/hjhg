@@ -19,11 +19,6 @@ struct AppIcon {
     Bitmap* image;
     std::wstring label;
     float sizeMM; // Icon size in millimeters
-    float leftMarginMM;  // Margin from the left edge if first in row
-    float rightMarginMM; // Margin from the right edge if last in row
-
-    AppIcon(Bitmap* img, const std::wstring& lbl, float szMM = 10.0f, float leftMM = 0.0f, float rightMM = 0.0f)
-        : image(img), label(lbl), sizeMM(szMM), leftMarginMM(leftMM), rightMarginMM(rightMM) {}
 };
 
 // Global variables to store images
@@ -211,7 +206,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             iconsStartX -= (iconSize_Internet + spacing);
         }
 
-        // Define the number of app icons per row
+        // Determine the number of app icons per row
         int iconsPerRow = 4; // Number of icons in one row
         int totalApps = static_cast<int>(g_appIcons.size());
         int totalRows = (totalApps + iconsPerRow - 1) / iconsPerRow;
@@ -219,6 +214,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         // Calculate vertical spacing
         int rowSpacing = mmToPixels(10.0f, dpiY); // 10 mm between rows
 
+        // Calculate start Y position for drawing app icons
         // Calculate total height required for all rows
         int totalHeight = 0;
         std::vector<int> rowHeights(totalRows, 0);
@@ -245,9 +241,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         for (int row = 0; row < totalRows; ++row) {
             // Number of icons in this row
             int iconsInThisRow = (row == totalRows - 1 && totalApps % iconsPerRow != 0) ? (totalApps % iconsPerRow) : iconsPerRow;
-            if (iconsInThisRow == 0) iconsInThisRow = iconsPerRow;
-
-            // Calculate total width for this row based on individual icon sizes and spacings
+            // Calculate total width for this row based on individual icon sizes
             int totalWidth = 0;
             std::vector<int> iconWidths(iconsInThisRow, 0);
             for (int i = 0; i < iconsInThisRow; ++i) {
@@ -261,23 +255,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 }
             }
 
-            // Retrieve left and right margins for this row from the first and last icons
-            float rowLeftMarginMM = 0.0f;
-            float rowRightMarginMM = 0.0f;
-            if (iconsInThisRow > 0) {
-                rowLeftMarginMM = g_appIcons[row * iconsPerRow].leftMarginMM;
-            }
-            if (iconsInThisRow > 1) {
-                rowRightMarginMM = g_appIcons[row * iconsPerRow + iconsInThisRow - 1].rightMarginMM;
-            }
-
-            // Convert row margins to pixels
-            int rowLeftMarginPx = mmToPixels(rowLeftMarginMM, dpiX);
-            int rowRightMarginPx = mmToPixels(rowRightMarginMM, dpiX);
-
-            // Calculate starting X position to account for left margin
-            int availableWidth = windowWidth - rowLeftMarginPx - rowRightMarginPx;
-            int startX = rowLeftMarginPx + (availableWidth - totalWidth) / 2;
+            // Calculate starting X position to center the row
+            int startX = (windowWidth - totalWidth) / 2;
 
             // Y position for this row
             int y = startY + row * (rowHeights[row] + rowSpacing);
@@ -426,7 +405,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             (xPos >= dateRect.left && xPos <= dateRect.right &&
                 yPos >= dateRect.top && yPos <= dateRect.bottom)) {
             isDragging = true;
-            // Determine where the click was
+            // Determine which area was clicked
             if (xPos >= timeRect.left && xPos <= timeRect.right &&
                 yPos >= timeRect.top && yPos <= timeRect.bottom) {
                 dragStartPoint.x = xPos - timeRect.left;
@@ -613,11 +592,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     const wchar_t* calendarIconURL = L"https://cdn-icons-png.flaticon.com/512/747/747376.png";  // Calendar
     const wchar_t* notesIconURL = L"https://cdn-icons-png.flaticon.com/512/1827/1827372.png";     // Notes
 
-    // Lambda function to add an app icon with specified size and optional margins
-    auto AddAppIcon = [&](const wchar_t* url, const std::wstring& label, float sizeMM = 10.0f, float leftMarginMM = 0.0f, float rightMarginMM = 0.0f) {
+    // Lambda function to add an app icon with a specified size
+    auto AddAppIcon = [&](const wchar_t* url, const std::wstring& label, float sizeMM) {
         Bitmap* bmp = LoadImageFromURL(url);
         if (bmp) {
-            AppIcon app(bmp, label, sizeMM, leftMarginMM, rightMarginMM);
+            AppIcon app;
+            app.image = bmp;
+            app.label = label;
+            app.sizeMM = sizeMM;
             g_appIcons.push_back(app);
         }
         else {
@@ -626,25 +608,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             MessageBox(NULL, errorMsg, L"Ошибка", MB_ICONERROR);
             // Continue without this icon
         }
-    };
+        };
 
-    // Define number of icons per row
-    int iconsPerRow = 4;
+    // Add main application icons with individual sizes (size in mm)
 
-    // Add main application icons with individual sizes and margins
-    // Assuming iconsPerRow is 4, set margins for first and last icons in each row
-    // Row 1
-    AddAppIcon(settingsIconURL, L"Настройки", 10.0f, 5.0f, 0.0f);   // Settings - first in row, left margin
-    AddAppIcon(filesIconURL, L"Файлы", 10.0f);                      // Files
-    AddAppIcon(cameraIconURL, L"Камера", 10.0f);                    // Camera
-    AddAppIcon(browserIconURL, L"Браузер", 10.0f, 0.0f, 5.0f);      // Browser - last in row, right margin
+    // Add additional application icons with individual sizes
+    AddAppIcon(mailIconURL, L"Почта", 15.0f);          // Mail
+    AddAppIcon(musicIconURL, L"Музыка", 15.0f);        // Music
+    AddAppIcon(calendarIconURL, L"Календарь", 15.0f);  // Calendar
+    AddAppIcon(notesIconURL, L"Заметки", 15.0f);        // Notes
 
-    // Row 2
-    AddAppIcon(mailIconURL, L"Почта", 10.0f, 5.0f, 0.0f);          // Mail - first in row, left margin
-    AddAppIcon(musicIconURL, L"Музыка", 10.0f);                    // Music
-    AddAppIcon(calendarIconURL, L"Календарь", 10.0f);              // Calendar
-    AddAppIcon(notesIconURL, L"Заметки", 10.0f, 0.0f, 5.0f);        // Notes - last in row, right margin
 
+
+    AddAppIcon(settingsIconURL, L"", 25.0f);   // Settings
+    AddAppIcon(filesIconURL, L"", 15.0f);          // Files
+    AddAppIcon(cameraIconURL, L"", 25.0f);        // Camera
+    AddAppIcon(browserIconURL, L"", 10.0f);      // Browser
     // Window parameters
     const wchar_t CLASS_NAME[] = L"Sample Window Class";
 

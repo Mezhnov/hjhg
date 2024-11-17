@@ -1,3 +1,22 @@
-number :: 5
+# add(a, b) {
+    return a + b
+}
 
-result :: factorial(number)
+# subtract(a, b) {
+    return a - b
+}
+
+# multiply(a, b) {
+    return a * b
+}
+
+# divide(a, b) {
+    if b == 0 {
+        return "Error: Division by zero"
+    } else {
+        return a / b
+    }
+}
+
+x :: 20
+y :: 5

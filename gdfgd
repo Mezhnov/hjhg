@@ -18,7 +18,7 @@ std::string generateRandomString(int length) {
     const std::string chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     std::random_device rd;
     std::mt19937 generator(rd());
-    std::uniform_int_distribution<> distribution(0, chars.size() - 1);
+    std::uniform_int_distribution<> distribution(0, static_cast<int>(chars.size() - 1));
     std::string result;
     for (int i = 0; i < length; ++i) {
         result += chars[distribution(generator)];
@@ -87,7 +87,7 @@ private:
         std::string digits = "0123456789";
         std::random_device rd;
         std::mt19937 generator(rd());
-        std::uniform_int_distribution<> distribution(0, digits.size() - 1);
+        std::uniform_int_distribution<> distribution(0, static_cast<int>(digits.size() - 1));
         std::string result;
         for (int i = 0; i < length; ++i) {
             result += digits[distribution(generator)];
@@ -120,7 +120,7 @@ private:
         const std::string chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         std::random_device rd;
         std::mt19937 generator(rd());
-        std::uniform_int_distribution<> distribution(0, chars.size() - 1);
+        std::uniform_int_distribution<> distribution(0, static_cast<int>(chars.size() - 1));
         std::string result;
         for (int i = 0; i < length; ++i) {
             result += chars[distribution(generator)];
@@ -446,28 +446,3 @@ int main() {
     system.showMenu();
     return 0;
 }
-
-
-Сборка начата в 10:53...
-1>------ Сборка начата: проект: 000, Конфигурация: Debug x64 ------
-1>000.cpp
-1>C:\Users\User\source\repos\000\000\000.cpp(21,66): warning C4267: аргумент: преобразование из "size_t" в "_Ty"; возможна потеря данных
-1>C:\Users\User\source\repos\000\000\000.cpp(21,66): warning C4267:         with
-1>C:\Users\User\source\repos\000\000\000.cpp(21,66): warning C4267:         [
-1>C:\Users\User\source\repos\000\000\000.cpp(21,66): warning C4267:             _Ty=int
-1>C:\Users\User\source\repos\000\000\000.cpp(21,66): warning C4267:         ]
-1>C:\Users\User\source\repos\000\000\000.cpp(90,71): warning C4267: аргумент: преобразование из "size_t" в "_Ty"; возможна потеря данных
-1>C:\Users\User\source\repos\000\000\000.cpp(90,71): warning C4267:         with
-1>C:\Users\User\source\repos\000\000\000.cpp(90,71): warning C4267:         [
-1>C:\Users\User\source\repos\000\000\000.cpp(90,71): warning C4267:             _Ty=int
-1>C:\Users\User\source\repos\000\000\000.cpp(90,71): warning C4267:         ]
-1>C:\Users\User\source\repos\000\000\000.cpp(123,70): warning C4267: аргумент: преобразование из "size_t" в "_Ty"; возможна потеря данных
-1>C:\Users\User\source\repos\000\000\000.cpp(123,70): warning C4267:         with
-1>C:\Users\User\source\repos\000\000\000.cpp(123,70): warning C4267:         [
-1>C:\Users\User\source\repos\000\000\000.cpp(123,70): warning C4267:             _Ty=int
-1>C:\Users\User\source\repos\000\000\000.cpp(123,70): warning C4267:         ]
-1>MSVCRTD.lib(exe_winmain.obj) : error LNK2019: ссылка на неразрешенный внешний символ WinMain в функции "int __cdecl invoke_main(void)" (?invoke_main@@YAHXZ).
-1>C:\Users\User\source\repos\000\x64\Debug\000.exe : fatal error LNK1120: неразрешенных внешних элементов: 1
-1>Сборка проекта "000.vcxproj" завершена с ошибкой.
-========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
-========== Сборка завершено в 10:53 и заняло 01,129 с ==========

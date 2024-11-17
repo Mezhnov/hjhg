@@ -1,3 +1,1154 @@
+// Включаем необходимые заголовочные файлы
+#include <windows.h>
+#include <gdiplus.h>
+#include <wininet.h>
+#include <string>
+#include <vector>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
+#include <locale>
+#include <codecvt>
+#include <windowsx.h>
+#include <mmsystem.h>  // Для PlaySound
+#include <CommCtrl.h>  // Для common controls
+#include <richedit.h>  // Для rich edit controls
+#include "resource.h"  // Убедитесь, что у вас есть этот заголовочный файл для идентификаторов ресурсов
+#include <map>
+#include <functional>  // Для std::function
+#include <memory>      // Для std::shared_ptr
+#include <cctype>      // Для isdigit и isalpha
+#include <stack>       // Для std::stack
+#include <cmath>       // Для fmod
+
+// Линкуем необходимые библиотеки
+#pragma comment(lib, "gdiplus.lib")
+#pragma comment(lib, "wininet.lib")
+#pragma comment(lib, "comctl32.lib")
+#pragma comment(lib, "Winmm.lib")
+
+// Глобальные переменные
+HINSTANCE hInst;
+HWND hEdit;
+HWND hOutput;
+
+// Объявления функций
+LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+void ExecuteCode(const std::wstring& code);
+void CreateControls(HWND hWnd);
+
+// Точка входа
+int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
+{
+    hInst = hInstance;
+
+    // Инициализируем common controls
+    INITCOMMONCONTROLSEX icex = { sizeof(INITCOMMONCONTROLSEX) };
+    icex.dwICC = ICC_WIN95_CLASSES;
+    InitCommonControlsEx(&icex);
+
+    // Загружаем библиотеку RichEdit
+    LoadLibrary(TEXT("Msftedit.dll"));
+
+    WNDCLASSEX wcex = { 0 };
+    wcex.cbSize = sizeof(WNDCLASSEX);
+    wcex.style = CS_HREDRAW | CS_VREDRAW;
+    wcex.lpfnWndProc = WndProc;
+    wcex.hInstance = hInst;
+    wcex.hIcon = LoadIcon(nullptr, IDI_APPLICATION);
+    wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wcex.lpszClassName = L"MyIDEClass";
+    wcex.hIconSm = LoadIcon(nullptr, IDI_APPLICATION);
+
+    RegisterClassEx(&wcex);
+
+    HWND hWnd = CreateWindowW(L"MyIDEClass", L"Nova IDE", WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, 0, 800, 600, nullptr, nullptr, hInst, nullptr);
+
+    if (!hWnd)
+    {
+        MessageBox(nullptr, L"Не удалось создать главное окно!", L"Ошибка", MB_OK);
+        return FALSE;
+    }
+
+    ShowWindow(hWnd, nCmdShow);
+    UpdateWindow(hWnd);
+
+    // Главный цикл сообщений
+    MSG msg;
+    while (GetMessage(&msg, nullptr, 0, 0))
+    {
+        if (!IsDialogMessage(hWnd, &msg))
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+    }
+
+    return (int)msg.wParam;
+}
+
+// Создаем элементы управления (редактор, кнопка, вывод)
+void CreateControls(HWND hWnd)
+{
+    // Создаем RichEdit для ввода кода
+    hEdit = CreateWindowEx(0, MSFTEDIT_CLASS, L"",
+        WS_VISIBLE | WS_CHILD | WS_BORDER | ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL,
+        10, 10, 760, 400, hWnd, (HMENU)1, hInst, nullptr);
+
+    // Создаем кнопку "Run"
+    HWND hButton = CreateWindow(L"BUTTON", L"Run",
+        WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+        10, 420, 100, 30, hWnd, (HMENU)2, hInst, nullptr);
+
+    // Создаем элемент вывода
+    hOutput = CreateWindow(L"EDIT", L"",
+        WS_VISIBLE | WS_CHILD | WS_BORDER | ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL | ES_READONLY,
+        10, 460, 760, 100, hWnd, (HMENU)3, hInst, nullptr);
+}
+
+// Обработчик окна
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
+    case WM_CREATE:
+        CreateControls(hWnd);
+        break;
+    case WM_COMMAND:
+        if (LOWORD(wParam) == 2) // Нажата кнопка "Run"
+        {
+            // Получаем код из редактора
+            int length = GetWindowTextLength(hEdit);
+            std::wstring code(length + 1, L'\0');
+            GetWindowText(hEdit, &code[0], length + 1);
+
+            // Исполняем код
+            ExecuteCode(code);
+        }
+        break;
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+    default:
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+    return 0;
+}
+
+// Интерпретатор языка Nova
+namespace Nova
+{
+    // Типы токенов
+    enum class TokenType
+    {
+        Identifier,
+        Number,
+        String,
+        Operator,
+        Symbol,
+        EndOfFile
+    };
+
+    // Структура токена
+    struct Token
+    {
+        TokenType type;
+        std::wstring value;
+    };
+
+    // Лексер
+    class Lexer
+    {
+    public:
+        Lexer(const std::wstring& source)
+            : source(source), position(0), length(source.length())
+        {
+        }
+
+        Token GetNextToken()
+        {
+            SkipWhitespace();
+
+            if (position >= length)
+            {
+                return { TokenType::EndOfFile, L"" };
+            }
+
+            wchar_t currentChar = Peek();
+
+            if (iswalpha(currentChar) || currentChar == L'#' || currentChar == L'_' || currentChar == L'@' || currentChar == L'$')
+            {
+                return Identifier();
+            }
+            else if (iswdigit(currentChar))
+            {
+                return Number();
+            }
+            else if (currentChar == L'"')
+            {
+                return String();
+            }
+            else if (IsOperator(currentChar))
+            {
+                return Operator();
+            }
+            else if (IsSymbol(currentChar))
+            {
+                return Symbol();
+            }
+            else
+            {
+                // Неизвестный токен
+                position++;
+                return { TokenType::Operator, std::wstring(1, currentChar) };
+            }
+        }
+
+        size_t GetPosition() const
+        {
+            return position;
+        }
+
+        void SetPosition(size_t pos)
+        {
+            position = pos;
+        }
+
+    private:
+        std::wstring source;
+        size_t position;
+        size_t length;
+
+        wchar_t Peek()
+        {
+            if (position < length)
+                return source[position];
+            return L'\0';
+        }
+
+        wchar_t Get()
+        {
+            if (position < length)
+                return source[position++];
+            return L'\0';
+        }
+
+        void SkipWhitespace()
+        {
+            while (position < length && iswspace(source[position]))
+                position++;
+        }
+
+        Token Identifier()
+        {
+            size_t start = position;
+
+            while (position < length && (iswalpha(source[position]) || iswdigit(source[position]) || source[position] == L'_' || source[position] == L'@' || source[position] == L'$'))
+                position++;
+
+            return { TokenType::Identifier, source.substr(start, position - start) };
+        }
+
+        Token Number()
+        {
+            size_t start = position;
+
+            while (position < length && iswdigit(source[position]))
+                position++;
+
+            return { TokenType::Number, source.substr(start, position - start) };
+        }
+
+        Token String()
+        {
+            position++; // Пропускаем начальную кавычку
+            size_t start = position;
+
+            while (position < length && source[position] != L'"')
+                position++;
+
+            std::wstring str = source.substr(start, position - start);
+            position++; // Пропускаем закрывающую кавычку
+
+            return { TokenType::String, str };
+        }
+
+        Token Operator()
+        {
+            wchar_t op = Get();
+
+            // Обрабатываем многосимвольные операторы
+            if (op == L':' && Peek() == L':')
+            {
+                Get();
+                return { TokenType::Operator, L"::" };
+            }
+            else if (op == L'>' && Peek() == L'>')
+            {
+                Get();
+                return { TokenType::Operator, L">>" };
+            }
+            else if (op == L'=' && Peek() == L'=')
+            {
+                Get();
+                return { TokenType::Operator, L"==" };
+            }
+            else if (op == L'!' && Peek() == L'=')
+            {
+                Get();
+                return { TokenType::Operator, L"!=" };
+            }
+            else if (op == L'<' && Peek() == L'=')
+            {
+                Get();
+                return { TokenType::Operator, L"<=" };
+            }
+            else if (op == L'>' && Peek() == L'=')
+            {
+                Get();
+                return { TokenType::Operator, L">=" };
+            }
+
+            return { TokenType::Operator, std::wstring(1, op) };
+        }
+
+        Token Symbol()
+        {
+            wchar_t sym = Get();
+            return { TokenType::Symbol, std::wstring(1, sym) };
+        }
+
+        bool IsOperator(wchar_t ch)
+        {
+            return wcschr(L"+-*/%=<>!&|:^#", ch) != nullptr;
+        }
+
+        bool IsSymbol(wchar_t ch)
+        {
+            return wcschr(L"(){}[],", ch) != nullptr;
+        }
+    };
+
+    // Предварительные объявления
+    struct Value;
+    struct Variable;
+    struct Function;
+    struct Class;
+    struct Object;
+
+    // Типы значений
+    enum class ValueType
+    {
+        Number,
+        String,
+        Function,
+        Object,
+        Null
+    };
+
+    // Структура Value
+    struct Value
+    {
+        ValueType type;
+        double numberValue;
+        std::wstring stringValue;
+        std::shared_ptr<Function> functionValue;
+        std::shared_ptr<Object> objectValue;
+
+        Value() : type(ValueType::Null), numberValue(0) {}
+
+        Value(double num) : type(ValueType::Number), numberValue(num) {}
+
+        Value(const std::wstring& str) : type(ValueType::String), stringValue(str) {}
+
+        Value(std::shared_ptr<Function> func) : type(ValueType::Function), functionValue(func) {}
+
+        Value(std::shared_ptr<Object> obj) : type(ValueType::Object), objectValue(obj) {}
+    };
+
+    // Переменная
+    struct Variable
+    {
+        std::wstring name;
+        Value value;
+    };
+
+    // Функция
+    struct Function
+    {
+        std::vector<std::wstring> parameters;
+        std::vector<Token> body;
+    };
+
+    // Класс
+    struct Class
+    {
+        std::wstring name;
+        std::vector<std::wstring> members;
+        std::map<std::wstring, Value> defaults;
+        std::map<std::wstring, std::shared_ptr<Function>> methods;
+    };
+
+    // Объект
+    struct Object
+    {
+        std::shared_ptr<Class> classType;
+        std::map<std::wstring, Value> fields;
+    };
+
+    // Интерпретатор
+    class Interpreter
+    {
+    public:
+        Interpreter(const std::wstring& code)
+            : lexer(code), outputStream()
+        {
+            variableScopes.push_back(std::map<std::wstring, Value>()); // Инициализируем глобальную область видимости
+            Advance();
+        }
+
+        void Interpret()
+        {
+            try
+            {
+                while (currentToken.type != TokenType::EndOfFile)
+                {
+                    Statement();
+                }
+            }
+            catch (const std::exception& e)
+            {
+                outputStream << L"Ошибка: " << std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(e.what()) << L"\n";
+            }
+        }
+
+        std::wstring GetOutput()
+        {
+            return outputStream.str();
+        }
+
+    private:
+        Lexer lexer;
+        Token currentToken;
+        std::wstringstream outputStream;
+
+        // Стек областей видимости
+        std::vector<std::map<std::wstring, Value>> variableScopes;
+
+        std::map<std::wstring, std::shared_ptr<Function>> functions;
+        std::map<std::wstring, std::shared_ptr<Class>> classes;
+
+        // Для управления выполнением функции и возврата значений
+        bool returnFlag = false;
+        Value returnValue;
+
+        void Advance()
+        {
+            currentToken = lexer.GetNextToken();
+        }
+
+        void Match(TokenType expectedType, const std::wstring& expectedValue = L"")
+        {
+            if (currentToken.type == expectedType &&
+                (expectedValue.empty() || currentToken.value == expectedValue))
+            {
+                Advance();
+            }
+            else
+            {
+                throw std::runtime_error("Ожидался другой токен");
+            }
+        }
+
+        void Statement()
+        {
+            if (currentToken.value == L"--") // Комментарий
+            {
+                while (currentToken.type != TokenType::EndOfFile && currentToken.value != L"\n")
+                {
+                    Advance();
+                }
+            }
+            else if (currentToken.value == L"if")
+            {
+                IfStatement();
+            }
+            else if (currentToken.value == L"while")
+            {
+                WhileStatement();
+            }
+            else if (currentToken.value == L"return")
+            {
+                ReturnStatement();
+                // Если выполнился возврат, выходим из обработки дальше
+                if (returnFlag)
+                    return;
+            }
+            else if (currentToken.type == TokenType::Identifier)
+            {
+                std::wstring identifier = currentToken.value;
+                Advance();
+                if (currentToken.value == L"::") // Объявление переменной
+                {
+                    Advance();
+                    Value val = Expression();
+                    variableScopes.back()[identifier] = val;
+                }
+                else if (currentToken.value == L"=") // Присваивание
+                {
+                    Advance();
+                    Value val = Expression();
+                    SetVariable(identifier, val);
+                }
+                else if (currentToken.value == L"(") // Вызов функции
+                {
+                    std::vector<Value> args = FunctionCallArguments();
+                    CallFunction(identifier, args);
+                }
+                else
+                {
+                    throw std::runtime_error("Неизвестная операция после идентификатора");
+                }
+            }
+            else if (currentToken.value == L"#") // Определение функции
+            {
+                Advance();
+                FunctionDefinition();
+            }
+            else if (currentToken.value == L"##") // Определение класса
+            {
+                Advance();
+                ClassDefinition();
+            }
+            else if (currentToken.value == L">>") // Вывод
+            {
+                Advance();
+                Value val = Expression();
+                PrintValue(val);
+            }
+            else if (currentToken.type == TokenType::EndOfFile)
+            {
+                // Конец файла
+            }
+            else
+            {
+                // Пропускаем неизвестные токены
+                Advance();
+            }
+        }
+
+        // Обработка оператора if
+        void IfStatement()
+        {
+            Advance();
+            Value condition = Expression();
+            bool conditionResult = IsTrue(condition);
+            Match(TokenType::Symbol, L"{");
+            if (conditionResult)
+            {
+                StatementBlock();
+                if (currentToken.value == L"else")
+                {
+                    // Пропускаем else блок
+                    Advance();
+                    Match(TokenType::Symbol, L"{");
+                    SkipStatementBlock();
+                }
+            }
+            else
+            {
+                SkipStatementBlock();
+                if (currentToken.value == L"else")
+                {
+                    Advance();
+                    Match(TokenType::Symbol, L"{");
+                    StatementBlock();
+                }
+            }
+        }
+
+        // Обработка оператора while
+        void WhileStatement()
+        {
+            Advance();
+            size_t loopStart = lexer.GetPosition();
+            Token savedToken = currentToken;
+
+            Value condition = Expression();
+            Match(TokenType::Symbol, L"{");
+
+            while (IsTrue(condition))
+            {
+                size_t bodyStart = lexer.GetPosition();
+                Token bodyToken = currentToken;
+
+                // Входим в новую область видимости цикла
+                variableScopes.push_back(std::map<std::wstring, Value>());
+
+                StatementBlock();
+
+                // Выходим из области видимости цикла
+                variableScopes.pop_back();
+
+                // Восстанавливаем состояние
+                lexer.SetPosition(loopStart);
+                currentToken = savedToken;
+                condition = Expression();
+                Match(TokenType::Symbol, L"{");
+            }
+            // Пропускаем блок, если условие ложно
+            SkipStatementBlock();
+        }
+
+        // Обработка возврата из функции
+        void ReturnStatement()
+        {
+            Advance();
+            returnValue = Expression();
+            returnFlag = true;
+        }
+
+        // Проверка истинности значения
+        bool IsTrue(const Value& val)
+        {
+            if (val.type == ValueType::Number)
+            {
+                return val.numberValue != 0;
+            }
+            else if (val.type == ValueType::String)
+            {
+                return !val.stringValue.empty();
+            }
+            else if (val.type == ValueType::Null)
+            {
+                return false;
+            }
+            return false;
+        }
+
+        // Обработка блока операторов
+        void StatementBlock()
+        {
+            while (currentToken.type != TokenType::Symbol || currentToken.value != L"}")
+            {
+                Statement();
+                if (returnFlag)
+                    break;
+            }
+            Match(TokenType::Symbol, L"}");
+        }
+
+        // Пропуск блока операторов
+        void SkipStatementBlock()
+        {
+            int braceCount = 1;
+            while (braceCount > 0)
+            {
+                Advance();
+                if (currentToken.type == TokenType::Symbol && currentToken.value == L"{")
+                {
+                    braceCount++;
+                }
+                else if (currentToken.type == TokenType::Symbol && currentToken.value == L"}")
+                {
+                    braceCount--;
+                }
+            }
+            Advance();
+        }
+
+        // Определение функции
+        void FunctionDefinition()
+        {
+            if (currentToken.type == TokenType::Identifier)
+            {
+                std::wstring funcName = currentToken.value;
+                Advance();
+                Match(TokenType::Symbol, L"(");
+                std::vector<std::wstring> parameters = ParameterList();
+                Match(TokenType::Symbol, L")");
+                Match(TokenType::Symbol, L"{");
+                std::vector<Token> body = FunctionBody();
+                functions[funcName] = std::make_shared<Function>(Function{ parameters, body });
+            }
+            else
+            {
+                throw std::runtime_error("Ожидалось имя функции после '#'");
+            }
+        }
+
+        // Определение класса
+        void ClassDefinition()
+        {
+            // Здесь можно добавить реализацию классов
+            // Пока пропустим эту часть
+            throw std::runtime_error("Определение классов пока не поддерживается");
+        }
+
+        // Список параметров
+        std::vector<std::wstring> ParameterList()
+        {
+            std::vector<std::wstring> params;
+
+            if (currentToken.type == TokenType::Identifier)
+            {
+                params.push_back(currentToken.value);
+                Advance();
+                while (currentToken.value == L",")
+                {
+                    Advance();
+                    if (currentToken.type == TokenType::Identifier)
+                    {
+                        params.push_back(currentToken.value);
+                        Advance();
+                    }
+                    else
+                    {
+                        throw std::runtime_error("Ожидалось имя параметра");
+                    }
+                }
+            }
+
+            return params;
+        }
+
+        // Тело функции
+        std::vector<Token> FunctionBody()
+        {
+            std::vector<Token> tokens;
+            int braceCount = 1; // Мы уже обработали открывающую '{'
+
+            while (braceCount > 0)
+            {
+                if (currentToken.type == TokenType::Symbol && currentToken.value == L"{")
+                {
+                    braceCount++;
+                }
+                else if (currentToken.type == TokenType::Symbol && currentToken.value == L"}")
+                {
+                    braceCount--;
+                    if (braceCount == 0)
+                    {
+                        Advance();
+                        break;
+                    }
+                }
+                tokens.push_back(currentToken);
+                Advance();
+            }
+
+            return tokens;
+        }
+
+        // Аргументы вызова функции
+        std::vector<Value> FunctionCallArguments()
+        {
+            Match(TokenType::Symbol, L"(");
+            std::vector<Value> args;
+
+            if (currentToken.type != TokenType::Symbol || currentToken.value != L")")
+            {
+                args.push_back(Expression());
+                while (currentToken.value == L",")
+                {
+                    Advance();
+                    args.push_back(Expression());
+                }
+            }
+
+            Match(TokenType::Symbol, L")");
+            return args;
+        }
+
+        // Вызов функции
+        Value CallFunction(const std::wstring& name, const std::vector<Value>& args)
+        {
+            if (functions.find(name) != functions.end())
+            {
+                auto func = functions[name];
+                if (args.size() != func->parameters.size())
+                {
+                    throw std::runtime_error("Количество аргументов не совпадает при вызове функции");
+                }
+
+                // Создаем новую область видимости
+                variableScopes.push_back(std::map<std::wstring, Value>());
+
+                for (size_t i = 0; i < args.size(); ++i)
+                {
+                    variableScopes.back()[func->parameters[i]] = args[i];
+                }
+
+                // Сохраняем текущий токен и лексер
+                Token savedToken = currentToken;
+                Lexer savedLexer = lexer;
+
+                // Загружаем тело функции в лексер
+                lexer = Lexer(TokensToString(func->body));
+                Advance();
+
+                returnFlag = false;
+                returnValue = Value();
+
+                while (currentToken.type != TokenType::EndOfFile && !returnFlag)
+                {
+                    Statement();
+                }
+
+                // Восстанавливаем лексер и токен
+                lexer = savedLexer;
+                currentToken = savedToken;
+
+                // Выходим из области видимости функции
+                variableScopes.pop_back();
+
+                return returnValue;
+            }
+            else
+            {
+                throw std::runtime_error("Неопределенная функция: " + std::string(name.begin(), name.end()));
+            }
+        }
+
+        // Парсинг выражений
+        Value Expression()
+        {
+            return LogicalOrExpression();
+        }
+
+        // Логические выражения
+        Value LogicalOrExpression()
+        {
+            Value lhs = LogicalAndExpression();
+
+            while (currentToken.value == L"||")
+            {
+                std::wstring op = currentToken.value;
+                Advance();
+                Value rhs = LogicalAndExpression();
+                lhs = ApplyLogicalOperator(lhs, op, rhs);
+            }
+
+            return lhs;
+        }
+
+        Value LogicalAndExpression()
+        {
+            Value lhs = EqualityExpression();
+
+            while (currentToken.value == L"&&")
+            {
+                std::wstring op = currentToken.value;
+                Advance();
+                Value rhs = EqualityExpression();
+                lhs = ApplyLogicalOperator(lhs, op, rhs);
+            }
+
+            return lhs;
+        }
+
+        Value EqualityExpression()
+        {
+            Value lhs = RelationalExpression();
+
+            while (currentToken.value == L"==" || currentToken.value == L"!=")
+            {
+                std::wstring op = currentToken.value;
+                Advance();
+                Value rhs = RelationalExpression();
+                lhs = ApplyEqualityOperator(lhs, op, rhs);
+            }
+
+            return lhs;
+        }
+
+        Value RelationalExpression()
+        {
+            Value lhs = AdditiveExpression();
+
+            while (currentToken.value == L"<" || currentToken.value == L">" || currentToken.value == L"<=" || currentToken.value == L">=")
+            {
+                std::wstring op = currentToken.value;
+                Advance();
+                Value rhs = AdditiveExpression();
+                lhs = ApplyRelationalOperator(lhs, op, rhs);
+            }
+
+            return lhs;
+        }
+
+        Value AdditiveExpression()
+        {
+            Value lhs = MultiplicativeExpression();
+
+            while (currentToken.value == L"+" || currentToken.value == L"-")
+            {
+                std::wstring op = currentToken.value;
+                Advance();
+                Value rhs = MultiplicativeExpression();
+                lhs = ApplyOperator(lhs, op, rhs);
+            }
+
+            return lhs;
+        }
+
+        Value MultiplicativeExpression()
+        {
+            Value lhs = UnaryExpression();
+
+            while (currentToken.value == L"*" || currentToken.value == L"/" || currentToken.value == L"%")
+            {
+                std::wstring op = currentToken.value;
+                Advance();
+                Value rhs = UnaryExpression();
+                lhs = ApplyOperator(lhs, op, rhs);
+            }
+
+            return lhs;
+        }
+
+        Value UnaryExpression()
+        {
+            if (currentToken.value == L"-")
+            {
+                Advance();
+                Value val = PrimaryExpression();
+                if (val.type == ValueType::Number)
+                {
+                    val.numberValue = -val.numberValue;
+                    return val;
+                }
+                else
+                {
+                    throw std::runtime_error("Унарный минус применим только к числам");
+                }
+            }
+            else
+            {
+                return PrimaryExpression();
+            }
+        }
+
+        Value PrimaryExpression()
+        {
+            if (currentToken.type == TokenType::Number)
+            {
+                double num = std::stod(currentToken.value);
+                Advance();
+                return Value(num);
+            }
+            else if (currentToken.type == TokenType::String)
+            {
+                std::wstring str = currentToken.value;
+                Advance();
+                return Value(str);
+            }
+            else if (currentToken.type == TokenType::Identifier)
+            {
+                std::wstring identifier = currentToken.value;
+                Advance();
+                if (currentToken.value == L"(")
+                {
+                    // Вызов функции
+                    std::vector<Value> args = FunctionCallArguments();
+                    return CallFunction(identifier, args);
+                }
+                else
+                {
+                    // Значение переменной
+                    return GetVariable(identifier);
+                }
+            }
+            else if (currentToken.value == L"(")
+            {
+                Advance();
+                Value val = Expression();
+                Match(TokenType::Symbol, L")");
+                return val;
+            }
+            else
+            {
+                throw std::runtime_error("Неожиданный токен в выражении");
+            }
+        }
+
+        Value ApplyOperator(const Value& lhs, const std::wstring& op, const Value& rhs)
+        {
+            if (lhs.type == ValueType::Number && rhs.type == ValueType::Number)
+            {
+                if (op == L"+")
+                    return Value(lhs.numberValue + rhs.numberValue);
+                else if (op == L"-")
+                    return Value(lhs.numberValue - rhs.numberValue);
+                else if (op == L"*")
+                    return Value(lhs.numberValue * rhs.numberValue);
+                else if (op == L"/")
+                    return Value(lhs.numberValue / rhs.numberValue);
+                else if (op == L"%")
+                    return Value(fmod(lhs.numberValue, rhs.numberValue));
+            }
+            else if (lhs.type == ValueType::String || rhs.type == ValueType::String)
+            {
+                if (op == L"+")
+                {
+                    return Value(ToString(lhs) + ToString(rhs));
+                }
+            }
+
+            throw std::runtime_error("Недопустимые операнды для оператора");
+        }
+
+        Value ApplyLogicalOperator(const Value& lhs, const std::wstring& op, const Value& rhs)
+        {
+            bool lhsBool = IsTrue(lhs);
+            bool rhsBool = IsTrue(rhs);
+
+            if (op == L"&&")
+                return Value((double)(lhsBool && rhsBool));
+            else if (op == L"||")
+                return Value((double)(lhsBool || rhsBool));
+
+            throw std::runtime_error("Недопустимый логический оператор");
+        }
+
+        Value ApplyEqualityOperator(const Value& lhs, const std::wstring& op, const Value& rhs)
+        {
+            if (op == L"==")
+            {
+                return Value((double)(IsEqual(lhs, rhs)));
+            }
+            else if (op == L"!=")
+            {
+                return Value((double)!IsEqual(lhs, rhs));
+            }
+
+            throw std::runtime_error("Недопустимый оператор равенства");
+        }
+
+        Value ApplyRelationalOperator(const Value& lhs, const std::wstring& op, const Value& rhs)
+        {
+            if (lhs.type == ValueType::Number && rhs.type == ValueType::Number)
+            {
+                if (op == L"<")
+                    return Value((double)(lhs.numberValue < rhs.numberValue));
+                else if (op == L">")
+                    return Value((double)(lhs.numberValue > rhs.numberValue));
+                else if (op == L"<=")
+                    return Value((double)(lhs.numberValue <= rhs.numberValue));
+                else if (op == L">=")
+                    return Value((double)(lhs.numberValue >= rhs.numberValue));
+            }
+            else
+            {
+                throw std::runtime_error("Операторы сравнения применимы только к числам");
+            }
+
+            throw std::runtime_error("Недопустимый оператор сравнения");
+        }
+
+        bool IsEqual(const Value& lhs, const Value& rhs)
+        {
+            if (lhs.type != rhs.type)
+                return false;
+
+            if (lhs.type == ValueType::Number)
+                return lhs.numberValue == rhs.numberValue;
+            else if (lhs.type == ValueType::String)
+                return lhs.stringValue == rhs.stringValue;
+
+            return false;
+        }
+
+        std::wstring ToString(const Value& val)
+        {
+            if (val.type == ValueType::Number)
+            {
+                std::wstringstream ss;
+                ss << val.numberValue;
+                return ss.str();
+            }
+            else if (val.type == ValueType::String)
+            {
+                return val.stringValue;
+            }
+            else if (val.type == ValueType::Null)
+            {
+                return L"null";
+            }
+            else if (val.type == ValueType::Object)
+            {
+                return L"[Object]";
+            }
+            else if (val.type == ValueType::Function)
+            {
+                return L"[Function]";
+            }
+            return L"";
+        }
+
+        void PrintValue(const Value& val)
+        {
+            outputStream << ToString(val) << L"\n";
+        }
+
+        std::wstring TokensToString(const std::vector<Token>& tokens)
+        {
+            std::wstring result;
+            for (const auto& token : tokens)
+            {
+                result += token.value + L" ";
+            }
+            return result;
+        }
+
+        Value GetVariable(const std::wstring& name)
+        {
+            for (auto it = variableScopes.rbegin(); it != variableScopes.rend(); ++it)
+            {
+                if (it->find(name) != it->end())
+                {
+                    return it->at(name);
+                }
+            }
+            throw std::runtime_error("Неопределенная переменная: " + std::string(name.begin(), name.end()));
+        }
+
+        void SetVariable(const std::wstring& name, const Value& val)
+        {
+            for (auto it = variableScopes.rbegin(); it != variableScopes.rend(); ++it)
+            {
+                if (it->find(name) != it->end())
+                {
+                    (*it)[name] = val;
+                    return;
+                }
+            }
+            // Если переменная не найдена, создаем ее в текущей области видимости
+            variableScopes.back()[name] = val;
+        }
+    };
+}
+
+// Исполняем код на языке Nova
+void ExecuteCode(const std::wstring& code)
+{
+    try
+    {
+        Nova::Interpreter interpreter(code);
+        interpreter.Interpret();
+        std::wstring output = interpreter.GetOutput();
+        // Выводим результат
+        SetWindowText(hOutput, output.c_str());
+    }
+    catch (const std::exception& e)
+    {
+        std::wstring errorMsg = L"Ошибка: " + std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(e.what());
+        SetWindowText(hOutput, errorMsg.c_str());
+    }
+}
+
 #factorial(n) {
     if n == 0 {
         return 1
@@ -11,3 +1162,5 @@ n :: 5
 result :: factorial(n)
 
 >> result
+
+Ошибка: bad conversion

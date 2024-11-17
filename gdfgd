@@ -66,9 +66,9 @@ public:
 
 private:
     std::string generateCardNumber() {
-        // Генерация номера карты (16 цифр)
-        // Начинается с '4000' (например, Visa)
-        std::string card = "4000";
+        // Генерация номера карты (16 символов)
+        // Начинается с 'OTEN' вместо '4000'
+        std::string card = "OTEN";
         card += generateRandomDigits(12);
         return card;
     }
@@ -446,10 +446,451 @@ int main() {
     system.showMenu();
     return 0;
 }
-Сборка начата в 9:48...
-1>------ Сборка начата: проект: 000, Конфигурация: Debug x64 ------
-1>MSVCRTD.lib(exe_winmain.obj) : error LNK2019: ссылка на неразрешенный внешний символ WinMain в функции "int __cdecl invoke_main(void)" (?invoke_main@@YAHXZ).
-1>C:\Users\User\source\repos\000\x64\Debug\000.exe : fatal error LNK1120: неразрешенных внешних элементов: 1
-1>Сборка проекта "000.vcxproj" завершена с ошибкой.
-========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
-========== Сборка завершено в 9:48 и заняло 00,303 с ==========
+#include <iostream>
+#include <string>
+#include <vector>
+#include <unordered_map>
+#include <iomanip>
+#include <fstream>
+#include <sstream>
+#include <ctime>
+#include <random>
+#include <algorithm>
+
+// Константы
+const std::string USERS_FILE = "users.dat";
+const std::string TRANSACTIONS_FILE = "transactions.dat";
+
+// Вспомогательные функции
+std::string generateRandomString(int length) {
+    const std::string chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    std::random_device rd;
+    std::mt19937 generator(rd());
+    std::uniform_int_distribution<> distribution(0, chars.size() - 1);
+    std::string result;
+    for(int i = 0; i < length; ++i){
+        result += chars[distribution(generator)];
+    }
+    return result;
+}
+
+std::string currentDateTime() {
+    std::time_t now = std::time(nullptr);
+    char buf[80];
+    struct tm tstruct;
+#if defined(_WIN32) || defined(_WIN64)
+    localtime_s(&tstruct, &now);
+#else
+    localtime_r(&now, &tstruct);
+#endif
+    std::strftime(buf, sizeof(buf), "%Y-%m-%d.%X", &tstruct);
+    return buf;
+}
+
+// Класс для представления счёта пользователя
+class Account {
+public:
+    std::string accountNumber;
+    double balance;
+
+    Account() : accountNumber(""), balance(0.0) {}
+    Account(const std::string& accNum, double initialBalance = 0.0)
+        : accountNumber(accNum), balance(initialBalance) {}
+};
+
+// Класс для представления пользователя
+class User {
+public:
+    std::string name;
+    std::string cardNumber;
+    std::string pin;
+    Account account;
+
+    User() {}
+    User(const std::string& userName, double initialBalance = 0.0)
+        : name(userName), pin(generatePIN()), account(generateAccountNumber(), initialBalance) {
+        cardNumber = generateCardNumber();
+    }
+
+private:
+    std::string generateCardNumber() {
+        // Генерация номера карты (16 символов)
+        // Начинается с 'OTEN' вместо '4000'
+        std::string card = "OTEN";
+        card += generateRandomDigits(12);
+        return card;
+    }
+
+    std::string generateAccountNumber() {
+        // Генерация номера счёта (20 цифр)
+        return generateRandomDigits(20);
+    }
+
+    std::string generatePIN() {
+        // Генерация PIN-кода (4 цифры)
+        return generateRandomDigits(4);
+    }
+
+    std::string generateRandomDigits(int length) {
+        std::string digits = "0123456789";
+        std::random_device rd;
+        std::mt19937 generator(rd());
+        std::uniform_int_distribution<> distribution(0, digits.size() - 1);
+        std::string result;
+        for(int i = 0; i < length; ++i){
+            result += digits[distribution(generator)];
+        }
+        return result;
+    }
+};
+
+// Класс для представления транзакции
+class Transaction {
+public:
+    std::string transactionID;
+    std::string fromCard;
+    std::string toCard;
+    double amount;
+    std::string timestamp;
+
+    Transaction() {}
+    Transaction(const std::string& from, const std::string& to, double amt)
+        : fromCard(from), toCard(to), amount(amt), timestamp(currentDateTime()) {
+        transactionID = generateTransactionID();
+    }
+
+private:
+    std::string generateTransactionID() {
+        return generateRandomString(10);
+    }
+
+    std::string generateRandomString(int length) {
+        const std::string chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        std::random_device rd;
+        std::mt19937 generator(rd());
+        std::uniform_int_distribution<> distribution(0, chars.size() - 1);
+        std::string result;
+        for(int i = 0; i < length; ++i){
+            result += chars[distribution(generator)];
+        }
+        return result;
+    }
+};
+
+// Класс для управления системой
+class PaymentSystem {
+private:
+    std::unordered_map<std::string, User> users; // Ключ: номер карты
+    std::vector<Transaction> transactions;
+
+public:
+    PaymentSystem() {
+        loadUsers();
+        loadTransactions();
+    }
+
+    ~PaymentSystem() {
+        saveUsers();
+        saveTransactions();
+    }
+
+    void showMenu() {
+        int choice;
+        do {
+            std::cout << "\n=== Платежная Система ===\n";
+            std::cout << "1. Регистрация пользователя\n";
+            std::cout << "2. Вход\n";
+            std::cout << "3. Просмотр транзакций\n";
+            std::cout << "4. Выйти\n";
+            std::cout << "Выберите действие: ";
+            std::cin >> choice;
+
+            switch(choice) {
+                case 1:
+                    registerUser();
+                    break;
+                case 2:
+                    login();
+                    break;
+                case 3:
+                    viewAllTransactions();
+                    break;
+                case 4:
+                    std::cout << "До свидания!\n";
+                    break;
+                default:
+                    std::cout << "Неверный выбор. Пожалуйста, попробуйте снова.\n";
+            }
+        } while(choice != 4);
+    }
+
+private:
+    // Регистрация нового пользователя
+    void registerUser() {
+        std::string name;
+        double initialBalance;
+
+        std::cin.ignore(); // Очистка буфера ввода
+        std::cout << "Введите имя пользователя: ";
+        std::getline(std::cin, name);
+        std::cout << "Введите начальный баланс: ";
+        std::cin >> initialBalance;
+
+        if(initialBalance < 0){
+            std::cout << "Начальный баланс не может быть отрицательным.\n";
+            return;
+        }
+
+        User newUser(name, initialBalance);
+        users[newUser.cardNumber] = newUser;
+
+        std::cout << "Пользователь зарегистрирован успешно!\n";
+        std::cout << "Номер карты: " << newUser.cardNumber << "\n";
+        std::cout << "PIN-код: " << newUser.pin << "\n";
+
+        saveUsers();
+    }
+
+    // Аутентификация пользователя
+    bool authenticate(User& user) {
+        std::string cardNumber, pin;
+        std::cout << "Введите номер вашей карты: ";
+        std::cin >> cardNumber;
+        std::cout << "Введите PIN-код: ";
+        std::cin >> pin;
+
+        auto it = users.find(cardNumber);
+        if(it != users.end() && it->second.pin == pin) {
+            user = it->second;
+            return true;
+        }
+        return false;
+    }
+
+    // Вход пользователя
+    void login() {
+        User currentUser;
+        if(authenticate(currentUser)) {
+            std::cout << "Аутентификация успешна. Добро пожаловать, " << currentUser.name << "!\n";
+            userMenu(currentUser);
+        }
+        else {
+            std::cout << "Аутентификация не удалась. Проверьте номер карты и PIN.\n";
+        }
+    }
+
+    // Меню для аутентифицированного пользователя
+    void userMenu(User& user) {
+        int choice;
+        do {
+            std::cout << "\n=== Меню Пользователя ===\n";
+            std::cout << "1. Проверить баланс\n";
+            std::cout << "2. Провести транзакцию\n";
+            std::cout << "3. История транзакций\n";
+            std::cout << "4. Выйти из аккаунта\n";
+            std::cout << "Выберите действие: ";
+            std::cin >> choice;
+
+            switch(choice) {
+                case 1:
+                    checkBalance(user);
+                    break;
+                case 2:
+                    performTransaction(user);
+                    break;
+                case 3:
+                    viewTransactionHistory(user);
+                    break;
+                case 4:
+                    std::cout << "Выход из аккаунта.\n";
+                    break;
+                default:
+                    std::cout << "Неверный выбор. Пожалуйста, попробуйте снова.\n";
+            }
+        } while(choice != 4);
+    }
+
+    // Проверка баланса
+    void checkBalance(User& user) {
+        std::cout << "Текущий баланс: $" << std::fixed << std::setprecision(2) << user.account.balance << "\n";
+    }
+
+    // Проведение транзакции
+    void performTransaction(User& user) {
+        std::string toCard;
+        double amount;
+
+        std::cout << "Введите номер карты получателя: ";
+        std::cin >> toCard;
+        std::cout << "Введите сумму для перевода: ";
+        std::cin >> amount;
+
+        if(amount <= 0){
+            std::cout << "Сумма должна быть положительной.\n";
+            return;
+        }
+
+        if(user.account.balance < amount){
+            std::cout << "Недостаточно средств для проведения транзакции.\n";
+            return;
+        }
+
+        auto it = users.find(toCard);
+        if(it == users.end()){
+            std::cout << "Карта получателя не найдена.\n";
+            return;
+        }
+
+        // Обновление балансов
+        user.account.balance -= amount;
+        it->second.account.balance += amount;
+
+        // Создание транзакции
+        Transaction txn(user.cardNumber, toCard, amount);
+        transactions.push_back(txn);
+
+        // Обновление пользователей
+        users[user.cardNumber].account.balance = user.account.balance;
+        users[toCard].account.balance = it->second.account.balance;
+
+        std::cout << "Транзакция успешно выполнена.\n";
+
+        saveUsers();
+        saveTransactions();
+    }
+
+    // Просмотр истории транзакций текущего пользователя
+    void viewTransactionHistory(User& user) {
+        std::cout << "\n=== История Транзакций ===\n";
+        bool found = false;
+        for(const auto& txn : transactions){
+            if(txn.fromCard == user.cardNumber || txn.toCard == user.cardNumber){
+                found = true;
+                std::cout << "ID: " << txn.transactionID << "\n";
+                std::cout << "От: " << txn.fromCard << "\n";
+                std::cout << "Кому: " << txn.toCard << "\n";
+                std::cout << "Сумма: $" << std::fixed << std::setprecision(2) << txn.amount << "\n";
+                std::cout << "Дата и время: " << txn.timestamp << "\n";
+                std::cout << "---------------------------\n";
+            }
+        }
+        if(!found){
+            std::cout << "Нет транзакций для отображения.\n";
+        }
+    }
+
+    // Просмотр всех транзакций (для админа или отладки)
+    void viewAllTransactions() {
+        std::cout << "\n=== Все Транзакции ===\n";
+        if(transactions.empty()){
+            std::cout << "Нет транзакций для отображения.\n";
+            return;
+        }
+        for(const auto& txn : transactions){
+            std::cout << "ID: " << txn.transactionID << "\n";
+            std::cout << "От: " << txn.fromCard << "\n";
+            std::cout << "Кому: " << txn.toCard << "\n";
+            std::cout << "Сумма: $" << std::fixed << std::setprecision(2) << txn.amount << "\n";
+            std::cout << "Дата и время: " << txn.timestamp << "\n";
+            std::cout << "---------------------------\n";
+        }
+    }
+
+    // Загрузка пользователей из файла
+    void loadUsers() {
+        std::ifstream infile(USERS_FILE);
+        if(!infile.is_open()){
+            std::cout << "Файл пользователей не найден. Будет создан новый.\n";
+            return;
+        }
+
+        std::string line;
+        while(std::getline(infile, line)){
+            if(line.empty()) continue;
+            std::istringstream iss(line);
+            std::string name, cardNumber, pin, accountNumber;
+            double balance;
+            iss >> std::ws;
+            std::getline(iss, name, '|');
+            std::getline(iss, cardNumber, '|');
+            std::getline(iss, pin, '|');
+            iss >> accountNumber >> balance;
+            User user;
+            user.name = name;
+            user.cardNumber = cardNumber;
+            user.pin = pin;
+            user.account.accountNumber = accountNumber;
+            user.account.balance = balance;
+            users[cardNumber] = user;
+        }
+        infile.close();
+    }
+
+    // Сохранение пользователей в файл
+    void saveUsers() {
+        std::ofstream outfile(USERS_FILE, std::ios::trunc);
+        if(!outfile.is_open()){
+            std::cout << "Не удалось открыть файл для сохранения пользователей.\n";
+            return;
+        }
+
+        for(const auto& pair : users){
+            const User& user = pair.second;
+            outfile << user.name << "|" << user.cardNumber << "|" << user.pin << "|"
+                    << user.account.accountNumber << " " << std::fixed << std::setprecision(2)
+                    << user.account.balance << "\n";
+        }
+        outfile.close();
+    }
+
+    // Загрузка транзакций из файла
+    void loadTransactions() {
+        std::ifstream infile(TRANSACTIONS_FILE);
+        if(!infile.is_open()){
+            std::cout << "Файл транзакций не найден. Будет создан новый.\n";
+            return;
+        }
+
+        std::string line;
+        while(std::getline(infile, line)){
+            if(line.empty()) continue;
+            std::istringstream iss(line);
+            std::string txnID, fromCard, toCard, timestamp;
+            double amount;
+            iss >> txnID >> fromCard >> toCard >> amount;
+            std::getline(iss, timestamp);
+            // Удаление возможного пробела в начале строки
+            timestamp.erase(0, timestamp.find_first_not_of(' '));
+            Transaction txn;
+            txn.transactionID = txnID;
+            txn.fromCard = fromCard;
+            txn.toCard = toCard;
+            txn.amount = amount;
+            txn.timestamp = timestamp;
+            transactions.push_back(txn);
+        }
+        infile.close();
+    }
+
+    // Сохранение транзакций в файл
+    void saveTransactions() {
+        std::ofstream outfile(TRANSACTIONS_FILE, std::ios::trunc);
+        if(!outfile.is_open()){
+            std::cout << "Не удалось открыть файл для сохранения транзакций.\n";
+            return;
+        }
+
+        for(const auto& txn : transactions){
+            outfile << txn.transactionID << " " << txn.fromCard << " " 
+                    << txn.toCard << " " << std::fixed << std::setprecision(2) 
+                    << txn.amount << " " << txn.timestamp << "\n";
+        }
+        outfile.close();
+    }
+};
+
+int main() {
+    PaymentSystem system;
+    system.showMenu();
+    return 0;
+}

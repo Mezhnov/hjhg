@@ -1110,3 +1110,39 @@ void ExecuteCode(const std::wstring& code)
         SetWindowText(hOutput, errorMsg.c_str());
     }
 }
+
+Сборка начата в 12:29...
+1>------ Сборка начата: проект: Решение, Конфигурация: Debug x64 ------
+1>Решение.cpp
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(570,37): error C2248: Nova::Lexer::position: невозможно обратиться к private член, объявленному в классе "Nova::Lexer"
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(210,16):
+1>     см. объявление "Nova::Lexer::position"
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(161,11):
+1>     см. объявление "Nova::Lexer"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(577,22): error C2248: Nova::Lexer::position: невозможно обратиться к private член, объявленному в классе "Nova::Lexer"
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(210,16):
+1>     см. объявление "Nova::Lexer::position"
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(161,11):
+1>     см. объявление "Nova::Lexer"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(580,22): error C2248: Nova::Lexer::position: невозможно обратиться к private член, объявленному в классе "Nova::Lexer"
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(210,16):
+1>     см. объявление "Nova::Lexer::position"
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(161,11):
+1>     см. объявление "Nova::Lexer"
+1>Сборка проекта "Решение.vcxproj" завершена с ошибкой.
+========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
+========== Сборка завершено в 12:29 и заняло 01,102 с ==========
+
+factorial(n) {
+    if n == 0 {
+        return 1
+    } else {
+        return n * factorial(n - 1)
+    }
+}
+
+n :: 5
+
+result :: factorial(number)
+
+Ошибка: Íåîïðåäåëåííàÿ ïåðåìåííàÿ: n

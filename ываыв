@@ -1,32 +1,14 @@
--- Variable declarations
-x :: 10
-y :: 5
-
--- Function definition
-#add(a, b) {
-    result :: a + b
-    return result
-}
-
-z :: add(x, y)
->> "The sum of x and y is: " + z
-
--- Class definition
-##Person {
-    name :: ""
-    age :: 0
-
-    #init(n, a) {
-        name = n
-        age = a
+factorial(n)
+{
+    if (n == 0)       # Базовый случай - факториал 0 равен 1
+    {
+        return 1;
     }
-
-    #greet() {
-        >> "Hello, my name is " + name + " and I am " + age + " years old."
+    else
+    {
+        return n * factorial(n - 1);  # Рекурсивно вызываем factorial(n-1)
     }
 }
 
--- Create an object of Person
-p :: Person()
-p.init("Alice", 30)
-p.greet()
+# Вычисление факториала числа 5
+result = factorial(5);

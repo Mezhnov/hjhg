@@ -1,14 +1,906 @@
-factorial(n)
+// Include necessary headers
+#include <windows.h>
+#include <gdiplus.h>
+#include <wininet.h>
+#include <string>
+#include <vector>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
+#include <locale>
+#include <codecvt>
+#include <windowsx.h>
+#include <mmsystem.h>  // For PlaySound
+#include <CommCtrl.h>  // For common controls
+#include <richedit.h>  // For rich edit controls
+#include "resource.h"  // Ensure you have this header for resource IDs
+#include <map>
+#include <functional>  // For std::function
+#include <memory>      // For std::shared_ptr
+#include <cctype>      // For isdigit and isalpha
+
+// Link the necessary libraries
+#pragma comment(lib, "gdiplus.lib")
+#pragma comment(lib, "wininet.lib")
+#pragma comment(lib, "comctl32.lib")
+#pragma comment(lib, "Winmm.lib")
+
+// Global variables
+HINSTANCE hInst;
+HWND hEdit;
+HWND hOutput;
+
+// Function declarations
+LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+void ExecuteCode(const std::wstring& code);
+void CreateControls(HWND hWnd);
+
+// Entry point
+int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
 {
-    if (n == 0)       # Базовый случай - факториал 0 равен 1
+    hInst = hInstance;
+
+    // Initialize common controls
+    INITCOMMONCONTROLSEX icex = { sizeof(INITCOMMONCONTROLSEX) };
+    icex.dwICC = ICC_WIN95_CLASSES;
+    InitCommonControlsEx(&icex);
+
+    // Load RichEdit Library
+    LoadLibrary(TEXT("Msftedit.dll"));
+
+    WNDCLASSEX wcex = { 0 };
+    wcex.cbSize = sizeof(WNDCLASSEX);
+    wcex.style = CS_HREDRAW | CS_VREDRAW;
+    wcex.lpfnWndProc = WndProc;
+    wcex.hInstance = hInst;
+    wcex.hIcon = LoadIcon(nullptr, IDI_APPLICATION);
+    wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wcex.lpszClassName = L"MyIDEClass";
+    wcex.hIconSm = LoadIcon(nullptr, IDI_APPLICATION);
+
+    RegisterClassEx(&wcex);
+
+    HWND hWnd = CreateWindowW(L"MyIDEClass", L"Nova IDE", WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, 0, 800, 600, nullptr, nullptr, hInst, nullptr);
+
+    if (!hWnd)
     {
-        return 1;
+        MessageBox(nullptr, L"Main window creation failed!", L"Error", MB_OK);
+        return FALSE;
     }
-    else
+
+    ShowWindow(hWnd, nCmdShow);
+    UpdateWindow(hWnd);
+
+    // Main message loop:
+    MSG msg;
+    while (GetMessage(&msg, nullptr, 0, 0))
     {
-        return n * factorial(n - 1);  # Рекурсивно вызываем factorial(n-1)
+        if (!IsDialogMessage(hWnd, &msg))
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
     }
+
+    return (int)msg.wParam;
 }
 
-# Вычисление факториала числа 5
-result = factorial(5);
+// Create controls (editor, button, output)
+void CreateControls(HWND hWnd)
+{
+    // Create the RichEdit control for code input
+    hEdit = CreateWindowEx(0, MSFTEDIT_CLASS, L"",
+        WS_VISIBLE | WS_CHILD | WS_BORDER | ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL,
+        10, 10, 760, 400, hWnd, (HMENU)1, hInst, nullptr);
+
+    // Create the Run button
+    HWND hButton = CreateWindow(L"BUTTON", L"Run",
+        WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+        10, 420, 100, 30, hWnd, (HMENU)2, hInst, nullptr);
+
+    // Create the output static control
+    hOutput = CreateWindow(L"EDIT", L"",
+        WS_VISIBLE | WS_CHILD | WS_BORDER | ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL | ES_READONLY,
+        10, 460, 760, 100, hWnd, (HMENU)3, hInst, nullptr);
+}
+
+// Window procedure
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
+    case WM_CREATE:
+        CreateControls(hWnd);
+        break;
+    case WM_COMMAND:
+        if (LOWORD(wParam) == 2) // Run button clicked
+        {
+            // Get the code from the edit control
+            int length = GetWindowTextLength(hEdit);
+            std::wstring code(length + 1, L'\0');
+            GetWindowText(hEdit, &code[0], length + 1);
+
+            // Execute the code
+            ExecuteCode(code);
+        }
+        break;
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+    default:
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+    return 0;
+}
+
+// Nova language interpreter
+namespace Nova
+{
+    // Token types
+    enum class TokenType
+    {
+        Identifier,
+        Number,
+        String,
+        Operator,
+        Symbol,
+        EndOfFile
+    };
+
+    // Token structure
+    struct Token
+    {
+        TokenType type;
+        std::wstring value;
+    };
+
+    // Lexer class
+    class Lexer
+    {
+    public:
+        Lexer(const std::wstring& source)
+            : source(source), position(0), length(source.length())
+        {
+        }
+
+        Token GetNextToken()
+        {
+            SkipWhitespace();
+
+            if (position >= length)
+            {
+                return { TokenType::EndOfFile, L"" };
+            }
+
+            wchar_t currentChar = Peek();
+
+            if (iswalpha(currentChar) || currentChar == L'#' || currentChar == L'_' || currentChar == L'@' || currentChar == L'$')
+            {
+                return Identifier();
+            }
+            else if (iswdigit(currentChar))
+            {
+                return Number();
+            }
+            else if (currentChar == L'"')
+            {
+                return String();
+            }
+            else if (IsOperator(currentChar))
+            {
+                return Operator();
+            }
+            else if (IsSymbol(currentChar))
+            {
+                return Symbol();
+            }
+            else
+            {
+                // Unknown token
+                position++;
+                return { TokenType::Operator, std::wstring(1, currentChar) };
+            }
+        }
+
+    private:
+        std::wstring source;
+        size_t position;
+        size_t length;
+
+        wchar_t Peek()
+        {
+            if (position < length)
+                return source[position];
+            return L'\0';
+        }
+
+        wchar_t Get()
+        {
+            if (position < length)
+                return source[position++];
+            return L'\0';
+        }
+
+        void SkipWhitespace()
+        {
+            while (position < length && iswspace(source[position]))
+                position++;
+        }
+
+        Token Identifier()
+        {
+            size_t start = position;
+
+            while (position < length && (iswalpha(source[position]) || iswdigit(source[position]) || source[position] == L'_' || source[position] == L'@' || source[position] == L'$'))
+                position++;
+
+            return { TokenType::Identifier, source.substr(start, position - start) };
+        }
+
+        Token Number()
+        {
+            size_t start = position;
+
+            while (position < length && iswdigit(source[position]))
+                position++;
+
+            return { TokenType::Number, source.substr(start, position - start) };
+        }
+
+        Token String()
+        {
+            position++; // Skip initial quote
+            size_t start = position;
+
+            while (position < length && source[position] != L'"')
+                position++;
+
+            std::wstring str = source.substr(start, position - start);
+            position++; // Skip closing quote
+
+            return { TokenType::String, str };
+        }
+
+        Token Operator()
+        {
+            wchar_t op = Get();
+
+            // Handle multi-char operators
+            if (op == L':' && Peek() == L':')
+            {
+                Get();
+                return { TokenType::Operator, L"::" };
+            }
+            else if (op == L'>' && Peek() == L'>')
+            {
+                Get();
+                return { TokenType::Operator, L">>" };
+            }
+            else if (op == L'=' && Peek() == L'=')
+            {
+                Get();
+                return { TokenType::Operator, L"==" };
+            }
+
+            return { TokenType::Operator, std::wstring(1, op) };
+        }
+
+        Token Symbol()
+        {
+            wchar_t sym = Get();
+            return { TokenType::Symbol, std::wstring(1, sym) };
+        }
+
+        bool IsOperator(wchar_t ch)
+        {
+            return wcschr(L"+-*/%=<>!&|:^#", ch) != nullptr;
+        }
+
+        bool IsSymbol(wchar_t ch)
+        {
+            return wcschr(L"(){}[],", ch) != nullptr;
+        }
+    };
+
+    // Forward declarations
+    struct Value;
+    struct Variable;
+    struct Function;
+    struct Class;
+    struct Object;
+
+    // Value types
+    enum class ValueType
+    {
+        Number,
+        String,
+        Function,
+        Object,
+        Null
+    };
+
+    // Value structure
+    struct Value
+    {
+        ValueType type;
+        double numberValue;
+        std::wstring stringValue;
+        std::shared_ptr<Function> functionValue;
+        std::shared_ptr<Object> objectValue;
+
+        Value() : type(ValueType::Null), numberValue(0) {}
+
+        Value(double num) : type(ValueType::Number), numberValue(num) {}
+
+        Value(const std::wstring& str) : type(ValueType::String), stringValue(str) {}
+
+        Value(std::shared_ptr<Function> func) : type(ValueType::Function), functionValue(func) {}
+
+        Value(std::shared_ptr<Object> obj) : type(ValueType::Object), objectValue(obj) {}
+    };
+
+    // Variable structure
+    struct Variable
+    {
+        std::wstring name;
+        Value value;
+    };
+
+    // Function structure
+    struct Function
+    {
+        std::vector<std::wstring> parameters;
+        std::vector<Token> body;
+    };
+
+    // Class structure
+    struct Class
+    {
+        std::wstring name;
+        std::vector<std::wstring> members;
+        std::map<std::wstring, Value> defaults;
+        std::map<std::wstring, std::shared_ptr<Function>> methods;
+    };
+
+    // Object structure
+    struct Object
+    {
+        std::shared_ptr<Class> classType;
+        std::map<std::wstring, Value> fields;
+    };
+
+    // Interpreter class
+    class Interpreter
+    {
+    public:
+        Interpreter(const std::wstring& code)
+            : lexer(code), outputStream()
+        {
+            Advance();
+        }
+
+        void Interpret()
+        {
+            while (currentToken.type != TokenType::EndOfFile)
+            {
+                Statement();
+            }
+        }
+
+        std::wstring GetOutput()
+        {
+            return outputStream.str();
+        }
+
+    private:
+        Lexer lexer;
+        Token currentToken;
+        std::wstringstream outputStream;
+        std::map<std::wstring, Value> variables;
+        std::map<std::wstring, std::shared_ptr<Function>> functions;
+        std::map<std::wstring, std::shared_ptr<Class>> classes;
+
+        void Advance()
+        {
+            currentToken = lexer.GetNextToken();
+        }
+
+        void Match(TokenType expectedType, const std::wstring& expectedValue = L"")
+        {
+            if (currentToken.type == expectedType &&
+                (expectedValue.empty() || currentToken.value == expectedValue))
+            {
+                Advance();
+            }
+            else
+            {
+                throw std::runtime_error("Syntax error");
+            }
+        }
+
+        void Statement()
+        {
+            if (currentToken.value == L"--") // Comment
+            {
+                while (currentToken.type != TokenType::EndOfFile && currentToken.value != L"\n")
+                {
+                    Advance();
+                }
+            }
+            else if (currentToken.type == TokenType::Identifier)
+            {
+                std::wstring identifier = currentToken.value;
+                Advance();
+                if (currentToken.value == L"::") // Variable declaration
+                {
+                    Advance();
+                    Value val = Expression();
+                    variables[identifier] = val;
+                }
+                else if (currentToken.value == L"=") // Assignment
+                {
+                    Advance();
+                    Value val = Expression();
+                    if (variables.find(identifier) != variables.end())
+                    {
+                        variables[identifier] = val;
+                    }
+                    else
+                    {
+                        throw std::runtime_error("Undefined variable: " + std::string(identifier.begin(), identifier.end()));
+                    }
+                }
+                else if (currentToken.value == L"(") // Function call
+                {
+                    std::vector<Value> args = FunctionCallArguments();
+                    CallFunction(identifier, args);
+                }
+                else
+                {
+                    throw std::runtime_error("Unexpected token after identifier");
+                }
+            }
+            else if (currentToken.value == L"#") // Function definition
+            {
+                Advance();
+                FunctionDefinition();
+            }
+            else if (currentToken.value == L"##") // Class definition
+            {
+                Advance();
+                ClassDefinition();
+            }
+            else if (currentToken.value == L">>") // Output
+            {
+                Advance();
+                Value val = Expression();
+                PrintValue(val);
+            }
+            else
+            {
+                Advance(); // Skip unknown tokens
+            }
+        }
+
+        // Function definition
+        void FunctionDefinition()
+        {
+            if (currentToken.type == TokenType::Identifier)
+            {
+                std::wstring funcName = currentToken.value;
+                Advance();
+                Match(TokenType::Symbol, L"(");
+                std::vector<std::wstring> parameters = ParameterList();
+                Match(TokenType::Symbol, L")");
+                Match(TokenType::Symbol, L"{");
+                std::vector<Token> body = FunctionBody();
+                functions[funcName] = std::make_shared<Function>(Function{ parameters, body });
+            }
+            else
+            {
+                throw std::runtime_error("Expected function name after '#'");
+            }
+        }
+
+        // Class definition
+        void ClassDefinition()
+        {
+            if (currentToken.type == TokenType::Identifier)
+            {
+                std::wstring className = currentToken.value;
+                Advance();
+                Match(TokenType::Symbol, L"{");
+                std::shared_ptr<Class> newClass = std::make_shared<Class>(Class{ className });
+                while (currentToken.type != TokenType::Symbol || currentToken.value != L"}")
+                {
+                    if (currentToken.type == TokenType::Identifier)
+                    {
+                        std::wstring memberName = currentToken.value;
+                        Advance();
+                        if (currentToken.value == L"::")
+                        {
+                            Advance();
+                            Value defaultValue = Expression();
+                            newClass->members.push_back(memberName);
+                            newClass->defaults[memberName] = defaultValue;
+                        }
+                        else
+                        {
+                            throw std::runtime_error("Expected '::' after member name");
+                        }
+                    }
+                    else if (currentToken.value == L"#") // Method
+                    {
+                        Advance();
+                        if (currentToken.type == TokenType::Identifier)
+                        {
+                            std::wstring methodName = currentToken.value;
+                            Advance();
+                            Match(TokenType::Symbol, L"(");
+                            std::vector<std::wstring> parameters = ParameterList();
+                            Match(TokenType::Symbol, L")");
+                            Match(TokenType::Symbol, L"{");
+                            std::vector<Token> body = FunctionBody();
+                            newClass->methods[methodName] = std::make_shared<Function>(Function{ parameters, body });
+                        }
+                        else
+                        {
+                            throw std::runtime_error("Expected method name after '#'");
+                        }
+                    }
+                    else
+                    {
+                        Advance(); // Skip unknown tokens
+                    }
+                }
+                Match(TokenType::Symbol, L"}");
+                classes[className] = newClass;
+            }
+            else
+            {
+                throw std::runtime_error("Expected class name after '##'");
+            }
+        }
+
+        // Parameter list
+        std::vector<std::wstring> ParameterList()
+        {
+            std::vector<std::wstring> params;
+
+            if (currentToken.type == TokenType::Identifier)
+            {
+                params.push_back(currentToken.value);
+                Advance();
+                while (currentToken.value == L",")
+                {
+                    Advance();
+                    if (currentToken.type == TokenType::Identifier)
+                    {
+                        params.push_back(currentToken.value);
+                        Advance();
+                    }
+                    else
+                    {
+                        throw std::runtime_error("Expected parameter name");
+                    }
+                }
+            }
+
+            return params;
+        }
+
+        // Function body
+        std::vector<Token> FunctionBody()
+        {
+            std::vector<Token> tokens;
+            int braceCount = 1; // We've already matched the opening '{'
+
+            while (braceCount > 0)
+            {
+                if (currentToken.type == TokenType::Symbol && currentToken.value == L"{")
+                {
+                    braceCount++;
+                }
+                else if (currentToken.type == TokenType::Symbol && currentToken.value == L"}")
+                {
+                    braceCount--;
+                    if (braceCount == 0)
+                    {
+                        Advance();
+                        break;
+                    }
+                }
+                tokens.push_back(currentToken);
+                Advance();
+            }
+
+            return tokens;
+        }
+
+        // Function call arguments
+        std::vector<Value> FunctionCallArguments()
+        {
+            Match(TokenType::Symbol, L"(");
+            std::vector<Value> args;
+
+            if (currentToken.type != TokenType::Symbol || currentToken.value != L")")
+            {
+                args.push_back(Expression());
+                while (currentToken.value == L",")
+                {
+                    Advance();
+                    args.push_back(Expression());
+                }
+            }
+
+            Match(TokenType::Symbol, L")");
+            return args;
+        }
+
+        // Call function
+        Value CallFunction(const std::wstring& name, const std::vector<Value>& args)
+        {
+            if (functions.find(name) != functions.end())
+            {
+                auto func = functions[name];
+                if (args.size() != func->parameters.size())
+                {
+                    throw std::runtime_error("Argument count mismatch in function call");
+                }
+
+                // Create a new scope for local variables
+                auto savedVariables = variables;
+                for (size_t i = 0; i < args.size(); ++i)
+                {
+                    variables[func->parameters[i]] = args[i];
+                }
+
+                // Save current token
+                auto savedToken = currentToken;
+
+                // Set up lexer for function body
+                Lexer functionLexer(TokensToString(func->body));
+                lexer = functionLexer;
+                Advance();
+
+                Value returnValue;
+
+                try
+                {
+                    while (currentToken.type != TokenType::EndOfFile)
+                    {
+                        if (currentToken.type == TokenType::Identifier && currentToken.value == L"return")
+                        {
+                            Advance();
+                            returnValue = Expression();
+                            break;
+                        }
+                        else
+                        {
+                            Statement();
+                        }
+                    }
+                }
+                catch (const std::exception& e)
+                {
+                    // Handle exception within function
+                    outputStream << L"Error in function '" << name << L"': " << e.what() << L"\n";
+                }
+
+                // Restore variables and token
+                variables = savedVariables;
+                currentToken = savedToken;
+                lexer = Lexer(L""); // Reset lexer
+
+                return returnValue;
+            }
+            else
+            {
+                throw std::runtime_error("Undefined function: " + std::string(name.begin(), name.end()));
+            }
+        }
+
+        // Expression parsing
+        Value Expression()
+        {
+            return AdditiveExpression();
+        }
+
+        Value AdditiveExpression()
+        {
+            Value lhs = MultiplicativeExpression();
+
+            while (currentToken.value == L"+" || currentToken.value == L"-")
+            {
+                std::wstring op = currentToken.value;
+                Advance();
+                Value rhs = MultiplicativeExpression();
+                lhs = ApplyOperator(lhs, op, rhs);
+            }
+
+            return lhs;
+        }
+
+        Value MultiplicativeExpression()
+        {
+            Value lhs = PrimaryExpression();
+
+            while (currentToken.value == L"*" || currentToken.value == L"/" || currentToken.value == L"%")
+            {
+                std::wstring op = currentToken.value;
+                Advance();
+                Value rhs = PrimaryExpression();
+                lhs = ApplyOperator(lhs, op, rhs);
+            }
+
+            return lhs;
+        }
+
+        Value PrimaryExpression()
+        {
+            if (currentToken.type == TokenType::Number)
+            {
+                double num = std::stod(currentToken.value);
+                Advance();
+                return Value(num);
+            }
+            else if (currentToken.type == TokenType::String)
+            {
+                std::wstring str = currentToken.value;
+                Advance();
+                return Value(str);
+            }
+            else if (currentToken.type == TokenType::Identifier)
+            {
+                std::wstring identifier = currentToken.value;
+                Advance();
+                if (currentToken.value == L"(")
+                {
+                    // Function call
+                    std::vector<Value> args = FunctionCallArguments();
+                    return CallFunction(identifier, args);
+                }
+                else if (currentToken.value == L".")
+                {
+                    // Object member access
+                    Advance();
+                    std::wstring memberName = currentToken.value;
+                    Advance();
+                    if (variables.find(identifier) != variables.end())
+                    {
+                        Value objVal = variables[identifier];
+                        if (objVal.type == ValueType::Object)
+                        {
+                            auto obj = objVal.objectValue;
+                            if (obj->fields.find(memberName) != obj->fields.end())
+                            {
+                                return obj->fields[memberName];
+                            }
+                            else
+                            {
+                                throw std::runtime_error("Undefined member: " + std::string(memberName.begin(), memberName.end()));
+                            }
+                        }
+                        else
+                        {
+                            throw std::runtime_error("Variable is not an object: " + std::string(identifier.begin(), identifier.end()));
+                        }
+                    }
+                    else
+                    {
+                        throw std::runtime_error("Undefined variable: " + std::string(identifier.begin(), identifier.end()));
+                    }
+                }
+                else
+                {
+                    // Variable value
+                    if (variables.find(identifier) != variables.end())
+                    {
+                        return variables[identifier];
+                    }
+                    else
+                    {
+                        throw std::runtime_error("Undefined variable: " + std::string(identifier.begin(), identifier.end()));
+                    }
+                }
+            }
+            else if (currentToken.value == L"(")
+            {
+                Advance();
+                Value val = Expression();
+                Match(TokenType::Symbol, L")");
+                return val;
+            }
+            else
+            {
+                throw std::runtime_error("Unexpected token in expression");
+            }
+        }
+
+        Value ApplyOperator(const Value& lhs, const std::wstring& op, const Value& rhs)
+        {
+            if (lhs.type == ValueType::Number && rhs.type == ValueType::Number)
+            {
+                if (op == L"+")
+                    return Value(lhs.numberValue + rhs.numberValue);
+                else if (op == L"-")
+                    return Value(lhs.numberValue - rhs.numberValue);
+                else if (op == L"*")
+                    return Value(lhs.numberValue * rhs.numberValue);
+                else if (op == L"/")
+                    return Value(lhs.numberValue / rhs.numberValue);
+                else if (op == L"%")
+                    return Value(fmod(lhs.numberValue, rhs.numberValue));
+            }
+            else if (lhs.type == ValueType::String || rhs.type == ValueType::String)
+            {
+                if (op == L"+")
+                {
+                    return Value(ToString(lhs) + ToString(rhs));
+                }
+            }
+
+            throw std::runtime_error("Invalid operands for operator");
+        }
+
+        std::wstring ToString(const Value& val)
+        {
+            if (val.type == ValueType::Number)
+            {
+                return std::to_wstring(val.numberValue);
+            }
+            else if (val.type == ValueType::String)
+            {
+                return val.stringValue;
+            }
+            else if (val.type == ValueType::Null)
+            {
+                return L"null";
+            }
+            else if (val.type == ValueType::Object)
+            {
+                return L"[Object]";
+            }
+            else if (val.type == ValueType::Function)
+            {
+                return L"[Function]";
+            }
+            return L"";
+        }
+
+        void PrintValue(const Value& val)
+        {
+            outputStream << ToString(val) << L"\n";
+        }
+
+        std::wstring TokensToString(const std::vector<Token>& tokens)
+        {
+            std::wstring result;
+            for (const auto& token : tokens)
+            {
+                result += token.value + L" ";
+            }
+            return result;
+        }
+    };
+}
+
+// Execute code written in Nova language
+void ExecuteCode(const std::wstring& code)
+{
+    try
+    {
+        Nova::Interpreter interpreter(code);
+        interpreter.Interpret();
+        std::wstring output = interpreter.GetOutput();
+        // Display the output
+        SetWindowText(hOutput, output.c_str());
+    }
+    catch (const std::exception& e)
+    {
+        std::wstring errorMsg = L"Error: " + std::wstring(e.what(), e.what() + strlen(e.what()));
+        SetWindowText(hOutput, errorMsg.c_str());
+    }
+}

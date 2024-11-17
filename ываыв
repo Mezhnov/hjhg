@@ -205,3 +205,12 @@ void ExecuteCode(const std::wstring& code)
 1>Сборка проекта "Решение.vcxproj" завершена с ошибкой.
 ========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
 ========== Сборка завершено в 11:19 и заняло 01,133 с ==========
+
+PRINT "Welcome to the new language"
+SET X 10
+ADD X 5
+SUB X 2
+DISPLAY X
+PRINT "Calculation complete"
+END
+

@@ -19,6 +19,7 @@
 #include <memory>      // Для std::shared_ptr
 #include <cctype>      // Для isdigit и isalpha
 #include <stack>       // Для std::stack
+#include <cmath>       // Для fmod
 
 // Линкуем необходимые библиотеки
 #pragma comment(lib, "gdiplus.lib")
@@ -203,6 +204,16 @@ namespace Nova
                 position++;
                 return { TokenType::Operator, std::wstring(1, currentChar) };
             }
+        }
+
+        size_t GetPosition() const
+        {
+            return position;
+        }
+
+        void SetPosition(size_t pos)
+        {
+            position = pos;
         }
 
     private:
@@ -394,6 +405,7 @@ namespace Nova
         Interpreter(const std::wstring& code)
             : lexer(code), outputStream()
         {
+            variableScopes.push_back(std::map<std::wstring, Value>()); // Инициализируем глобальную область видимости
             Advance();
         }
 
@@ -408,7 +420,7 @@ namespace Nova
             }
             catch (const std::exception& e)
             {
-                outputStream << L"Ошибка: " << e.what() << L"\n";
+                outputStream << L"Ошибка: " << std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(e.what()) << L"\n";
             }
         }
 
@@ -422,12 +434,13 @@ namespace Nova
         Token currentToken;
         std::wstringstream outputStream;
 
-        // Контекст исполнения
-        std::map<std::wstring, Value> variables;
+        // Стек областей видимости
+        std::vector<std::map<std::wstring, Value>> variableScopes;
+
         std::map<std::wstring, std::shared_ptr<Function>> functions;
         std::map<std::wstring, std::shared_ptr<Class>> classes;
 
-        // Для управления выполнение функции и возврата значений
+        // Для управления выполнением функции и возврата значений
         bool returnFlag = false;
         Value returnValue;
 
@@ -481,20 +494,13 @@ namespace Nova
                 {
                     Advance();
                     Value val = Expression();
-                    variables[identifier] = val;
+                    variableScopes.back()[identifier] = val;
                 }
                 else if (currentToken.value == L"=") // Присваивание
                 {
                     Advance();
                     Value val = Expression();
-                    if (variables.find(identifier) != variables.end())
-                    {
-                        variables[identifier] = val;
-                    }
-                    else
-                    {
-                        throw std::runtime_error("Неопределенная переменная: " + std::string(identifier.begin(), identifier.end()));
-                    }
+                    SetVariable(identifier, val);
                 }
                 else if (currentToken.value == L"(") // Вызов функции
                 {
@@ -567,17 +573,27 @@ namespace Nova
         void WhileStatement()
         {
             Advance();
-            size_t loopStart = lexer.position;
+            size_t loopStart = lexer.GetPosition();
             Token savedToken = currentToken;
+
             Value condition = Expression();
             Match(TokenType::Symbol, L"{");
 
             while (IsTrue(condition))
             {
-                lexer.position = loopStart;
-                currentToken = savedToken;
+                size_t bodyStart = lexer.GetPosition();
+                Token bodyToken = currentToken;
+
+                // Входим в новую область видимости цикла
+                variableScopes.push_back(std::map<std::wstring, Value>());
+
                 StatementBlock();
-                lexer.position = loopStart;
+
+                // Выходим из области видимости цикла
+                variableScopes.pop_back();
+
+                // Восстанавливаем состояние
+                lexer.SetPosition(loopStart);
                 currentToken = savedToken;
                 condition = Expression();
                 Match(TokenType::Symbol, L"{");
@@ -757,13 +773,12 @@ namespace Nova
                     throw std::runtime_error("Количество аргументов не совпадает при вызове функции");
                 }
 
-                // Сохраняем текущие переменные
-                std::map<std::wstring, Value> savedVariables = variables;
-                variables.clear();
+                // Создаем новую область видимости
+                variableScopes.push_back(std::map<std::wstring, Value>());
 
                 for (size_t i = 0; i < args.size(); ++i)
                 {
-                    variables[func->parameters[i]] = args[i];
+                    variableScopes.back()[func->parameters[i]] = args[i];
                 }
 
                 // Сохраняем текущий токен и лексер
@@ -782,10 +797,12 @@ namespace Nova
                     Statement();
                 }
 
-                // Восстанавливаем переменные и лексер
-                variables = savedVariables;
+                // Восстанавливаем лексер и токен
                 lexer = savedLexer;
                 currentToken = savedToken;
+
+                // Выходим из области видимости функции
+                variableScopes.pop_back();
 
                 return returnValue;
             }
@@ -941,14 +958,7 @@ namespace Nova
                 else
                 {
                     // Значение переменной
-                    if (variables.find(identifier) != variables.end())
-                    {
-                        return variables[identifier];
-                    }
-                    else
-                    {
-                        throw std::runtime_error("Неопределенная переменная: " + std::string(identifier.begin(), identifier.end()));
-                    }
+                    return GetVariable(identifier);
                 }
             }
             else if (currentToken.value == L"(")
@@ -1055,7 +1065,9 @@ namespace Nova
         {
             if (val.type == ValueType::Number)
             {
-                return std::to_wstring(val.numberValue);
+                std::wstringstream ss;
+                ss << val.numberValue;
+                return ss.str();
             }
             else if (val.type == ValueType::String)
             {
@@ -1090,6 +1102,32 @@ namespace Nova
             }
             return result;
         }
+
+        Value GetVariable(const std::wstring& name)
+        {
+            for (auto it = variableScopes.rbegin(); it != variableScopes.rend(); ++it)
+            {
+                if (it->find(name) != it->end())
+                {
+                    return it->at(name);
+                }
+            }
+            throw std::runtime_error("Неопределенная переменная: " + std::string(name.begin(), name.end()));
+        }
+
+        void SetVariable(const std::wstring& name, const Value& val)
+        {
+            for (auto it = variableScopes.rbegin(); it != variableScopes.rend(); ++it)
+            {
+                if (it->find(name) != it->end())
+                {
+                    (*it)[name] = val;
+                    return;
+                }
+            }
+            // Если переменная не найдена, создаем ее в текущей области видимости
+            variableScopes.back()[name] = val;
+        }
     };
 }
 
@@ -1106,43 +1144,7 @@ void ExecuteCode(const std::wstring& code)
     }
     catch (const std::exception& e)
     {
-        std::wstring errorMsg = L"Ошибка: " + std::wstring(e.what(), e.what() + strlen(e.what()));
+        std::wstring errorMsg = L"Ошибка: " + std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(e.what());
         SetWindowText(hOutput, errorMsg.c_str());
     }
 }
-
-Сборка начата в 12:29...
-1>------ Сборка начата: проект: Решение, Конфигурация: Debug x64 ------
-1>Решение.cpp
-1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(570,37): error C2248: Nova::Lexer::position: невозможно обратиться к private член, объявленному в классе "Nova::Lexer"
-1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(210,16):
-1>     см. объявление "Nova::Lexer::position"
-1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(161,11):
-1>     см. объявление "Nova::Lexer"
-1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(577,22): error C2248: Nova::Lexer::position: невозможно обратиться к private член, объявленному в классе "Nova::Lexer"
-1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(210,16):
-1>     см. объявление "Nova::Lexer::position"
-1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(161,11):
-1>     см. объявление "Nova::Lexer"
-1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(580,22): error C2248: Nova::Lexer::position: невозможно обратиться к private член, объявленному в классе "Nova::Lexer"
-1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(210,16):
-1>     см. объявление "Nova::Lexer::position"
-1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(161,11):
-1>     см. объявление "Nova::Lexer"
-1>Сборка проекта "Решение.vcxproj" завершена с ошибкой.
-========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
-========== Сборка завершено в 12:29 и заняло 01,102 с ==========
-
-factorial(n) {
-    if n == 0 {
-        return 1
-    } else {
-        return n * factorial(n - 1)
-    }
-}
-
-n :: 5
-
-result :: factorial(number)
-
-Ошибка: Íåîïðåäåëåííàÿ ïåðåìåííàÿ: n

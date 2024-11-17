@@ -1,22 +1,17 @@
-# add(a, b) {
-    return a + b
-}
-
-# subtract(a, b) {
-    return a - b
-}
-
-# multiply(a, b) {
-    return a * b
-}
-
-# divide(a, b) {
-    if b == 0 {
-        return "Error: Division by zero"
+-- Define a recursive function to calculate factorial
+# factorial(n) {
+    if n == 0 {
+        return 1
     } else {
-        return a / b
+        return n * factorial(n - 1)
     }
 }
 
-x :: 20
-y :: 5
+-- Declare a variable and assign a value
+number :: 5
+
+-- Call the factorial function and store the result
+result :: factorial(number)
+
+-- Output the result
+>> "The factorial of " + number + " is " + result

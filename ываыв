@@ -8,7 +8,6 @@
 #include <iomanip>
 #include <sstream>
 #include <locale>
-#include <codecvt>
 #include <windowsx.h>
 #include <mmsystem.h>  // Для PlaySound
 #include <CommCtrl.h>  // Для common controls
@@ -310,6 +309,16 @@ namespace Nova
                 Get();
                 return { TokenType::Operator, L">=" };
             }
+            else if (op == L'&' && Peek() == L'&')
+            {
+                Get();
+                return { TokenType::Operator, L"&&" };
+            }
+            else if (op == L'|' && Peek() == L'|')
+            {
+                Get();
+                return { TokenType::Operator, L"||" };
+            }
 
             return { TokenType::Operator, std::wstring(1, op) };
         }
@@ -420,7 +429,7 @@ namespace Nova
             }
             catch (const std::exception& e)
             {
-                outputStream << L"Ошибка: " << std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(e.what()) << L"\n";
+                outputStream << L"Error: " << StringToWString(e.what()) << L"\n";
             }
         }
 
@@ -458,7 +467,7 @@ namespace Nova
             }
             else
             {
-                throw std::runtime_error("Ожидался другой токен");
+                throw std::runtime_error("Expected different token");
             }
         }
 
@@ -509,7 +518,7 @@ namespace Nova
                 }
                 else
                 {
-                    throw std::runtime_error("Неизвестная операция после идентификатора");
+                    throw std::runtime_error("Unknown token after identifier");
                 }
             }
             else if (currentToken.value == L"#") // Определение функции
@@ -675,7 +684,7 @@ namespace Nova
             }
             else
             {
-                throw std::runtime_error("Ожидалось имя функции после '#'");
+                throw std::runtime_error("Expected function name after '#'");
             }
         }
 
@@ -684,7 +693,7 @@ namespace Nova
         {
             // Здесь можно добавить реализацию классов
             // Пока пропустим эту часть
-            throw std::runtime_error("Определение классов пока не поддерживается");
+            throw std::runtime_error("Class definitions are not supported yet");
         }
 
         // Список параметров
@@ -706,7 +715,7 @@ namespace Nova
                     }
                     else
                     {
-                        throw std::runtime_error("Ожидалось имя параметра");
+                        throw std::runtime_error("Expected parameter name");
                     }
                 }
             }
@@ -770,7 +779,7 @@ namespace Nova
                 auto func = functions[name];
                 if (args.size() != func->parameters.size())
                 {
-                    throw std::runtime_error("Количество аргументов не совпадает при вызове функции");
+                    throw std::runtime_error("Argument count does not match when calling function");
                 }
 
                 // Создаем новую область видимости
@@ -808,7 +817,7 @@ namespace Nova
             }
             else
             {
-                throw std::runtime_error("Неопределенная функция: " + std::string(name.begin(), name.end()));
+                throw std::runtime_error("Undefined function: " + std::string(name.begin(), name.end()));
             }
         }
 
@@ -922,7 +931,7 @@ namespace Nova
                 }
                 else
                 {
-                    throw std::runtime_error("Унарный минус применим только к числам");
+                    throw std::runtime_error("Unary minus can only be applied to numbers");
                 }
             }
             else
@@ -970,7 +979,7 @@ namespace Nova
             }
             else
             {
-                throw std::runtime_error("Неожиданный токен в выражении");
+                throw std::runtime_error("Unexpected token in expression");
             }
         }
 
@@ -997,7 +1006,7 @@ namespace Nova
                 }
             }
 
-            throw std::runtime_error("Недопустимые операнды для оператора");
+            throw std::runtime_error("Invalid operands for operator");
         }
 
         Value ApplyLogicalOperator(const Value& lhs, const std::wstring& op, const Value& rhs)
@@ -1010,7 +1019,7 @@ namespace Nova
             else if (op == L"||")
                 return Value((double)(lhsBool || rhsBool));
 
-            throw std::runtime_error("Недопустимый логический оператор");
+            throw std::runtime_error("Invalid logical operator");
         }
 
         Value ApplyEqualityOperator(const Value& lhs, const std::wstring& op, const Value& rhs)
@@ -1024,7 +1033,7 @@ namespace Nova
                 return Value((double)!IsEqual(lhs, rhs));
             }
 
-            throw std::runtime_error("Недопустимый оператор равенства");
+            throw std::runtime_error("Invalid equality operator");
         }
 
         Value ApplyRelationalOperator(const Value& lhs, const std::wstring& op, const Value& rhs)
@@ -1042,10 +1051,10 @@ namespace Nova
             }
             else
             {
-                throw std::runtime_error("Операторы сравнения применимы только к числам");
+                throw std::runtime_error("Comparison operators can only be applied to numbers");
             }
 
-            throw std::runtime_error("Недопустимый оператор сравнения");
+            throw std::runtime_error("Invalid comparison operator");
         }
 
         bool IsEqual(const Value& lhs, const Value& rhs)
@@ -1112,7 +1121,7 @@ namespace Nova
                     return it->at(name);
                 }
             }
-            throw std::runtime_error("Неопределенная переменная: " + std::string(name.begin(), name.end()));
+            throw std::runtime_error("Undefined variable: " + std::string(name.begin(), name.end()));
         }
 
         void SetVariable(const std::wstring& name, const Value& val)
@@ -1127,6 +1136,13 @@ namespace Nova
             }
             // Если переменная не найдена, создаем ее в текущей области видимости
             variableScopes.back()[name] = val;
+        }
+
+        // Преобразование std::string в std::wstring
+        std::wstring StringToWString(const std::string& str)
+        {
+            std::wstring wstr(str.begin(), str.end());
+            return wstr;
         }
     };
 }
@@ -1144,23 +1160,7 @@ void ExecuteCode(const std::wstring& code)
     }
     catch (const std::exception& e)
     {
-        std::wstring errorMsg = L"Ошибка: " + std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(e.what());
+        std::wstring errorMsg = L"Error: " + std::wstring(e.what(), e.what() + strlen(e.what()));
         SetWindowText(hOutput, errorMsg.c_str());
     }
 }
-
-#factorial(n) {
-    if n == 0 {
-        return 1
-    } else {
-        return n * factorial(n - 1)
-    }
-}
-
-n :: 5
-
-result :: factorial(n)
-
->> result
-
-Ошибка: bad conversion

@@ -189,3 +189,19 @@ void ExecuteCode(const std::wstring& code)
     // Display the output
     SetWindowText(hOutput, output.c_str());
 }
+Сборка начата в 11:19...
+1>------ Сборка начата: проект: Решение, Конфигурация: Debug x64 ------
+1>Решение.cpp
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(136,10): error C2039: "map": не является членом "std".
+1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\codecvt(20,1):
+1>     см. объявление "std"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(136,10): error C2065: map: необъявленный идентификатор
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(136,19): error C2275: "std::wstring": ожидается выражение вместо типа
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(136,28): error C2062: тип "int" не требуется
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(157,13): error C2065: variables: необъявленный идентификатор
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(164,13): error C2065: variables: необъявленный идентификатор
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(171,13): error C2065: variables: необъявленный идентификатор
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(177,58): error C2065: variables: необъявленный идентификатор
+1>Сборка проекта "Решение.vcxproj" завершена с ошибкой.
+========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
+========== Сборка завершено в 11:19 и заняло 01,133 с ==========

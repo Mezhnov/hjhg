@@ -1164,3 +1164,16 @@ void ExecuteCode(const std::wstring& code)
         SetWindowText(hOutput, errorMsg.c_str());
     }
 }
+#factorial(n) {
+    if n == 0 {
+        return 1
+    } else {
+        return n * factorial(n - 1)
+    }
+}
+
+n :: 5
+
+result :: factorial(n)
+
+>> result

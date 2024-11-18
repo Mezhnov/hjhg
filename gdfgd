@@ -1,8 +1,7 @@
 // Включаем необходимые заголовочные файлы
 #include <windows.h>
 #include <gdiplus.h>
-#include <urlmon.h>
-#include <shlwapi.h> // Для функций манипуляции путями
+#include <wininet.h>
 #include <string>
 #include <vector>
 #include <chrono>
@@ -23,65 +22,119 @@
 
 // Линкуем необходимые библиотеки
 #pragma comment(lib, "gdiplus.lib")
-#pragma comment(lib, "urlmon.lib")
-#pragma comment(lib, "shlwapi.lib") // Для функций манипуляции путями
-#pragma comment(lib, "Wininet.lib")
+#pragma comment(lib, "wininet.lib")
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "Winmm.lib")
 
-using namespace Gdiplus;
-
-// Глобальные переменные для хранения изображений
-Bitmap* g_mainImage = nullptr;
-Bitmap* g_wifiIcon = nullptr;
-Bitmap* g_batteryIcon = nullptr;
-Bitmap* g_signalIcon = nullptr;
-Bitmap* g_internetIcon = nullptr;
-
-// Вектор для хранения иконок приложений
-std::vector<AppIcon> g_appIcons;
-
-// Глобальные переменные для отображения времени и даты
-bool isDragging = false;
-POINT dragStartPoint = { 0, 0 };
-int selectedAppIndex = -1; // Индекс выбранной иконки для изменения размера
-
-// Позиция времени и даты: настройте значения для позиционирования
-RECT timeRect = { 50, 50, 300, 100 }; // Начальная позиция и размер времени
-Color timeColor = Color(255, 255, 255, 255); // Белый цвет по умолчанию
-float timeFontSize = 50.0f; // Начальный размер шрифта времени
-
-RECT dateRect = { 50, 110, 300, 150 }; // Начальная позиция и размер даты
-Color dateColor = Color(255, 255, 255, 255); // Белый цвет даты
-float dateFontSize = 20.0f; // Начальный размер шрифта даты
-
-std::wstring currentTime = L"00:00"; // Текущее время
-std::wstring currentDate = L"01.09.2023"; // Текущая дата
+// Глобальные переменные
+HINSTANCE hInst;
+HWND hEdit;
+HWND hOutput;
 
 // Объявления функций
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 void ExecuteCode(const std::wstring& code);
 void CreateControls(HWND hWnd);
 
-// Перевод числа в строку (для некоторых случаев)
-std::wstring NumberToWString(double num) {
-    std::wstringstream ss;
-    ss << num;
-    return ss.str();
+// Точка входа
+int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
+{
+    hInst = hInstance;
+
+    // Инициализируем common controls
+    INITCOMMONCONTROLSEX icex = { sizeof(INITCOMMONCONTROLSEX) };
+    icex.dwICC = ICC_WIN95_CLASSES;
+    InitCommonControlsEx(&icex);
+
+    // Загружаем библиотеку RichEdit
+    LoadLibrary(TEXT("Msftedit.dll"));
+
+    WNDCLASSEX wcex = { 0 };
+    wcex.cbSize = sizeof(WNDCLASSEX);
+    wcex.style = CS_HREDRAW | CS_VREDRAW;
+    wcex.lpfnWndProc = WndProc;
+    wcex.hInstance = hInst;
+    wcex.hIcon = LoadIcon(nullptr, IDI_APPLICATION);
+    wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wcex.lpszClassName = L"MyIDEClass";
+    wcex.hIconSm = LoadIcon(nullptr, IDI_APPLICATION);
+
+    RegisterClassEx(&wcex);
+
+    HWND hWnd = CreateWindowW(L"MyIDEClass", L"Nova IDE", WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, 0, 800, 600, nullptr, nullptr, hInst, nullptr);
+
+    if (!hWnd)
+    {
+        MessageBox(nullptr, L"Не удалось создать главное окно!", L"Ошибка", MB_OK);
+        return FALSE;
+    }
+
+    ShowWindow(hWnd, nCmdShow);
+    UpdateWindow(hWnd);
+
+    // Главный цикл сообщений
+    MSG msg;
+    while (GetMessage(&msg, nullptr, 0, 0))
+    {
+        if (!IsDialogMessage(hWnd, &msg))
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+    }
+
+    return (int)msg.wParam;
 }
 
-// Добавляем пропущенные глобальные объявления
-HINSTANCE hInst = nullptr;
-HWND hEdit = nullptr;
-HWND hOutput = nullptr;
+// Создаем элементы управления (редактор, кнопка, вывод)
+void CreateControls(HWND hWnd)
+{
+    // Создаем RichEdit для ввода кода
+    hEdit = CreateWindowEx(0, MSFTEDIT_CLASS, L"",
+        WS_VISIBLE | WS_CHILD | WS_BORDER | ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL,
+        10, 10, 760, 400, hWnd, (HMENU)1, hInst, nullptr);
 
-// Структура для хранения иконки приложения и её метки
-struct AppIcon {
-    Bitmap* image;
-    std::wstring label;
-    float sizeFactor; // Коэффициент размера (1.0 - стандартный размер)
-    RECT drawRect;    // Прямоугольник для обнаружения кликов
-};
+    // Создаем кнопку "Run"
+    HWND hButton = CreateWindow(L"BUTTON", L"Run",
+        WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+        10, 420, 100, 30, hWnd, (HMENU)2, hInst, nullptr);
+
+    // Создаем элемент вывода
+    hOutput = CreateWindow(L"EDIT", L"",
+        WS_VISIBLE | WS_CHILD | WS_BORDER | ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL | ES_READONLY,
+        10, 460, 760, 100, hWnd, (HMENU)3, hInst, nullptr);
+}
+
+// Обработчик окна
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
+    case WM_CREATE:
+        CreateControls(hWnd);
+        break;
+    case WM_COMMAND:
+        if (LOWORD(wParam) == 2) // Нажата кнопка "Run"
+        {
+            // Получаем код из редактора
+            int length = GetWindowTextLength(hEdit);
+            std::wstring code(length + 1, L'\0');
+            GetWindowText(hEdit, &code[0], length + 1);
+
+            // Исполняем код
+            ExecuteCode(code);
+        }
+        break;
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+    default:
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+    return 0;
+}
 
 // Интерпретатор языка Nova
 namespace Nova
@@ -266,10 +319,6 @@ namespace Nova
                 Get();
                 return { TokenType::Operator, L"||" };
             }
-            else if (op == L'>') // Оператор вывода
-            {
-                return { TokenType::Operator, L">>" };
-            }
 
             return { TokenType::Operator, std::wstring(1, op) };
         }
@@ -291,6 +340,13 @@ namespace Nova
         }
     };
 
+    // Предварительные объявления
+    struct Value;
+    struct Variable;
+    struct Function;
+    struct Class;
+    struct Object;
+
     // Типы значений
     enum class ValueType
     {
@@ -307,8 +363,8 @@ namespace Nova
         ValueType type;
         double numberValue;
         std::wstring stringValue;
-        std::shared_ptr<class Function> functionValue;
-        std::shared_ptr<class Object> objectValue;
+        std::shared_ptr<Function> functionValue;
+        std::shared_ptr<Object> objectValue;
 
         Value() : type(ValueType::Null), numberValue(0) {}
 
@@ -316,9 +372,9 @@ namespace Nova
 
         Value(const std::wstring& str) : type(ValueType::String), stringValue(str) {}
 
-        Value(std::shared_ptr<class Function> func) : type(ValueType::Function), functionValue(func) {}
+        Value(std::shared_ptr<Function> func) : type(ValueType::Function), functionValue(func) {}
 
-        Value(std::shared_ptr<class Object> obj) : type(ValueType::Object), objectValue(obj) {}
+        Value(std::shared_ptr<Object> obj) : type(ValueType::Object), objectValue(obj) {}
     };
 
     // Переменная
@@ -369,8 +425,6 @@ namespace Nova
                 while (currentToken.type != TokenType::EndOfFile)
                 {
                     Statement();
-                    if (returnFlag)
-                        break;
                 }
             }
             catch (const std::exception& e)
@@ -395,6 +449,7 @@ namespace Nova
         std::map<std::wstring, std::shared_ptr<Function>> functions;
         std::map<std::wstring, std::shared_ptr<Class>> classes;
 
+        // Для управления выполнением функции и возврата значений
         bool returnFlag = false;
         Value returnValue;
 
@@ -440,10 +495,6 @@ namespace Nova
                 if (returnFlag)
                     return;
             }
-            else if (currentToken.value == L">>") // Оператор вывода
-            {
-                PrintStatement();
-            }
             else if (currentToken.type == TokenType::Identifier)
             {
                 std::wstring identifier = currentToken.value;
@@ -479,6 +530,16 @@ namespace Nova
             {
                 Advance();
                 ClassDefinition();
+            }
+            else if (currentToken.value == L">>") // Вывод
+            {
+                Advance();
+                Value val = Expression();
+                PrintValue(val);
+            }
+            else if (currentToken.type == TokenType::EndOfFile)
+            {
+                // Конец файла
             }
             else
             {
@@ -731,7 +792,7 @@ namespace Nova
 
                 // Сохраняем текущий токен и лексер
                 Token savedToken = currentToken;
-                size_t savedPosition = lexer.GetPosition();
+                Lexer savedLexer = lexer;
 
                 // Загружаем тело функции в лексер
                 lexer = Lexer(TokensToString(func->body));
@@ -746,7 +807,7 @@ namespace Nova
                 }
 
                 // Восстанавливаем лексер и токен
-                lexer.SetPosition(savedPosition);
+                lexer = savedLexer;
                 currentToken = savedToken;
 
                 // Выходим из области видимости функции
@@ -885,6 +946,7 @@ namespace Nova
             }
         }
 
+
         Value PrimaryExpression()
         {
             if (currentToken.type == TokenType::Number)
@@ -939,17 +1001,9 @@ namespace Nova
                 else if (op == L"*")
                     return Value(lhs.numberValue * rhs.numberValue);
                 else if (op == L"/")
-                {
-                    if (rhs.numberValue == 0)
-                        throw std::runtime_error("Division by zero");
                     return Value(lhs.numberValue / rhs.numberValue);
-                }
                 else if (op == L"%")
-                {
-                    if (rhs.numberValue == 0)
-                        throw std::runtime_error("Division by zero");
                     return Value(fmod(lhs.numberValue, rhs.numberValue));
-                }
             }
             else if (lhs.type == ValueType::String || rhs.type == ValueType::String)
             {
@@ -1097,36 +1151,6 @@ namespace Nova
             std::wstring wstr(str.begin(), str.end());
             return wstr;
         }
-
-        // Обработка оператора вывода >>
-        void PrintStatement()
-        {
-            Advance(); // Пропустить >>
-            // Собираем выражения до конца строки или блока
-            std::wstring outputStr;
-            bool first = true;
-            while (currentToken.type != TokenType::EndOfFile &&
-                   !(currentToken.type == TokenType::Symbol && currentToken.value == L"}"))
-            {
-                if (currentToken.value == L" ")
-                {
-                    outputStr += L" ";
-                    Advance();
-                }
-                else
-                {
-                    if (!first)
-                        outputStr += L" ";
-                    Value val = Expression();
-                    outputStr += ToString(val);
-                    first = false;
-                    // Если текущий токен запятая, пропускаем ее
-                    if (currentToken.value == L",")
-                        Advance();
-                }
-            }
-            PrintValue(Value(outputStr));
-        }
     };
 }
 
@@ -1148,127 +1172,3 @@ void ExecuteCode(const std::wstring& code)
     }
 }
 
-// Создаем элементы управления (редактор, кнопка, вывод)
-void CreateControls(HWND hWnd)
-{
-    // Создаем RichEdit для ввода кода
-    hEdit = CreateWindowEx(0, MSFTEDIT_CLASS, L"",
-        WS_VISIBLE | WS_CHILD | WS_BORDER | ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL,
-        10, 10, 760, 400, hWnd, (HMENU)1, hInst, nullptr);
-
-    // Создаем кнопку "Run"
-    HWND hButton = CreateWindow(L"BUTTON", L"Run",
-        WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
-        10, 420, 100, 30, hWnd, (HMENU)2, hInst, nullptr);
-
-    // Создаем элемент вывода
-    hOutput = CreateWindow(L"EDIT", L"",
-        WS_VISIBLE | WS_CHILD | WS_BORDER | ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL | ES_READONLY,
-        10, 460, 760, 100, hWnd, (HMENU)3, hInst, nullptr);
-}
-
-// Обработчик окна
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-    switch (message)
-    {
-    case WM_CREATE:
-        CreateControls(hWnd);
-        break;
-    case WM_COMMAND:
-        if (LOWORD(wParam) == 2) // Нажата кнопка "Run"
-        {
-            // Получаем код из редактора
-            int length = GetWindowTextLength(hEdit);
-            std::wstring code(length + 1, L'\0');
-            GetWindowText(hEdit, &code[0], length + 1);
-
-            // Исполняем код
-            ExecuteCode(code);
-        }
-        break;
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        break;
-    default:
-        return DefWindowProc(hWnd, message, wParam, lParam);
-    }
-    return 0;
-}
-
-// Основная функция для приложений Windows
-int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
-{
-    hInst = hInstance;
-
-    // Инициализируем common controls
-    INITCOMMONCONTROLSEX icex = { sizeof(INITCOMMONCONTROLSEX) };
-    icex.dwICC = ICC_WIN95_CLASSES;
-    InitCommonControlsEx(&icex);
-
-    // Загружаем библиотеку RichEdit
-    LoadLibrary(TEXT("Msftedit.dll"));
-
-    WNDCLASSEX wcex = { 0 };
-    wcex.cbSize = sizeof(WNDCLASSEX);
-    wcex.style = CS_HREDRAW | CS_VREDRAW;
-    wcex.lpfnWndProc = WndProc;
-    wcex.hInstance = hInstance;
-    wcex.hIcon = LoadIcon(nullptr, IDI_APPLICATION);
-    wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-    wcex.lpszClassName = L"MyIDEClass";
-    wcex.hIconSm = LoadIcon(nullptr, IDI_APPLICATION);
-
-    RegisterClassEx(&wcex);
-
-    HWND hWnd = CreateWindowW(L"MyIDEClass", L"Nova IDE", WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, 0, 800, 600, nullptr, nullptr, hInstance, nullptr);
-
-    if (!hWnd)
-    {
-        MessageBox(nullptr, L"Не удалось создать главное окно!", L"Ошибка", MB_OK);
-        return FALSE;
-    }
-
-    ShowWindow(hWnd, nCmdShow);
-    UpdateWindow(hWnd);
-
-    // Главный цикл сообщений
-    MSG msg;
-    while (GetMessage(&msg, nullptr, 0, 0))
-    {
-        if (!IsDialogMessage(hWnd, &msg))
-        {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
-    }
-
-    return (int)msg.wParam;
-}
->> "x y z w"
-
-x :: 0
-y :: 0
-z :: 0
-w :: 0
-
-while x < 2 {
-    while y < 2 {
-        while z < 2 {
-            while w < 2 {
-                if !((x <= y && y <= w) || (z == (x || y))) {
-                    >> x " " y " " z " " w
-                }
-                w = w + 1
-            }
-            w = 0
-            z = z + 1
-        }
-        z = 0
-        y = y + 1
-    }
-    y = 0
-    x = x + 1
-}

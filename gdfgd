@@ -918,27 +918,34 @@ namespace Nova
             return lhs;
         }
 
-        Value UnaryExpression()
+Value UnaryExpression()
+{
+    if (currentToken.value == L"-")
+    {
+        Advance();
+        Value val = UnaryExpression();
+        if (val.type == ValueType::Number)
         {
-            if (currentToken.value == L"-")
-            {
-                Advance();
-                Value val = PrimaryExpression();
-                if (val.type == ValueType::Number)
-                {
-                    val.numberValue = -val.numberValue;
-                    return val;
-                }
-                else
-                {
-                    throw std::runtime_error("Unary minus can only be applied to numbers");
-                }
-            }
-            else
-            {
-                return PrimaryExpression();
-            }
+            val.numberValue = -val.numberValue;
+            return val;
         }
+        else
+        {
+            throw std::runtime_error("Унарный минус может применяться только к числам");
+        }
+    }
+    else if (currentToken.value == L"!")
+    {
+        Advance();
+        Value val = UnaryExpression();
+        return Value((double)!IsTrue(val));
+    }
+    else
+    {
+        return PrimaryExpression();
+    }
+}
+
 
         Value PrimaryExpression()
         {
@@ -1190,6 +1197,3 @@ while x < 2 {
     y = 0
     x = x + 1
 }
-
-x y z w
-Error: Unexpected token in expression

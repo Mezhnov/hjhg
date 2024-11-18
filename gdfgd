@@ -1247,3 +1247,28 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmd
 
     return (int)msg.wParam;
 }
+>> "x y z w"
+
+x :: 0
+y :: 0
+z :: 0
+w :: 0
+
+while x < 2 {
+    while y < 2 {
+        while z < 2 {
+            while w < 2 {
+                if !((x <= y && y <= w) || (z == (x || y))) {
+                    >> x " " y " " z " " w
+                }
+                w = w + 1
+            }
+            w = 0
+            z = z + 1
+        }
+        z = 0
+        y = y + 1
+    }
+    y = 0
+    x = x + 1
+}

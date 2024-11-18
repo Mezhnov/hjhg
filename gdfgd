@@ -1172,3 +1172,28 @@ void ExecuteCode(const std::wstring& code)
     }
 }
 
+// Эмулируем сортировку трех чисел
+a :: 10
+b :: 3
+c :: 7
+
+// Пузырьковая сортировка
+if a > b {
+    temp :: a
+    a = b
+    b = temp
+}
+
+if b > c {
+    temp :: b
+    b = c
+    c = temp
+}
+
+if a > b {
+    temp :: a
+    a = b
+    b = temp
+}
+
+>> "Отсортированные числа: " + a + ", " + b + ", " + c

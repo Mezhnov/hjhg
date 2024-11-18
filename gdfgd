@@ -1197,3 +1197,6 @@ while x < 2 {
     y = 0
     x = x + 1
 }
+x y z w
+0
+Error: Unknown token after identifier

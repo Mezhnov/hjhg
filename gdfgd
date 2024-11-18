@@ -3538,3 +3538,319 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmd
 
     return (int)msg.wParam;
 }
+Сборка начата в 20:53...
+1>------ Сборка начата: проект: Решение, Конфигурация: Debug x64 ------
+1>Решение.cpp
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(327,12): warning C4099: Nova::Function: имя типа, ранее отображенное с помощью "class", теперь отображено с помощью "struct"
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(327,12):
+1>     см. объявление "Nova::Function"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(343,12): warning C4099: Nova::Object: имя типа, ранее отображенное с помощью "class", теперь отображено с помощью "struct"
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(343,12):
+1>     см. объявление "Nova::Object"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1119,14): error C2535: void Nova::Interpreter::StatementBlock(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(575,14):
+1>     см. объявление "Nova::Interpreter::StatementBlock"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1131,14): error C2535: void Nova::Interpreter::SkipStatementBlock(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(587,14):
+1>     см. объявление "Nova::Interpreter::SkipStatementBlock"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1150,14): error C2535: void Nova::Interpreter::FunctionDefinition(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(606,14):
+1>     см. объявление "Nova::Interpreter::FunctionDefinition"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1170,14): error C2535: void Nova::Interpreter::ClassDefinition(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(626,14):
+1>     см. объявление "Nova::Interpreter::ClassDefinition"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1178,35): error C2535: std::vector<std::wstring,std::allocator<std::wstring>> Nova::Interpreter::ParameterList(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(634,35):
+1>     см. объявление "Nova::Interpreter::ParameterList"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1205,28): error C2535: std::vector<Nova::Token,std::allocator<Nova::Token>> Nova::Interpreter::FunctionBody(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(661,28):
+1>     см. объявление "Nova::Interpreter::FunctionBody"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1233,28): error C2535: std::vector<Nova::Value,std::allocator<Nova::Value>> Nova::Interpreter::FunctionCallArguments(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(689,28):
+1>     см. объявление "Nova::Interpreter::FunctionCallArguments"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1253,15): error C2535: Nova::Value Nova::Interpreter::CallFunction(const std::wstring &,const std::vector<Nova::Value,std::allocator<Nova::Value>> &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(709,15):
+1>     см. объявление "Nova::Interpreter::CallFunction"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1303,15): error C2535: Nova::Value Nova::Interpreter::Expression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(759,15):
+1>     см. объявление "Nova::Interpreter::Expression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1309,15): error C2535: Nova::Value Nova::Interpreter::LogicalOrExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(765,15):
+1>     см. объявление "Nova::Interpreter::LogicalOrExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1324,15): error C2535: Nova::Value Nova::Interpreter::LogicalAndExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(780,15):
+1>     см. объявление "Nova::Interpreter::LogicalAndExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1339,15): error C2535: Nova::Value Nova::Interpreter::EqualityExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(795,15):
+1>     см. объявление "Nova::Interpreter::EqualityExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1354,15): error C2535: Nova::Value Nova::Interpreter::RelationalExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(810,15):
+1>     см. объявление "Nova::Interpreter::RelationalExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1369,15): error C2535: Nova::Value Nova::Interpreter::AdditiveExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(825,15):
+1>     см. объявление "Nova::Interpreter::AdditiveExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1384,15): error C2535: Nova::Value Nova::Interpreter::MultiplicativeExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(840,15):
+1>     см. объявление "Nova::Interpreter::MultiplicativeExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1399,15): error C2535: Nova::Value Nova::Interpreter::UnaryExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(855,15):
+1>     см. объявление "Nova::Interpreter::UnaryExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1427,15): error C2535: Nova::Value Nova::Interpreter::PrimaryExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(883,15):
+1>     см. объявление "Nova::Interpreter::PrimaryExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1470,15): error C2535: Nova::Value Nova::Interpreter::ApplyOperator(const Nova::Value &,const std::wstring &,const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(926,15):
+1>     см. объявление "Nova::Interpreter::ApplyOperator"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1504,15): error C2535: Nova::Value Nova::Interpreter::ApplyLogicalOperator(const Nova::Value &,const std::wstring &,const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(960,15):
+1>     см. объявление "Nova::Interpreter::ApplyLogicalOperator"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1517,15): error C2535: Nova::Value Nova::Interpreter::ApplyEqualityOperator(const Nova::Value &,const std::wstring &,const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(973,15):
+1>     см. объявление "Nova::Interpreter::ApplyEqualityOperator"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1531,15): error C2535: Nova::Value Nova::Interpreter::ApplyRelationalOperator(const Nova::Value &,const std::wstring &,const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(987,15):
+1>     см. объявление "Nova::Interpreter::ApplyRelationalOperator"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1552,14): error C2535: bool Nova::Interpreter::IsEqual(const Nova::Value &,const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1008,14):
+1>     см. объявление "Nova::Interpreter::IsEqual"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1565,22): error C2535: std::wstring Nova::Interpreter::ToString(const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1021,22):
+1>     см. объявление "Nova::Interpreter::ToString"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1592,14): error C2535: void Nova::Interpreter::PrintValue(const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1048,14):
+1>     см. объявление "Nova::Interpreter::PrintValue"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1597,22): error C2535: std::wstring Nova::Interpreter::TokensToString(const std::vector<Nova::Token,std::allocator<Nova::Token>> &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1053,22):
+1>     см. объявление "Nova::Interpreter::TokensToString"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1607,15): error C2535: Nova::Value Nova::Interpreter::GetVariable(const std::wstring &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1063,15):
+1>     см. объявление "Nova::Interpreter::GetVariable"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1619,14): error C2535: void Nova::Interpreter::SetVariable(const std::wstring &,const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1075,14):
+1>     см. объявление "Nova::Interpreter::SetVariable"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1634,22): error C2535: std::wstring Nova::Interpreter::StringToWString(const std::string &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1090,22):
+1>     см. объявление "Nova::Interpreter::StringToWString"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1641,14): error C2535: void Nova::Interpreter::PrintStatement(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1097,14):
+1>     см. объявление "Nova::Interpreter::PrintStatement"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1667,14): error C2535: void Nova::Interpreter::StatementBlock(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(575,14):
+1>     см. объявление "Nova::Interpreter::StatementBlock"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1679,14): error C2535: void Nova::Interpreter::SkipStatementBlock(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(587,14):
+1>     см. объявление "Nova::Interpreter::SkipStatementBlock"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1698,14): error C2535: void Nova::Interpreter::FunctionDefinition(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(606,14):
+1>     см. объявление "Nova::Interpreter::FunctionDefinition"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1718,14): error C2535: void Nova::Interpreter::ClassDefinition(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(626,14):
+1>     см. объявление "Nova::Interpreter::ClassDefinition"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1726,35): error C2535: std::vector<std::wstring,std::allocator<std::wstring>> Nova::Interpreter::ParameterList(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(634,35):
+1>     см. объявление "Nova::Interpreter::ParameterList"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1753,28): error C2535: std::vector<Nova::Token,std::allocator<Nova::Token>> Nova::Interpreter::FunctionBody(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(661,28):
+1>     см. объявление "Nova::Interpreter::FunctionBody"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1781,28): error C2535: std::vector<Nova::Value,std::allocator<Nova::Value>> Nova::Interpreter::FunctionCallArguments(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(689,28):
+1>     см. объявление "Nova::Interpreter::FunctionCallArguments"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1801,15): error C2535: Nova::Value Nova::Interpreter::CallFunction(const std::wstring &,const std::vector<Nova::Value,std::allocator<Nova::Value>> &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(709,15):
+1>     см. объявление "Nova::Interpreter::CallFunction"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1851,15): error C2535: Nova::Value Nova::Interpreter::Expression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(759,15):
+1>     см. объявление "Nova::Interpreter::Expression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1857,15): error C2535: Nova::Value Nova::Interpreter::LogicalOrExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(765,15):
+1>     см. объявление "Nova::Interpreter::LogicalOrExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1872,15): error C2535: Nova::Value Nova::Interpreter::LogicalAndExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(780,15):
+1>     см. объявление "Nova::Interpreter::LogicalAndExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1887,15): error C2535: Nova::Value Nova::Interpreter::EqualityExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(795,15):
+1>     см. объявление "Nova::Interpreter::EqualityExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1902,15): error C2535: Nova::Value Nova::Interpreter::RelationalExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(810,15):
+1>     см. объявление "Nova::Interpreter::RelationalExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1917,15): error C2535: Nova::Value Nova::Interpreter::AdditiveExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(825,15):
+1>     см. объявление "Nova::Interpreter::AdditiveExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1932,15): error C2535: Nova::Value Nova::Interpreter::MultiplicativeExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(840,15):
+1>     см. объявление "Nova::Interpreter::MultiplicativeExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1947,15): error C2535: Nova::Value Nova::Interpreter::UnaryExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(855,15):
+1>     см. объявление "Nova::Interpreter::UnaryExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1975,15): error C2535: Nova::Value Nova::Interpreter::PrimaryExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(883,15):
+1>     см. объявление "Nova::Interpreter::PrimaryExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2018,15): error C2535: Nova::Value Nova::Interpreter::ApplyOperator(const Nova::Value &,const std::wstring &,const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(926,15):
+1>     см. объявление "Nova::Interpreter::ApplyOperator"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2052,15): error C2535: Nova::Value Nova::Interpreter::ApplyLogicalOperator(const Nova::Value &,const std::wstring &,const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(960,15):
+1>     см. объявление "Nova::Interpreter::ApplyLogicalOperator"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2065,15): error C2535: Nova::Value Nova::Interpreter::ApplyEqualityOperator(const Nova::Value &,const std::wstring &,const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(973,15):
+1>     см. объявление "Nova::Interpreter::ApplyEqualityOperator"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2079,15): error C2535: Nova::Value Nova::Interpreter::ApplyRelationalOperator(const Nova::Value &,const std::wstring &,const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(987,15):
+1>     см. объявление "Nova::Interpreter::ApplyRelationalOperator"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2100,14): error C2535: bool Nova::Interpreter::IsEqual(const Nova::Value &,const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1008,14):
+1>     см. объявление "Nova::Interpreter::IsEqual"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2113,22): error C2535: std::wstring Nova::Interpreter::ToString(const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1021,22):
+1>     см. объявление "Nova::Interpreter::ToString"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2140,14): error C2535: void Nova::Interpreter::PrintValue(const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1048,14):
+1>     см. объявление "Nova::Interpreter::PrintValue"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2145,22): error C2535: std::wstring Nova::Interpreter::TokensToString(const std::vector<Nova::Token,std::allocator<Nova::Token>> &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1053,22):
+1>     см. объявление "Nova::Interpreter::TokensToString"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2155,15): error C2535: Nova::Value Nova::Interpreter::GetVariable(const std::wstring &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1063,15):
+1>     см. объявление "Nova::Interpreter::GetVariable"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2167,14): error C2535: void Nova::Interpreter::SetVariable(const std::wstring &,const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1075,14):
+1>     см. объявление "Nova::Interpreter::SetVariable"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2182,22): error C2535: std::wstring Nova::Interpreter::StringToWString(const std::string &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1090,22):
+1>     см. объявление "Nova::Interpreter::StringToWString"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2189,14): error C2535: void Nova::Interpreter::PrintStatement(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1097,14):
+1>     см. объявление "Nova::Interpreter::PrintStatement"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2215,14): error C2535: void Nova::Interpreter::StatementBlock(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(575,14):
+1>     см. объявление "Nova::Interpreter::StatementBlock"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2227,14): error C2535: void Nova::Interpreter::SkipStatementBlock(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(587,14):
+1>     см. объявление "Nova::Interpreter::SkipStatementBlock"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2246,14): error C2535: void Nova::Interpreter::FunctionDefinition(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(606,14):
+1>     см. объявление "Nova::Interpreter::FunctionDefinition"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2266,14): error C2535: void Nova::Interpreter::ClassDefinition(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(626,14):
+1>     см. объявление "Nova::Interpreter::ClassDefinition"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2274,35): error C2535: std::vector<std::wstring,std::allocator<std::wstring>> Nova::Interpreter::ParameterList(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(634,35):
+1>     см. объявление "Nova::Interpreter::ParameterList"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2301,28): error C2535: std::vector<Nova::Token,std::allocator<Nova::Token>> Nova::Interpreter::FunctionBody(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(661,28):
+1>     см. объявление "Nova::Interpreter::FunctionBody"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2329,28): error C2535: std::vector<Nova::Value,std::allocator<Nova::Value>> Nova::Interpreter::FunctionCallArguments(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(689,28):
+1>     см. объявление "Nova::Interpreter::FunctionCallArguments"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2349,15): error C2535: Nova::Value Nova::Interpreter::CallFunction(const std::wstring &,const std::vector<Nova::Value,std::allocator<Nova::Value>> &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(709,15):
+1>     см. объявление "Nova::Interpreter::CallFunction"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2399,15): error C2535: Nova::Value Nova::Interpreter::Expression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(759,15):
+1>     см. объявление "Nova::Interpreter::Expression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2405,15): error C2535: Nova::Value Nova::Interpreter::LogicalOrExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(765,15):
+1>     см. объявление "Nova::Interpreter::LogicalOrExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2420,15): error C2535: Nova::Value Nova::Interpreter::LogicalAndExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(780,15):
+1>     см. объявление "Nova::Interpreter::LogicalAndExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2435,15): error C2535: Nova::Value Nova::Interpreter::EqualityExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(795,15):
+1>     см. объявление "Nova::Interpreter::EqualityExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2450,15): error C2535: Nova::Value Nova::Interpreter::RelationalExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(810,15):
+1>     см. объявление "Nova::Interpreter::RelationalExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2465,15): error C2535: Nova::Value Nova::Interpreter::AdditiveExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(825,15):
+1>     см. объявление "Nova::Interpreter::AdditiveExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2480,15): error C2535: Nova::Value Nova::Interpreter::MultiplicativeExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(840,15):
+1>     см. объявление "Nova::Interpreter::MultiplicativeExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2495,15): error C2535: Nova::Value Nova::Interpreter::UnaryExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(855,15):
+1>     см. объявление "Nova::Interpreter::UnaryExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2523,15): error C2535: Nova::Value Nova::Interpreter::PrimaryExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(883,15):
+1>     см. объявление "Nova::Interpreter::PrimaryExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2566,15): error C2535: Nova::Value Nova::Interpreter::ApplyOperator(const Nova::Value &,const std::wstring &,const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(926,15):
+1>     см. объявление "Nova::Interpreter::ApplyOperator"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2600,15): error C2535: Nova::Value Nova::Interpreter::ApplyLogicalOperator(const Nova::Value &,const std::wstring &,const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(960,15):
+1>     см. объявление "Nova::Interpreter::ApplyLogicalOperator"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2613,15): error C2535: Nova::Value Nova::Interpreter::ApplyEqualityOperator(const Nova::Value &,const std::wstring &,const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(973,15):
+1>     см. объявление "Nova::Interpreter::ApplyEqualityOperator"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2627,15): error C2535: Nova::Value Nova::Interpreter::ApplyRelationalOperator(const Nova::Value &,const std::wstring &,const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(987,15):
+1>     см. объявление "Nova::Interpreter::ApplyRelationalOperator"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2648,14): error C2535: bool Nova::Interpreter::IsEqual(const Nova::Value &,const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1008,14):
+1>     см. объявление "Nova::Interpreter::IsEqual"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2661,22): error C2535: std::wstring Nova::Interpreter::ToString(const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1021,22):
+1>     см. объявление "Nova::Interpreter::ToString"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2688,14): error C2535: void Nova::Interpreter::PrintValue(const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1048,14):
+1>     см. объявление "Nova::Interpreter::PrintValue"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2693,22): error C2535: std::wstring Nova::Interpreter::TokensToString(const std::vector<Nova::Token,std::allocator<Nova::Token>> &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1053,22):
+1>     см. объявление "Nova::Interpreter::TokensToString"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2703,15): error C2535: Nova::Value Nova::Interpreter::GetVariable(const std::wstring &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1063,15):
+1>     см. объявление "Nova::Interpreter::GetVariable"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2715,14): error C2535: void Nova::Interpreter::SetVariable(const std::wstring &,const Nova::Value &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1075,14):
+1>     см. объявление "Nova::Interpreter::SetVariable"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2730,22): error C2535: std::wstring Nova::Interpreter::StringToWString(const std::string &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1090,22):
+1>     см. объявление "Nova::Interpreter::StringToWString"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2737,14): error C2535: void Nova::Interpreter::PrintStatement(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(1097,14):
+1>     см. объявление "Nova::Interpreter::PrintStatement"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2763,14): error C2535: void Nova::Interpreter::StatementBlock(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(575,14):
+1>     см. объявление "Nova::Interpreter::StatementBlock"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2775,14): error C2535: void Nova::Interpreter::SkipStatementBlock(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(587,14):
+1>     см. объявление "Nova::Interpreter::SkipStatementBlock"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2794,14): error C2535: void Nova::Interpreter::FunctionDefinition(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(606,14):
+1>     см. объявление "Nova::Interpreter::FunctionDefinition"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2814,14): error C2535: void Nova::Interpreter::ClassDefinition(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(626,14):
+1>     см. объявление "Nova::Interpreter::ClassDefinition"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2822,35): error C2535: std::vector<std::wstring,std::allocator<std::wstring>> Nova::Interpreter::ParameterList(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(634,35):
+1>     см. объявление "Nova::Interpreter::ParameterList"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2849,28): error C2535: std::vector<Nova::Token,std::allocator<Nova::Token>> Nova::Interpreter::FunctionBody(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(661,28):
+1>     см. объявление "Nova::Interpreter::FunctionBody"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2877,28): error C2535: std::vector<Nova::Value,std::allocator<Nova::Value>> Nova::Interpreter::FunctionCallArguments(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(689,28):
+1>     см. объявление "Nova::Interpreter::FunctionCallArguments"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2897,15): error C2535: Nova::Value Nova::Interpreter::CallFunction(const std::wstring &,const std::vector<Nova::Value,std::allocator<Nova::Value>> &): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(709,15):
+1>     см. объявление "Nova::Interpreter::CallFunction"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2947,15): error C2535: Nova::Value Nova::Interpreter::Expression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(759,15):
+1>     см. объявление "Nova::Interpreter::Expression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2953,15): error C2535: Nova::Value Nova::Interpreter::LogicalOrExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(765,15):
+1>     см. объявление "Nova::Interpreter::LogicalOrExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2968,15): error C2535: Nova::Value Nova::Interpreter::LogicalAndExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(780,15):
+1>     см. объявление "Nova::Interpreter::LogicalAndExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2983,15): error C2535: Nova::Value Nova::Interpreter::EqualityExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(795,15):
+1>     см. объявление "Nova::Interpreter::EqualityExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(2998,15): error C2535: Nova::Value Nova::Interpreter::RelationalExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(810,15):
+1>     см. объявление "Nova::Interpreter::RelationalExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(3013,15): error C2535: Nova::Value Nova::Interpreter::AdditiveExpression(void): функция-член уже определена или объявлена
+1>    C:\Users\User\source\repos\Решение\Решение\Решение.cpp(825,15):
+1>     см. объявление "Nova::Interpreter::AdditiveExpression"
+1>C:\Users\User\source\repos\Решение\Решение\Решение.cpp(3013,15): error C1003: число ошибок превышает 100; остановка компиляции
+1>Сборка проекта "Решение.vcxproj" завершена с ошибкой.
+========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
+========== Сборка завершено в 20:53 и заняло 00,985 с ==========

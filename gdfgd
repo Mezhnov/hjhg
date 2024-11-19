@@ -1,30 +1,15 @@
-// Включаем необходимые заголовочные файлы
+// Подключаем необходимые заголовочные файлы
 #include <windows.h>
 #include <gdiplus.h>
-#include <wininet.h>
 #include <string>
 #include <vector>
-#include <chrono>
-#include <iomanip>
-#include <sstream>
-#include <locale>
-#include <windowsx.h>
-#include <mmsystem.h>  // Для PlaySound
-#include <CommCtrl.h>  // Для common controls
-#include <richedit.h>  // Для rich edit controls
 #include <map>
-#include <functional>  // Для std::function
-#include <memory>      // Для std::shared_ptr
-#include <cctype>      // Для isdigit и isalpha
-#include <stack>       // Для std::stack
-#include <cmath>       // Для fmod
+#include <commctrl.h>
+#include <shellapi.h> // Для Shell_NotifyIcon
+#include <sstream>
 
-// Линкуем необходимые библиотеки
 #pragma comment(lib, "gdiplus.lib")
-#pragma comment(lib, "wininet.lib")
-#pragma comment(lib, "comctl32.lib")
-#pragma comment(lib, "Winmm.lib")
-#pragma comment(lib, "UxTheme.lib")
+#pragma comment(lib, "Comctl32.lib")
 
 // Определение идентификаторов
 #define IDM_FILE_NEW        1001
@@ -38,15 +23,22 @@
 #define IDM_EDIT_PASTE      2005
 #define IDM_HELP_ABOUT      3001
 
-// Идентификаторы изображения
-#define IDB_TOOLBAR_IMAGES  4001
-#define IDI_APP_ICON        5001
-#define IDI_FOLDER_ICON     5002
+// Идентификаторы элементов управления
+#define IDC_PROJECT_PANE    4001
+#define IDC_HIERARCHY_PANE  4002
+#define IDC_INSPECTOR_PANE  4003
+#define IDC_SCENE_PANE      4004
+#define IDC_GAME_PANE       4005
+#define IDC_CONSOLE_PANE    4006
+#define IDC_TOOLBAR         4007
+#define IDC_STATUSBAR       4008
 
 // Глобальные переменные
 HINSTANCE hInst;
 HWND hMainWnd;
 HWND hProjectPane, hHierarchyPane, hInspectorPane, hScenePane, hGamePane, hConsolePane;
+HWND hToolbar, hStatusBar;
+ULONG_PTR gdiplusToken;
 
 // Прототипы функций
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
@@ -54,38 +46,35 @@ void CreateMenus(HWND hWnd);
 void CreateToolbar(HWND hWnd);
 void CreateStatusBar(HWND hWnd);
 void CreateDockablePanes(HWND hWnd);
+void LoadImages();
+void ApplyDarkTheme(HWND hWnd);
+HIMAGELIST hImageListSmall;
+HIMAGELIST hImageListLarge;
 
-// Добавляем поддержку тем
-BOOL EnableVisualStyles()
+// Функция для инициализации GDI+
+void InitGDIPlus()
 {
-    HMODULE hMod = LoadLibrary(L"uxtheme.dll");
-    if (hMod)
-    {
-        typedef HRESULT(WINAPI* SetWindowThemeFunc)(HWND, LPCWSTR, LPCWSTR);
-        SetWindowThemeFunc SetWindowTheme = (SetWindowThemeFunc)GetProcAddress(hMod, "SetWindowTheme");
-        if (SetWindowTheme)
-        {
-            SetWindowTheme(hMainWnd, L"Explorer", NULL);
-            FreeLibrary(hMod);
-            return TRUE;
-        }
-        FreeLibrary(hMod);
-    }
-    return FALSE;
+    Gdiplus::GdiplusStartupInput gdiplusStartupInput;
+    Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
 }
 
+// Функция для завершения работы GDI+
+void ShutdownGDIPlus()
+{
+    Gdiplus::GdiplusShutdown(gdiplusToken);
+}
+
+// Главная функция
 int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
 {
     hInst = hInstance;
 
     // Инициализируем GDI+
-    Gdiplus::GdiplusStartupInput gdiplusStartupInput;
-    ULONG_PTR gdiplusToken;
-    Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
+    InitGDIPlus();
 
     // Инициализируем common controls
     INITCOMMONCONTROLSEX icex = { sizeof(INITCOMMONCONTROLSEX) };
-    icex.dwICC = ICC_WIN95_CLASSES | ICC_BAR_CLASSES;
+    icex.dwICC = ICC_WIN95_CLASSES | ICC_BAR_CLASSES | ICC_LISTVIEW_CLASSES | ICC_TREEVIEW_CLASSES;
     InitCommonControlsEx(&icex);
 
     // Регистрируем класс окна
@@ -93,15 +82,12 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmd
     wcex.cbSize = sizeof(WNDCLASSEX);
     wcex.style = CS_HREDRAW | CS_VREDRAW;
     wcex.lpfnWndProc = WndProc;
-    wcex.cbClsExtra = 0;
-    wcex.cbWndExtra = 0;
     wcex.hInstance = hInst;
-    wcex.hIcon = LoadIcon(hInst, MAKEINTRESOURCE(IDI_APP_ICON));
+    wcex.hIcon = static_cast<HICON>(LoadImage(hInst, L"app_icon.ico", IMAGE_ICON, 32, 32, LR_LOADFROMFILE));
     wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground = CreateSolidBrush(RGB(56, 56, 56)); // Темный фон
-    wcex.lpszMenuName = nullptr;
+    wcex.hbrBackground = CreateSolidBrush(RGB(45, 45, 48)); // Темный фон
     wcex.lpszClassName = L"UnityCloneClass";
-    wcex.hIconSm = LoadIcon(hInst, MAKEINTRESOURCE(IDI_APP_ICON));
+    wcex.hIconSm = static_cast<HICON>(LoadImage(hInst, L"app_icon.ico", IMAGE_ICON, 16, 16, LR_LOADFROMFILE));
 
     RegisterClassEx(&wcex);
 
@@ -115,26 +101,26 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmd
         return FALSE;
     }
 
-    // Включаем визуальные стили
-    EnableVisualStyles();
-
     ShowWindow(hMainWnd, nCmdShow);
     UpdateWindow(hMainWnd);
+
+    // Загружаем изображения и иконки
+    LoadImages();
+
+    // Применяем темную тему к главным элементам
+    ApplyDarkTheme(hMainWnd);
 
     // Главный цикл сообщений
     MSG msg;
     while (GetMessage(&msg, nullptr, 0, 0))
     {
-        // Если сообщение не обрабатывается, передаем его функцию перевода и отправки
-        if (!IsDialogMessage(hMainWnd, &msg))
-        {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
+        // Переводим и отправляем сообщения
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
     }
 
     // Завершаем GDI+
-    Gdiplus::GdiplusShutdown(gdiplusToken);
+    ShutdownGDIPlus();
 
     return (int)msg.wParam;
 }
@@ -142,8 +128,6 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmd
 // Обработчик окна
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    static HWND hStatusBar;
-
     switch (message)
     {
     case WM_CREATE:
@@ -152,6 +136,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         CreateStatusBar(hWnd);
         CreateDockablePanes(hWnd);
         break;
+
     case WM_SIZE:
     {
         RECT rect;
@@ -160,21 +145,27 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         // Обновляем размер статусной строки
         SendMessage(hStatusBar, WM_SIZE, 0, 0);
 
+        // Получаем размеры панели инструментов
+        RECT toolbarRect;
+        GetWindowRect(hToolbar, &toolbarRect);
+        int toolbarHeight = toolbarRect.bottom - toolbarRect.top;
+
         // Обновляем размеры панелей
         int width = rect.right - rect.left;
-        int height = rect.bottom - rect.top - 20; // Учитываем высоту статусной строки
+        int height = rect.bottom - rect.top - toolbarHeight - 20; // Учитываем высоту панели инструментов и статусной строки
 
         int panelWidth = 250;
         int panelHeight = 200;
 
-        MoveWindow(hProjectPane, 0, 0, panelWidth, height - panelHeight, TRUE);
-        MoveWindow(hHierarchyPane, 0, height - panelHeight, panelWidth, panelHeight, TRUE);
-        MoveWindow(hInspectorPane, width - panelWidth, 0, panelWidth, height, TRUE);
-        MoveWindow(hScenePane, panelWidth, 0, width - 2 * panelWidth, height / 2, TRUE);
-        MoveWindow(hGamePane, panelWidth, height / 2, width - 2 * panelWidth, height / 2, TRUE);
-        MoveWindow(hConsolePane, 0, height - panelHeight, width, panelHeight, TRUE);
+        MoveWindow(hProjectPane, 0, toolbarHeight, panelWidth, height - panelHeight, TRUE);
+        MoveWindow(hHierarchyPane, 0, toolbarHeight + height - panelHeight, panelWidth, panelHeight, TRUE);
+        MoveWindow(hInspectorPane, width - panelWidth, toolbarHeight, panelWidth, height, TRUE);
+        MoveWindow(hScenePane, panelWidth, toolbarHeight, width - 2 * panelWidth, height / 2, TRUE);
+        MoveWindow(hGamePane, panelWidth, toolbarHeight + height / 2, width - 2 * panelWidth, height / 2, TRUE);
+        MoveWindow(hConsolePane, 0, toolbarHeight + height, width, panelHeight, TRUE);
     }
     break;
+
     case WM_COMMAND:
     {
         int wmId = LOWORD(wParam);
@@ -216,26 +207,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
     }
     break;
+
     case WM_NOTIFY:
-    {
-        LPNMHDR lpnmh = (LPNMHDR)lParam;
-        if (lpnmh->hwndFrom == hProjectPane && lpnmh->code == NM_DBLCLK)
-        {
-            // Обработка двойного щелчка по элементу в панели проекта
-            MessageBox(hWnd, L"Вы открыли файл из панели проекта.", L"Информация", MB_OK);
-        }
-    }
-    break;
+        // Обработка уведомлений от элементов управления
+        break;
+
     case WM_DESTROY:
         PostQuitMessage(0);
         break;
+
     case WM_CTLCOLORSTATIC:
+    case WM_CTLCOLORBTN:
+    case WM_CTLCOLOREDIT:
+    case WM_CTLCOLORLISTBOX:
     {
-        HDC hdcStatic = (HDC)wParam;
-        SetBkMode(hdcStatic, TRANSPARENT);
-        SetTextColor(hdcStatic, RGB(220, 220, 220)); // Светлый текст
-        return (INT_PTR)CreateSolidBrush(RGB(56, 56, 56)); // Темный фон
+        HDC hdc = (HDC)wParam;
+        SetBkMode(hdc, TRANSPARENT);
+        SetTextColor(hdc, RGB(241, 241, 241)); // Светлый текст
+        return (INT_PTR)CreateSolidBrush(RGB(45, 45, 48)); // Темный фон
     }
+
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
@@ -249,28 +240,26 @@ void CreateMenus(HWND hWnd)
 
     HMENU hFileMenu = CreateMenu();
     HMENU hEditMenu = CreateMenu();
-    HMENU hWindowMenu = CreateMenu();
     HMENU hHelpMenu = CreateMenu();
 
-    AppendMenu(hFileMenu, MF_STRING, IDM_FILE_NEW, L"&New Project\tCtrl+N");
-    AppendMenu(hFileMenu, MF_STRING, IDM_FILE_OPEN, L"&Open Project...\tCtrl+O");
-    AppendMenu(hFileMenu, MF_STRING, IDM_FILE_SAVE, L"&Save Project\tCtrl+S");
+    AppendMenu(hFileMenu, MF_STRING, IDM_FILE_NEW, L"&Новый проект\tCtrl+N");
+    AppendMenu(hFileMenu, MF_STRING, IDM_FILE_OPEN, L"&Открыть проект...\tCtrl+O");
+    AppendMenu(hFileMenu, MF_STRING, IDM_FILE_SAVE, L"&Сохранить проект\tCtrl+S");
     AppendMenu(hFileMenu, MF_SEPARATOR, 0, nullptr);
-    AppendMenu(hFileMenu, MF_STRING, IDM_FILE_EXIT, L"E&xit");
+    AppendMenu(hFileMenu, MF_STRING, IDM_FILE_EXIT, L"&Выход");
 
-    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_UNDO, L"&Undo\tCtrl+Z");
-    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_REDO, L"&Redo\tCtrl+Y");
+    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_UNDO, L"&Отменить\tCtrl+Z");
+    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_REDO, L"&Повторить\tCtrl+Y");
     AppendMenu(hEditMenu, MF_SEPARATOR, 0, nullptr);
-    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_CUT, L"Cu&t\tCtrl+X");
-    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_COPY, L"&Copy\tCtrl+C");
-    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_PASTE, L"&Paste\tCtrl+V");
+    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_CUT, L"&Вырезать\tCtrl+X");
+    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_COPY, L"&Копировать\tCtrl+C");
+    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_PASTE, L"&Вставить\tCtrl+V");
 
-    AppendMenu(hHelpMenu, MF_STRING, IDM_HELP_ABOUT, L"&About");
+    AppendMenu(hHelpMenu, MF_STRING, IDM_HELP_ABOUT, L"&О программе");
 
-    AppendMenu(hMenuBar, MF_POPUP, (UINT_PTR)hFileMenu, L"&File");
-    AppendMenu(hMenuBar, MF_POPUP, (UINT_PTR)hEditMenu, L"&Edit");
-    AppendMenu(hMenuBar, MF_POPUP, (UINT_PTR)hWindowMenu, L"&Window");
-    AppendMenu(hMenuBar, MF_POPUP, (UINT_PTR)hHelpMenu, L"&Help");
+    AppendMenu(hMenuBar, MF_POPUP, (UINT_PTR)hFileMenu, L"&Файл");
+    AppendMenu(hMenuBar, MF_POPUP, (UINT_PTR)hEditMenu, L"&Правка");
+    AppendMenu(hMenuBar, MF_POPUP, (UINT_PTR)hHelpMenu, L"&Справка");
 
     SetMenu(hWnd, hMenuBar);
 }
@@ -278,56 +267,60 @@ void CreateMenus(HWND hWnd)
 // Создание панели инструментов
 void CreateToolbar(HWND hWnd)
 {
-    TBBUTTON tbb[3];
-    TBADDBITMAP tbab;
-
-    HWND hToolbar = CreateWindowEx(0, TOOLBARCLASSNAME, nullptr,
-        WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | TBSTYLE_TOOLTIPS,
-        0, 0, 0, 0, hWnd, nullptr, hInst, nullptr);
+    hToolbar = CreateWindowEx(0, TOOLBARCLASSNAME, nullptr,
+        WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | TBSTYLE_TRANSPARENT,
+        0, 0, 0, 0, hWnd, (HMENU)IDC_TOOLBAR, hInst, nullptr);
 
     SendMessage(hToolbar, TB_BUTTONSTRUCTSIZE, (WPARAM)sizeof(TBBUTTON), 0);
 
-    tbab.hInst = hInst;
-    tbab.nID = IDB_TOOLBAR_IMAGES;
+    // Загрузка изображений для панели инструментов
+    HIMAGELIST hImageListToolbar = ImageList_Create(24, 24, ILC_COLOR32, 5, 5);
 
-    SendMessage(hToolbar, TB_ADDBITMAP, 3, (LPARAM)&tbab);
+    HICON hIconNew = static_cast<HICON>(LoadImage(hInst, L"icon_new.ico", IMAGE_ICON, 24, 24, LR_LOADFROMFILE));
+    HICON hIconOpen = static_cast<HICON>(LoadImage(hInst, L"icon_open.ico", IMAGE_ICON, 24, 24, LR_LOADFROMFILE));
+    HICON hIconSave = static_cast<HICON>(LoadImage(hInst, L"icon_save.ico", IMAGE_ICON, 24, 24, LR_LOADFROMFILE));
 
+    ImageList_AddIcon(hImageListToolbar, hIconNew);
+    ImageList_AddIcon(hImageListToolbar, hIconOpen);
+    ImageList_AddIcon(hImageListToolbar, hIconSave);
+
+    SendMessage(hToolbar, TB_SETIMAGELIST, 0, (LPARAM)hImageListToolbar);
+
+    TBBUTTON tbb[3];
     ZeroMemory(tbb, sizeof(tbb));
 
     tbb[0].iBitmap = 0;
     tbb[0].idCommand = IDM_FILE_NEW;
     tbb[0].fsState = TBSTATE_ENABLED;
     tbb[0].fsStyle = TBSTYLE_BUTTON;
-    tbb[0].iString = (INT_PTR)L"New";
 
     tbb[1].iBitmap = 1;
     tbb[1].idCommand = IDM_FILE_OPEN;
     tbb[1].fsState = TBSTATE_ENABLED;
     tbb[1].fsStyle = TBSTYLE_BUTTON;
-    tbb[1].iString = (INT_PTR)L"Open";
 
     tbb[2].iBitmap = 2;
     tbb[2].idCommand = IDM_FILE_SAVE;
     tbb[2].fsState = TBSTATE_ENABLED;
     tbb[2].fsStyle = TBSTYLE_BUTTON;
-    tbb[2].iString = (INT_PTR)L"Save";
 
     SendMessage(hToolbar, TB_ADDBUTTONS, 3, (LPARAM)&tbb);
+
+    // Настройки панели инструментов
+    SendMessage(hToolbar, TB_AUTOSIZE, 0, 0);
+    SetWindowPos(hToolbar, NULL, 0, 0, 0, 0, SWP_NOZORDER | SWP_NOMOVE | SWP_NOSIZE);
 }
 
 // Создание статусной строки
 void CreateStatusBar(HWND hWnd)
 {
-    HWND hStatus = CreateWindowEx(0, STATUSCLASSNAME, nullptr,
+    hStatusBar = CreateWindowEx(0, STATUSCLASSNAME, nullptr,
         WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP,
-        0, 0, 0, 0, hWnd, (HMENU)1, hInst, nullptr);
+        0, 0, 0, 0, hWnd, (HMENU)IDC_STATUSBAR, hInst, nullptr);
 
     int statwidths[] = { 100, -1 };
-    SendMessage(hStatus, SB_SETPARTS, sizeof(statwidths) / sizeof(int), (LPARAM)statwidths);
-    SendMessage(hStatus, SB_SETTEXT, 0, (LPARAM)L"Готово");
-
-    // Сохраняем handle статусной строки для обновления в WndProc
-    SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR)hStatus);
+    SendMessage(hStatusBar, SB_SETPARTS, sizeof(statwidths) / sizeof(int), (LPARAM)statwidths);
+    SendMessage(hStatusBar, SB_SETTEXT, 0, (LPARAM)L"Готово");
 }
 
 // Создание докируемых панелей
@@ -337,79 +330,136 @@ void CreateDockablePanes(HWND hWnd)
     RECT rect;
     GetClientRect(hWnd, &rect);
 
+    // Получаем размеры панели инструментов
+    RECT toolbarRect;
+    GetWindowRect(hToolbar, &toolbarRect);
+    int toolbarHeight = toolbarRect.bottom - toolbarRect.top;
+
     int width = rect.right - rect.left;
-    int height = rect.bottom - rect.top - 20; // Учитываем высоту статусной строки
+    int height = rect.bottom - rect.top - toolbarHeight - 20; // Учитываем высоту панели инструментов и статусной строки
     int panelWidth = 250;
     int panelHeight = 200;
 
     // Создаем окно списка для панели "Project"
     hProjectPane = CreateWindowEx(WS_EX_CLIENTEDGE, WC_LISTVIEW, nullptr,
-        WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_ICON,
-        0, 0, panelWidth, height - panelHeight,
-        hWnd, (HMENU)2, hInst, nullptr);
+        WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_ICON | LVS_AUTOARRANGE,
+        0, toolbarHeight, panelWidth, height - panelHeight,
+        hWnd, (HMENU)IDC_PROJECT_PANE, hInst, nullptr);
 
     // Настраиваем список панели "Project"
-    HIMAGELIST hImageList;
-    hImageList = ImageList_Create(32, 32, ILC_COLOR32, 1, 1);
-    HICON hIcon = LoadIcon(hInst, MAKEINTRESOURCE(IDI_FOLDER_ICON));
-    ImageList_AddIcon(hImageList, hIcon);
-    SendMessage(hProjectPane, LVM_SETIMAGELIST, LVSIL_NORMAL, (LPARAM)hImageList);
+    SendMessage(hProjectPane, LVM_SETIMAGELIST, LVSIL_SMALL, (LPARAM)hImageListSmall);
+    SendMessage(hProjectPane, LVM_SETIMAGELIST, LVSIL_NORMAL, (LPARAM)hImageListLarge);
 
+    // Добавление элементов в панель "Project"
     LVITEM lvItem = { 0 };
     lvItem.mask = LVIF_TEXT | LVIF_IMAGE;
     lvItem.iItem = 0;
-    lvItem.pszText == L"Assets";
+    lvItem.pszText = const_cast<LPWSTR>(L"Assets");
     lvItem.iImage = 0;
     SendMessage(hProjectPane, LVM_INSERTITEM, 0, (LPARAM)&lvItem);
 
     lvItem.iItem = 1;
-    lvItem.pszText == L"Scripts";
+    lvItem.pszText = const_cast<LPWSTR>(L"Scripts");
     lvItem.iImage = 0;
     SendMessage(hProjectPane, LVM_INSERTITEM, 0, (LPARAM)&lvItem);
 
     // Создаем окно дерева для панели "Hierarchy"
     hHierarchyPane = CreateWindowEx(WS_EX_CLIENTEDGE, WC_TREEVIEW, nullptr,
-        WS_CHILD | WS_VISIBLE | TVS_HASLINES | TVS_HASBUTTONS,
-        0, height - panelHeight, panelWidth, panelHeight,
-        hWnd, (HMENU)3, hInst, nullptr);
+        WS_CHILD | WS_VISIBLE | TVS_HASLINES | TVS_HASBUTTONS | TVS_LINESATROOT,
+        0, toolbarHeight + height - panelHeight, panelWidth, panelHeight,
+        hWnd, (HMENU)IDC_HIERARCHY_PANE, hInst, nullptr);
 
-    // Добавляем элементы в дерево
+    // Настраиваем дерево панели "Hierarchy"
+    SendMessage(hHierarchyPane, TVM_SETIMAGELIST, TVSIL_NORMAL, (LPARAM)hImageListSmall);
+
+    // Добавление элементов в панель "Hierarchy"
     TVINSERTSTRUCT tvInsert = { 0 };
     tvInsert.hParent = TVI_ROOT;
     tvInsert.hInsertAfter = TVI_LAST;
-    tvInsert.item.mask = TVIF_TEXT;
-    tvInsert.item.pszText == L"Main Camera";
+    tvInsert.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE;
+    tvInsert.item.pszText = const_cast<LPWSTR>(L"Main Camera");
+    tvInsert.item.iImage = 1;
+    tvInsert.item.iSelectedImage = 1;
     HTREEITEM hCamera = (HTREEITEM)SendMessage(hHierarchyPane, TVM_INSERTITEM, 0, (LPARAM)&tvInsert);
 
-    tvInsert.item.pszText == L"Directional Light";
+    tvInsert.item.pszText = const_cast<LPWSTR>(L"Directional Light");
+    tvInsert.item.iImage = 2;
+    tvInsert.item.iSelectedImage = 2;
     HTREEITEM hLight = (HTREEITEM)SendMessage(hHierarchyPane, TVM_INSERTITEM, 0, (LPARAM)&tvInsert);
 
-    // Создаем статический контрол для панели "Inspector"
-    hInspectorPane = CreateWindowEx(WS_EX_CLIENTEDGE, L"STATIC", L"Inspector Pane",
+    // Создаем окно для панели "Inspector"
+    hInspectorPane = CreateWindowEx(WS_EX_CLIENTEDGE, L"STATIC", nullptr,
         WS_CHILD | WS_VISIBLE | SS_LEFT,
-        width - panelWidth, 0, panelWidth, height,
-        hWnd, (HMENU)4, hInst, nullptr);
+        width - panelWidth, toolbarHeight, panelWidth, height,
+        hWnd, (HMENU)IDC_INSPECTOR_PANE, hInst, nullptr);
 
-    // Создаем статический контрол для панели "Scene"
-    hScenePane = CreateWindowEx(WS_EX_CLIENTEDGE, L"STATIC", L"Scene Pane",
+    // Создаем окно для панели "Scene"
+    hScenePane = CreateWindowEx(WS_EX_CLIENTEDGE, L"STATIC", nullptr,
         WS_CHILD | WS_VISIBLE | SS_LEFT,
-        panelWidth, 0, width - 2 * panelWidth, height / 2,
-        hWnd, (HMENU)5, hInst, nullptr);
+        panelWidth, toolbarHeight, width - 2 * panelWidth, height / 2,
+        hWnd, (HMENU)IDC_SCENE_PANE, hInst, nullptr);
 
-    // Создаем статический контрол для панели "Game"
-    hGamePane = CreateWindowEx(WS_EX_CLIENTEDGE, L"STATIC", L"Game Pane",
+    // Создаем окно для панели "Game"
+    hGamePane = CreateWindowEx(WS_EX_CLIENTEDGE, L"STATIC", nullptr,
         WS_CHILD | WS_VISIBLE | SS_LEFT,
-        panelWidth, height / 2, width - 2 * panelWidth, height / 2,
-        hWnd, (HMENU)6, hInst, nullptr);
+        panelWidth, toolbarHeight + height / 2, width - 2 * panelWidth, height / 2,
+        hWnd, (HMENU)IDC_GAME_PANE, hInst, nullptr);
 
     // Создаем окно списка для панели "Console"
     hConsolePane = CreateWindowEx(WS_EX_CLIENTEDGE, WC_LISTBOX, nullptr,
         WS_CHILD | WS_VISIBLE | LBS_NOINTEGRALHEIGHT,
-        0, height - panelHeight, width, panelHeight,
-        hWnd, (HMENU)7, hInst, nullptr);
+        0, toolbarHeight + height, width, panelHeight,
+        hWnd, (HMENU)IDC_CONSOLE_PANE, hInst, nullptr);
 
     // Добавляем сообщения в консоль
-    SendMessage(hConsolePane, LB_ADDSTRING, 0, (LPARAM)L"Console initialized.");
+    SendMessage(hConsolePane, LB_ADDSTRING, 0, (LPARAM)L"Консоль инициализирована.");
 }
 
-// Остальная часть кода...
+// Загрузка изображений и иконок
+void LoadImages()
+{
+    // Создаем списки изображений
+    hImageListSmall = ImageList_Create(16, 16, ILC_COLOR32, 3, 3);
+    hImageListLarge = ImageList_Create(32, 32, ILC_COLOR32, 3, 3);
+
+    // Загружаем иконки
+    HICON hIconFolderSmall = static_cast<HICON>(LoadImage(hInst, L"icon_folder_small.ico", IMAGE_ICON, 16, 16, LR_LOADFROMFILE));
+    HICON hIconCameraSmall = static_cast<HICON>(LoadImage(hInst, L"icon_camera_small.ico", IMAGE_ICON, 16, 16, LR_LOADFROMFILE));
+    HICON hIconLightSmall = static_cast<HICON>(LoadImage(hInst, L"icon_light_small.ico", IMAGE_ICON, 16, 16, LR_LOADFROMFILE));
+
+    HICON hIconFolderLarge = static_cast<HICON>(LoadImage(hInst, L"icon_folder_large.ico", IMAGE_ICON, 32, 32, LR_LOADFROMFILE));
+    HICON hIconCameraLarge = static_cast<HICON>(LoadImage(hInst, L"icon_camera_large.ico", IMAGE_ICON, 32, 32, LR_LOADFROMFILE));
+    HICON hIconLightLarge = static_cast<HICON>(LoadImage(hInst, L"icon_light_large.ico", IMAGE_ICON, 32, 32, LR_LOADFROMFILE));
+
+    // Добавляем иконки в списки изображений
+    ImageList_AddIcon(hImageListSmall, hIconFolderSmall); // Индекс 0
+    ImageList_AddIcon(hImageListSmall, hIconCameraSmall); // Индекс 1
+    ImageList_AddIcon(hImageListSmall, hIconLightSmall);  // Индекс 2
+
+    ImageList_AddIcon(hImageListLarge, hIconFolderLarge); // Индекс 0
+    ImageList_AddIcon(hImageListLarge, hIconCameraLarge); // Индекс 1
+    ImageList_AddIcon(hImageListLarge, hIconLightLarge);  // Индекс 2
+}
+
+// Применение темной темы к элементам
+void ApplyDarkTheme(HWND hWnd)
+{
+    typedef BOOL(WINAPI* SetWindowThemeProc)(HWND, LPCWSTR, LPCWSTR);
+    HMODULE hUxTheme = LoadLibrary(L"uxtheme.dll");
+    if (hUxTheme)
+    {
+        SetWindowThemeProc SetWindowTheme = (SetWindowThemeProc)GetProcAddress(hUxTheme, "SetWindowTheme");
+        if (SetWindowTheme)
+        {
+            SetWindowTheme(hProjectPane, L"DarkMode_Explorer", NULL);
+            SetWindowTheme(hHierarchyPane, L"DarkMode_Explorer", NULL);
+            SetWindowTheme(hInspectorPane, L"DarkMode_Explorer", NULL);
+            SetWindowTheme(hScenePane, L"DarkMode_Explorer", NULL);
+            SetWindowTheme(hGamePane, L"DarkMode_Explorer", NULL);
+            SetWindowTheme(hConsolePane, L"DarkMode_Explorer", NULL);
+            SetWindowTheme(hToolbar, L"DarkMode_Explorer", NULL);
+            SetWindowTheme(hStatusBar, L"DarkMode_Explorer", NULL);
+        }
+        FreeLibrary(hUxTheme);
+    }
+}

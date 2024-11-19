@@ -12,21 +12,26 @@
 #include <mmsystem.h>  // Для PlaySound
 #include <CommCtrl.h>  // Для common controls
 #include <richedit.h>  // Для rich edit controls
-//#include "resource.h"  // Если у вас есть файл ресурсов, раскомментируйте эту строку
 #include <map>
 #include <functional>  // Для std::function
 #include <memory>      // Для std::shared_ptr
 #include <cctype>      // Для isdigit и isalpha
 #include <stack>       // Для std::stack
-#include <cmath>       // Для fmod
+#include <cmath>       // Для fmod>
+
+#include "resource.h"  // Убедитесь, что у вас есть этот заголовочный файл для идентификаторов ресурсов
 
 // Линкуем необходимые библиотеки
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "wininet.lib")
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "Winmm.lib")
+#pragma comment(lib, "UxTheme.lib")
+#pragma comment(lib, "Msftedit.lib") // Для RichEdit
 
-// Определение идентификаторов
+using namespace Gdiplus;
+
+// Определение идентификаторов меню
 #define IDM_FILE_NEW        1001
 #define IDM_FILE_OPEN       1002
 #define IDM_FILE_SAVE       1003
@@ -38,40 +43,116 @@
 #define IDM_EDIT_PASTE      2005
 #define IDM_HELP_ABOUT      3001
 
+// Идентификаторы изображений
+#define IDB_TOOLBAR_IMAGES  4001
+#define IDI_APP_ICON        5001
+#define IDI_FOLDER_ICON     5002
+#define IDI_SCRIPT_ICON     5003
+#define IDI_PLAY_ICON       5004
+#define IDI_STOP_ICON       5005
+
 // Глобальные переменные
 HINSTANCE hInst;
 HWND hMainWnd;
+HWND hProjectPane, hHierarchyPane, hInspectorPane, hScenePane, hGamePane, hConsolePane;
+HWND hToolbar, hStatusBar;
 
-// Объявления функций
+// Структура для хранения иконки приложения и её метки
+struct AppIcon {
+    Bitmap* image;
+    std::wstring label;
+    float sizeFactor; // Коэффициент размера (1.0 - стандартный размер)
+    RECT drawRect;    // Прямоугольник для обнаружения кликов
+};
+
+// Вектор для хранения иконок приложений
+std::vector<AppIcon> g_appIcons;
+
+// Глобальные переменные для отображения времени и даты
+bool isDragging = false;
+POINT dragStartPoint = { 0, 0 };
+int selectedAppIndex = -1; // Индекс выбранной иконки для изменения размера
+
+// Позиция времени и даты: настройте значения для позиционирования
+RECT timeRect = { 50, 50, 300, 100 }; // Начальная позиция и размер времени
+Color timeColor = Color(255, 255, 255, 255); // Белый цвет по умолчанию
+float timeFontSize = 50.0f; // Начальный размер шрифта времени
+
+RECT dateRect = { 50, 110, 300, 150 }; // Начальная позиция и размер даты
+Color dateColor = Color(255, 255, 255, 255); // Белый цвет даты
+float dateFontSize = 20.0f; // Начальный размер шрифта даты
+
+std::wstring currentTime = L"00:00";    // Текущее время
+std::wstring currentDate = L"01.09.2023"; // Текущая дата
+
+// Прототипы функций
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 void CreateMenus(HWND hWnd);
 void CreateToolbar(HWND hWnd);
 void CreateStatusBar(HWND hWnd);
 void CreateDockablePanes(HWND hWnd);
+void InitializeAppIcons();
+void RenderDockablePane(HWND pane, const std::wstring& title);
 
+// Функция для установки визуального стиля
+BOOL EnableVisualStyles()
+{
+    HMODULE hMod = LoadLibrary(L"uxtheme.dll");
+    if (hMod)
+    {
+        typedef HRESULT(WINAPI* SetWindowThemeFunc)(HWND, LPCWSTR, LPCWSTR);
+        SetWindowThemeFunc SetWindowTheme = (SetWindowThemeFunc)GetProcAddress(hMod, "SetWindowTheme");
+        if (SetWindowTheme)
+        {
+            // Пример применения темы к панели проектов
+            SetWindowTheme(hProjectPane, L"Explorer", NULL);
+            SetWindowTheme(hHierarchyPane, L"Explorer", NULL);
+            SetWindowTheme(hInspectorPane, L"Explorer", NULL);
+            SetWindowTheme(hScenePane, L"Explorer", NULL);
+            SetWindowTheme(hGamePane, L"Explorer", NULL);
+            SetWindowTheme(hConsolePane, L"Explorer", NULL);
+            FreeLibrary(hMod);
+            return TRUE;
+        }
+        FreeLibrary(hMod);
+    }
+    return FALSE;
+}
+
+// Точка входа
 int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
 {
     hInst = hInstance;
+
+    // Инициализируем GDI+
+    GdiplusStartupInput gdiplusStartupInput;
+    ULONG_PTR gdiplusToken;
+    if (GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL) != Ok) {
+        MessageBox(NULL, L"Не удалось инициализировать GDI+.", L"Ошибка", MB_ICONERROR);
+        return 0;
+    }
 
     // Инициализируем common controls
     INITCOMMONCONTROLSEX icex = { sizeof(INITCOMMONCONTROLSEX) };
     icex.dwICC = ICC_WIN95_CLASSES | ICC_BAR_CLASSES;
     InitCommonControlsEx(&icex);
 
+    // Загружаем библиотеку RichEdit
+    LoadLibrary(TEXT("Msftedit.dll"));
+
     // Регистрируем класс окна
     WNDCLASSEX wcex = { 0 };
     wcex.cbSize = sizeof(WNDCLASSEX);
-    wcex.style          = CS_HREDRAW | CS_VREDRAW;
-    wcex.lpfnWndProc    = WndProc;
-    wcex.cbClsExtra     = 0;
-    wcex.cbWndExtra     = 0;
-    wcex.hInstance      = hInst;
-    wcex.hIcon          = LoadIcon(nullptr, IDI_APPLICATION);
-    wcex.hCursor        = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW + 1);
-    wcex.lpszMenuName   = nullptr;
-    wcex.lpszClassName  = L"UnityCloneClass";
-    wcex.hIconSm        = LoadIcon(nullptr, IDI_APPLICATION);
+    wcex.style = CS_HREDRAW | CS_VREDRAW;
+    wcex.lpfnWndProc = WndProc;
+    wcex.cbClsExtra = 0;
+    wcex.cbWndExtra = 0;
+    wcex.hInstance = hInst;
+    wcex.hIcon = LoadIcon(hInst, MAKEINTRESOURCE(IDI_APP_ICON));
+    wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wcex.hbrBackground = CreateSolidBrush(RGB(30, 30, 30)); // Темный фон
+    wcex.lpszClassName = L"UnityCloneClass";
+    wcex.hIconSm = LoadIcon(hInst, MAKEINTRESOURCE(IDI_APP_ICON));
 
     RegisterClassEx(&wcex);
 
@@ -81,8 +162,9 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmd
 
     if (!hMainWnd)
     {
-        MessageBox(nullptr, L"Не удалось создать главное окно!", L"Ошибка", MB_OK);
-        return FALSE;
+        MessageBox(NULL, L"Не удалось создать главное окно!", L"Ошибка", MB_OK);
+        GdiplusShutdown(gdiplusToken);
+        return 0;
     }
 
     ShowWindow(hMainWnd, nCmdShow);
@@ -90,11 +172,17 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmd
 
     // Главный цикл сообщений
     MSG msg;
-    while (GetMessage(&msg, nullptr, 0, 0))
+    while (GetMessage(&msg, NULL, 0, 0))
     {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
+        if (!IsDialogMessage(hMainWnd, &msg))
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
     }
+
+    // Завершаем работу GDI+
+    GdiplusShutdown(gdiplusToken);
 
     return (int)msg.wParam;
 }
@@ -102,8 +190,6 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmd
 // Обработчик окна
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    static HWND hStatusBar;
-
     switch (message)
     {
     case WM_CREATE:
@@ -111,12 +197,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         CreateToolbar(hWnd);
         CreateStatusBar(hWnd);
         CreateDockablePanes(hWnd);
+        InitializeAppIcons();
         break;
     case WM_SIZE:
         {
-            // Обновляем размер статусной строки
+            RECT rect;
+            GetClientRect(hWnd, &rect);
+            int width = rect.right - rect.left;
+            int height = rect.bottom - rect.top - 25; // Учитываем высоту статусной строки
+
+            // Обновляем статусную строку
             SendMessage(hStatusBar, WM_SIZE, 0, 0);
-            // Здесь можно обновить размеры других элементов при изменении размера окна
+
+            // Обновляем размеры панелей
+            MoveWindow(hProjectPane, 0, 0, 250, height - 200, TRUE);
+            MoveWindow(hHierarchyPane, 0, height - 200, 250, 200, TRUE);
+            MoveWindow(hInspectorPane, width - 250, 0, 250, height, TRUE);
+            MoveWindow(hScenePane, 250, 0, width - 500, height / 2, TRUE);
+            MoveWindow(hGamePane, 250, height / 2, width - 500, height / 2, TRUE);
+            MoveWindow(hConsolePane, 0, height - 200, width, 200, TRUE);
+            MoveWindow(hToolbar, 0, 0, width, 40, TRUE);
         }
         break;
     case WM_COMMAND:
@@ -160,9 +260,326 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
         }
         break;
-    case WM_DESTROY:
-        PostQuitMessage(0);
+    case WM_NOTIFY:
+        {
+            LPNMHDR lpnmh = (LPNMHDR)lParam;
+            if (lpnmh->hwndFrom == hProjectPane && lpnmh->code == NM_DBLCLK)
+            {
+                // Обработка двойного щелчка по элементу в панели проекта
+                MessageBox(hWnd, L"Вы открыли файл из панели проекта.", L"Информация", MB_OK);
+            }
+        }
         break;
+    case WM_LBUTTONDOWN:
+        {
+            int xPos = GET_X_LPARAM(lParam);
+            int yPos = GET_Y_LPARAM(lParam);
+            // Проверка, попадает ли клик в область времени или даты
+            bool clickedOnTime = (xPos >= timeRect.left && xPos <= timeRect.right &&
+                                   yPos >= timeRect.top && yPos <= timeRect.bottom);
+            bool clickedOnDate = (xPos >= dateRect.left && xPos <= dateRect.right &&
+                                   yPos >= dateRect.top && yPos <= dateRect.bottom);
+    
+            // Проверить, находится ли клик на какой-либо иконке приложения
+            int appIndex = -1;
+            for (size_t i = 0; i < g_appIcons.size(); ++i)
+            {
+                AppIcon& app = g_appIcons[i];
+                if (PtInRect(&app.drawRect, POINT{ xPos, yPos }))
+                {
+                    appIndex = static_cast<int>(i);
+                    break;
+                }
+            }
+    
+            if (clickedOnTime || clickedOnDate)
+            {
+                isDragging = true;
+                if (clickedOnTime)
+                {
+                    dragStartPoint.x = xPos - timeRect.left;
+                    dragStartPoint.y = yPos - timeRect.top;
+                }
+                else
+                {
+                    dragStartPoint.x = xPos - dateRect.left;
+                    dragStartPoint.y = yPos - dateRect.top;
+                }
+                SetCapture(hWnd);
+            }
+            else if (appIndex != -1)
+            {
+                // Увеличить масштаб иконки при клике
+                AppIcon& app = g_appIcons[appIndex];
+                if (app.sizeFactor < 1.5f) // Максимальный масштаб 1.5x
+                {
+                    app.sizeFactor += 0.2f; // Увеличить на 20%
+                    InvalidateRect(hProjectPane, NULL, TRUE);
+                    InvalidateRect(hHierarchyPane, NULL, TRUE);
+                    InvalidateRect(hInspectorPane, NULL, TRUE);
+                    InvalidateRect(hScenePane, NULL, TRUE);
+                    InvalidateRect(hGamePane, NULL, TRUE);
+                    InvalidateRect(hConsolePane, NULL, TRUE);
+                }
+            }
+        }
+        break;
+    case WM_MOUSEMOVE:
+        {
+            if (isDragging)
+            {
+                int xPos = GET_X_LPARAM(lParam);
+                int yPos = GET_Y_LPARAM(lParam);
+    
+                // Новая позиция
+                int newLeft, newTop;
+    
+                if (selectedAppIndex != -1)
+                {
+                    // Перемещение иконки приложения
+                    AppIcon& app = g_appIcons[selectedAppIndex];
+                    newLeft = xPos - dragStartPoint.x;
+                    newTop = yPos - dragStartPoint.y;
+    
+                    // Ограничиваем перемещение внутри окна
+                    RECT rect;
+                    GetClientRect(hMainWnd, &rect);
+                    int iconSize = static_cast<int>(app.sizeFactor * 10.0f); // Примерное вычисление размера
+                    if (newLeft < 0) newLeft = 0;
+                    if (newTop < 0) newTop = 0;
+                    if (newLeft + iconSize > rect.right) newLeft = rect.right - iconSize;
+                    if (newTop + iconSize > rect.bottom) newTop = rect.bottom - iconSize;
+    
+                    // Обновляем положение иконки
+                    app.drawRect.left = newLeft;
+                    app.drawRect.top = newTop;
+                    app.drawRect.right = newLeft + iconSize;
+                    app.drawRect.bottom = newTop + iconSize;
+    
+                    InvalidateRect(hMainWnd, NULL, TRUE);
+                }
+                else
+                {
+                    // Перемещение времени или даты
+                    int width, height;
+                    GetClientRect(hMainWnd, &rect);
+                    width = rect.right - rect.left;
+                    height = rect.bottom - rect.top - 25; // Учитываем статусную строку
+    
+                    newLeft = xPos - dragStartPoint.x;
+                    newTop = yPos - dragStartPoint.y;
+    
+                    // Ограничиваем перемещение внутри окна
+                    int timeWidth = timeRect.right - timeRect.left;
+                    int timeHeight = timeRect.bottom - timeRect.top;
+                    if (newLeft < 0) newLeft = 0;
+                    if (newTop < 0) newTop = 0;
+                    if (newLeft + timeWidth > width) newLeft = width - timeWidth;
+                    if (newTop + timeHeight > height) newTop = height - timeHeight;
+    
+                    // Обновляем положение времени и даты
+                    timeRect.left = newLeft;
+                    timeRect.top = newTop;
+                    timeRect.right = newLeft + timeWidth;
+                    timeRect.bottom = newTop + timeHeight;
+    
+                    // Обновляем положение даты под временем
+                    int dateWidth = dateRect.right - dateRect.left;
+                    int dateHeight = dateRect.bottom - dateRect.top;
+                    dateRect.left = newLeft;
+                    dateRect.top = newTop + timeHeight + 5; // 5 пикселей отступа
+                    dateRect.right = newLeft + dateWidth;
+                    dateRect.bottom = dateRect.top + dateHeight;
+    
+                    InvalidateRect(hMainWnd, NULL, TRUE);
+                }
+            }
+        }
+        break;
+    case WM_LBUTTONUP:
+        {
+            if (isDragging)
+            {
+                isDragging = false;
+                ReleaseCapture();
+            }
+        }
+        break;
+    case WM_RBUTTONDOWN:
+        {
+            // Проверить, находится ли клик на какой-либо иконке приложения
+            int xPos = GET_X_LPARAM(lParam);
+            int yPos = GET_Y_LPARAM(lParam);
+            int appIndex = -1;
+            for (size_t i = 0; i < g_appIcons.size(); ++i)
+            {
+                AppIcon& app = g_appIcons[i];
+                if (PtInRect(&app.drawRect, POINT{ xPos, yPos }))
+                {
+                    appIndex = static_cast<int>(i);
+                    break;
+                }
+            }
+    
+            if (appIndex != -1)
+            {
+                // Создать контекстное меню для выбранной иконки
+                HMENU hMenu = CreatePopupMenu();
+                if (hMenu)
+                {
+                    AppendMenu(hMenu, MF_STRING, 6001, L"Увеличить размер");
+                    AppendMenu(hMenu, MF_STRING, 6002, L"Уменьшить размер");
+                    AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
+                    AppendMenu(hMenu, MF_STRING, 6003, L"Восстановить размер");
+    
+                    POINT cursorPos;
+                    GetCursorPos(&cursorPos);
+                    TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, cursorPos.x, cursorPos.y, 0, hWnd, NULL);
+                    DestroyMenu(hMenu);
+                }
+            }
+            else if (PtInRect(&timeRect, POINT{ GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) }) ||
+                     PtInRect(&dateRect, POINT{ GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) }))
+            {
+                // Добавим контекстное меню для изменения цвета и размера времени и даты
+                HMENU hMenu = CreatePopupMenu();
+                if (hMenu)
+                {
+                    AppendMenu(hMenu, MF_STRING, 7001, L"Изменить цвет времени");
+                    AppendMenu(hMenu, MF_STRING, 7002, L"Увеличить размер времени");
+                    AppendMenu(hMenu, MF_STRING, 7003, L"Уменьшить размер времени");
+                    AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
+                    AppendMenu(hMenu, MF_STRING, 7004, L"Изменить цвет даты");
+                    AppendMenu(hMenu, MF_STRING, 7005, L"Увеличить размер даты");
+                    AppendMenu(hMenu, MF_STRING, 7006, L"Уменьшить размер даты");
+    
+                    POINT cursorPos;
+                    GetCursorPos(&cursorPos);
+                    TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, cursorPos.x, cursorPos.y, 0, hWnd, NULL);
+                    DestroyMenu(hMenu);
+                }
+            }
+        }
+        break;
+    case WM_COMMAND:
+        {
+            int wmId = LOWORD(wParam);
+            // Обработка команд меню и контекстного меню
+            switch (wmId)
+            {
+            // Меню "File"
+            case IDM_FILE_NEW:
+                MessageBox(hWnd, L"Новый проект создан.", L"Файл", MB_OK);
+                break;
+            case IDM_FILE_OPEN:
+                MessageBox(hWnd, L"Открытие проекта.", L"Файл", MB_OK);
+                break;
+            case IDM_FILE_SAVE:
+                MessageBox(hWnd, L"Проект сохранен.", L"Файл", MB_OK);
+                break;
+            case IDM_FILE_EXIT:
+                DestroyWindow(hWnd);
+                break;
+    
+            // Меню "Edit"
+            case IDM_EDIT_UNDO:
+                MessageBox(hWnd, L"Отменить действие.", L"Правка", MB_OK);
+                break;
+            case IDM_EDIT_REDO:
+                MessageBox(hWnd, L"Повторить действие.", L"Правка", MB_OK);
+                break;
+            case IDM_EDIT_CUT:
+                MessageBox(hWnd, L"Вырезать.", L"Правка", MB_OK);
+                break;
+            case IDM_EDIT_COPY:
+                MessageBox(hWnd, L"Копировать.", L"Правка", MB_OK);
+                break;
+            case IDM_EDIT_PASTE:
+                MessageBox(hWnd, L"Вставить.", L"Правка", MB_OK);
+                break;
+    
+            // Меню "Help"
+            case IDM_HELP_ABOUT:
+                MessageBox(hWnd, L"Unity Clone IDE\nВерсия 1.0", L"О программе", MB_OK);
+                break;
+    
+            // Контекстное меню для иконок приложений
+            case 6001: // Увеличить размер иконки
+            case 6002: // Уменьшить размер иконки
+            case 6003: // Восстановить размер иконки
+                {
+                    if (selectedAppIndex != -1)
+                    {
+                        AppIcon& app = g_appIcons[selectedAppIndex];
+                        if (wmId == 6001 && app.sizeFactor < 1.5f)
+                            app.sizeFactor += 0.2f;
+                        else if (wmId == 6002 && app.sizeFactor > 0.4f)
+                            app.sizeFactor -= 0.2f;
+                        else if (wmId == 6003)
+                            app.sizeFactor = 1.0f;
+                        InvalidateRect(hMainWnd, NULL, TRUE);
+                    }
+                }
+                break;
+    
+            // Контекстное меню для времени и даты
+            case 7001: // Изменить цвет времени
+                {
+                    BYTE r = rand() % 256;
+                    BYTE g = rand() % 256;
+                    BYTE b = rand() % 256;
+                    timeColor = Color(255, r, g, b);
+                    InvalidateRect(hMainWnd, NULL, TRUE);
+                }
+                break;
+            case 7002: // Увеличить размер времени
+                {
+                    timeFontSize += 2.0f; // Увеличить размер шрифта на 2 пикселя
+                    InvalidateRect(hMainWnd, NULL, TRUE);
+                }
+                break;
+            case 7003: // Уменьшить размер времени
+                {
+                    if (timeFontSize > 20.0f) // Минимальный размер шрифта
+                        timeFontSize -= 2.0f; // Уменьшить размер шрифта на 2 пикселя
+                    InvalidateRect(hMainWnd, NULL, TRUE);
+                }
+                break;
+            case 7004: // Изменить цвет даты
+                {
+                    BYTE r = rand() % 256;
+                    BYTE g = rand() % 256;
+                    BYTE b = rand() % 256;
+                    dateColor = Color(255, r, g, b);
+                    InvalidateRect(hMainWnd, NULL, TRUE);
+                }
+                break;
+            case 7005: // Увеличить размер даты
+                {
+                    dateFontSize += 2.0f; // Увеличить размер шрифта на 2 пикселя
+                    InvalidateRect(hMainWnd, NULL, TRUE);
+                }
+                break;
+            case 7006: // Уменьшить размер даты
+                {
+                    if (dateFontSize > 10.0f) // Минимальный размер шрифта
+                        dateFontSize -= 2.0f; // Уменьшить размер шрифта на 2 пикселя
+                    InvalidateRect(hMainWnd, NULL, TRUE);
+                }
+                break;
+    
+            default:
+                return DefWindowProc(hWnd, message, wParam, lParam);
+            }
+        }
+        break;
+    case WM_CTLCOLORSTATIC:
+        {
+            HDC hdcStatic = (HDC)wParam;
+            SetBkMode(hdcStatic, TRANSPARENT);
+            SetTextColor(hdcStatic, RGB(255, 255, 255)); // Белый текст
+            return (INT_PTR)CreateSolidBrush(RGB(30, 30, 30)); // Темный фон
+        }
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
@@ -176,15 +593,16 @@ void CreateMenus(HWND hWnd)
 
     HMENU hFileMenu = CreateMenu();
     HMENU hEditMenu = CreateMenu();
-    HMENU hWindowMenu = CreateMenu();
     HMENU hHelpMenu = CreateMenu();
 
+    // Файл
     AppendMenu(hFileMenu, MF_STRING, IDM_FILE_NEW, L"&New Project\tCtrl+N");
     AppendMenu(hFileMenu, MF_STRING, IDM_FILE_OPEN, L"&Open Project...\tCtrl+O");
     AppendMenu(hFileMenu, MF_STRING, IDM_FILE_SAVE, L"&Save Project\tCtrl+S");
     AppendMenu(hFileMenu, MF_SEPARATOR, 0, nullptr);
     AppendMenu(hFileMenu, MF_STRING, IDM_FILE_EXIT, L"E&xit");
 
+    // Правка
     AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_UNDO, L"&Undo\tCtrl+Z");
     AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_REDO, L"&Redo\tCtrl+Y");
     AppendMenu(hEditMenu, MF_SEPARATOR, 0, nullptr);
@@ -192,11 +610,12 @@ void CreateMenus(HWND hWnd)
     AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_COPY, L"&Copy\tCtrl+C");
     AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_PASTE, L"&Paste\tCtrl+V");
 
+    // Справка
     AppendMenu(hHelpMenu, MF_STRING, IDM_HELP_ABOUT, L"&About");
 
+    // Добавляем меню "File", "Edit", "Help" в меню бар
     AppendMenu(hMenuBar, MF_POPUP, (UINT_PTR)hFileMenu, L"&File");
     AppendMenu(hMenuBar, MF_POPUP, (UINT_PTR)hEditMenu, L"&Edit");
-    AppendMenu(hMenuBar, MF_POPUP, (UINT_PTR)hWindowMenu, L"&Window");
     AppendMenu(hMenuBar, MF_POPUP, (UINT_PTR)hHelpMenu, L"&Help");
 
     SetMenu(hWnd, hMenuBar);
@@ -205,76 +624,877 @@ void CreateMenus(HWND hWnd)
 // Создание панели инструментов
 void CreateToolbar(HWND hWnd)
 {
-    // Создаем пустую панель инструментов
-    HWND hToolbar = CreateWindowEx(0, TOOLBARCLASSNAME, nullptr,
-        WS_CHILD | WS_VISIBLE | TBSTYLE_WRAPABLE | TBSTYLE_TOOLTIPS, 
-        0, 0, 0, 0, hWnd, nullptr, hInst, nullptr);
+    // Создаем окно панели инструментов
+    hToolbar = CreateWindowEx(0, TOOLBARCLASSNAME, NULL,
+        WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | TBSTYLE_TOOLTIPS,
+        0, 0, 0, 0, hWnd, NULL, hInst, NULL);
 
-    // Здесь можно добавить кнопки и изображения для панели инструментов
+    SendMessage(hToolbar, TB_BUTTONSTRUCTSIZE, (WPARAM)sizeof(TBBUTTON), 0);
+
+    // Добавляем изображения в ImageList
+    HIMAGELIST hImageList = ImageList_Create(32, 32, ILC_COLOR32 | ILC_MASK, 5, 1);
+    HICON hIcon;
+
+    hIcon = LoadIcon(hInst, MAKEINTRESOURCE(IDI_APP_ICON));
+    ImageList_AddIcon(hImageList, hIcon);
+    hIcon = LoadIcon(hInst, MAKEINTRESOURCE(IDI_FOLDER_ICON));
+    ImageList_AddIcon(hImageList, hIcon);
+    hIcon = LoadIcon(hInst, MAKEINTRESOURCE(IDI_SCRIPT_ICON));
+    ImageList_AddIcon(hImageList, hIcon);
+    hIcon = LoadIcon(hInst, MAKEINTRESOURCE(IDI_PLAY_ICON));
+    ImageList_AddIcon(hImageList, hIcon);
+    hIcon = LoadIcon(hInst, MAKEINTRESOURCE(IDI_STOP_ICON));
+    ImageList_AddIcon(hImageList, hIcon);
+
+    // Присваиваем ImageList панели инструментов
+    SendMessage(hToolbar, TB_SETIMAGELIST, 0, (LPARAM)hImageList);
+
+    // Определяем кнопки панели инструментов
+    TBBUTTON tbButtons[5];
+    ZeroMemory(tbButtons, sizeof(tbButtons));
+
+    // Кнопка "New Project"
+    tbButtons[0].iBitmap = 0;
+    tbButtons[0].idCommand = IDM_FILE_NEW;
+    tbButtons[0].fsState = TBSTATE_ENABLED;
+    tbButtons[0].fsStyle = TBSTYLE_BUTTON;
+
+    // Кнопка "Open Project"
+    tbButtons[1].iBitmap = 1;
+    tbButtons[1].idCommand = IDM_FILE_OPEN;
+    tbButtons[1].fsState = TBSTATE_ENABLED;
+    tbButtons[1].fsStyle = TBSTYLE_BUTTON;
+
+    // Кнопка "Save Project"
+    tbButtons[2].iBitmap = 2;
+    tbButtons[2].idCommand = IDM_FILE_SAVE;
+    tbButtons[2].fsState = TBSTATE_ENABLED;
+    tbButtons[2].fsStyle = TBSTYLE_BUTTON;
+
+    // Разделитель
+    tbButtons[3].fsStyle = TBSTYLE_SEP;
+
+    // Кнопка "Play"
+    tbButtons[4].iBitmap = 3;
+    tbButtons[4].idCommand = IDM_HELP_ABOUT; // Пример, замените на свой ID
+    tbButtons[4].fsState = TBSTATE_ENABLED;
+    tbButtons[4].fsStyle = TBSTYLE_BUTTON;
+
+    // Добавляем кнопки в панель инструментов
+    SendMessage(hToolbar, TB_ADDBUTTONS, 5, (LPARAM)&tbButtons);
 }
 
 // Создание статусной строки
 void CreateStatusBar(HWND hWnd)
 {
-    HWND hStatus = CreateWindowEx(0, STATUSCLASSNAME, nullptr,
-        WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP, 
-        0, 0, 0, 0, hWnd, (HMENU)1, hInst, nullptr);
+    hStatusBar = CreateWindowEx(0, STATUSCLASSNAME, NULL,
+        WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP,
+        0, 0, 0, 0, hWnd, (HMENU)1, hInst, NULL);
 
-    int statwidths[] = { 100, -1 };
-    SendMessage(hStatus, SB_SETPARTS, sizeof(statwidths)/sizeof(int), (LPARAM)statwidths);
-    SendMessage(hStatus, SB_SETTEXT, 0, (LPARAM)L"Готово");
+    int statwidths[] = { 200, -1 };
+    SendMessage(hStatusBar, SB_SETPARTS, sizeof(statwidths)/sizeof(int), (LPARAM)statwidths);
+    SendMessage(hStatusBar, SB_SETTEXT, 0, (LPARAM)L"Ready");
+}
 
-    // Сохраняем handle статусной строки для обновления в WndProc
-    SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR)hStatus);
+// Инициализация иконок приложений
+void InitializeAppIcons()
+{
+    // Пример добавления иконок приложений
+    AppIcon app;
+
+    // Настройки
+    app.image = new Bitmap(L"C:\\Path\\To\\SettingsIcon.png"); // Замените на реальные пути
+    app.label = L"Settings";
+    app.sizeFactor = 1.0f;
+    g_appIcons.push_back(app);
+
+    // Файлы
+    app.image = new Bitmap(L"C:\\Path\\To\\FilesIcon.png");
+    app.label = L"Files";
+    app.sizeFactor = 1.0f;
+    g_appIcons.push_back(app);
+
+    // Камера
+    app.image = new Bitmap(L"C:\\Path\\To\\CameraIcon.png");
+    app.label = L"Camera";
+    app.sizeFactor = 1.0f;
+    g_appIcons.push_back(app);
+
+    // Браузер
+    app.image = new Bitmap(L"C:\\Path\\To\\BrowserIcon.png");
+    app.label = L"Browser";
+    app.sizeFactor = 1.0f;
+    g_appIcons.push_back(app);
+
+    // Дополнительные иконки
+    app.image = new Bitmap(L"C:\\Path\\To\\MailIcon.png");
+    app.label = L"Mail";
+    app.sizeFactor = 1.0f;
+    g_appIcons.push_back(app);
+
+    app.image = new Bitmap(L"C:\\Path\\To\\MusicIcon.png");
+    app.label = L"Music";
+    app.sizeFactor = 1.0f;
+    g_appIcons.push_back(app);
+
+    app.image = new Bitmap(L"C:\\Path\\To\\CalendarIcon.png");
+    app.label = L"Calendar";
+    app.sizeFactor = 1.0f;
+    g_appIcons.push_back(app);
+
+    app.image = new Bitmap(L"C:\\Path\\To\\NotesIcon.png");
+    app.label = L"Notes";
+    app.sizeFactor = 1.0f;
+    g_appIcons.push_back(app);
 }
 
 // Создание докируемых панелей
 void CreateDockablePanes(HWND hWnd)
 {
-    // Размеры окна
-    RECT rect;
-    GetClientRect(hWnd, &rect);
-
-    int width = rect.right - rect.left;
-    int height = rect.bottom - rect.top;
-    int panelWidth = 200;
-    int panelHeight = 200;
-
-    // Создаем панель "Project"
-    HWND hProjectPane = CreateWindowEx(WS_EX_CLIENTEDGE, L"STATIC", L"Project Pane",
-        WS_CHILD | WS_VISIBLE | SS_LEFT, 
-        0, 0, panelWidth, height - panelHeight, 
+    // Проектная панель
+    hProjectPane = CreateWindowEx(WS_EX_CLIENTEDGE, WC_LISTVIEW, nullptr,
+        WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_ICON,
+        0, 40, 250, 600 - 200, // x, y, width, height
         hWnd, (HMENU)2, hInst, nullptr);
 
-    // Создаем панель "Hierarchy"
-    HWND hHierarchyPane = CreateWindowEx(WS_EX_CLIENTEDGE, L"STATIC", L"Hierarchy Pane",
-        WS_CHILD | WS_VISIBLE | SS_LEFT, 
-        0, height - panelHeight, panelWidth, panelHeight, 
+    // Настраиваем ListView
+    HIMAGELIST hImageList = ImageList_Create(32, 32, ILC_COLOR32 | ILC_MASK, 1, 1);
+    HICON hIcon = LoadIcon(hInst, MAKEINTRESOURCE(IDI_FOLDER_ICON));
+    ImageList_AddIcon(hImageList, hIcon);
+    SendMessage(hProjectPane, LVM_SETIMAGELIST, LVSIL_NORMAL, (LPARAM)hImageList);
+
+    // Добавляем элементы в ListView
+    LVITEM lvItem = { 0 };
+    lvItem.mask = LVIF_TEXT | LVIF_IMAGE;
+    lvItem.iItem = 0;
+    lvItem.pszText = L"Assets";
+    lvItem.iImage = 0;
+    SendMessage(hProjectPane, LVM_INSERTITEM, 0, (LPARAM)&lvItem);
+
+    lvItem.iItem = 1;
+    lvItem.pszText = L"Scripts";
+    lvItem.iImage = 0;
+    SendMessage(hProjectPane, LVM_INSERTITEM, 0, (LPARAM)&lvItem);
+
+    // Иерархическая панель
+    hHierarchyPane = CreateWindowEx(WS_EX_CLIENTEDGE, WC_TREEVIEW, nullptr,
+        WS_CHILD | WS_VISIBLE | TVS_HASLINES | TVS_HASBUTTONS,
+        0, 600 - 200, 250, 200,
         hWnd, (HMENU)3, hInst, nullptr);
 
-    // Создаем панель "Inspector"
-    HWND hInspectorPane = CreateWindowEx(WS_EX_CLIENTEDGE, L"STATIC", L"Inspector Pane",
-        WS_CHILD | WS_VISIBLE | SS_LEFT, 
-        width - panelWidth, 0, panelWidth, height, 
+    // Добавляем элементы в дерево
+    TVINSERTSTRUCT tvInsert = { 0 };
+    tvInsert.hParent = TVI_ROOT;
+    tvInsert.hInsertAfter = TVI_LAST;
+    tvInsert.item.mask = TVIF_TEXT;
+    tvInsert.item.pszText = L"Main Camera";
+    HTREEITEM hCamera = (HTREEITEM)SendMessage(hHierarchyPane, TVM_INSERTITEM, 0, (LPARAM)&tvInsert);
+
+    tvInsert.item.pszText = L"Directional Light";
+    HTREEITEM hLight = (HTREEITEM)SendMessage(hHierarchyPane, TVM_INSERTITEM, 0, (LPARAM)&tvInsert);
+
+    // Панель "Inspector"
+    hInspectorPane = CreateWindowEx(WS_EX_CLIENTEDGE, L"STATIC", L"Inspector Pane",
+        WS_CHILD | WS_VISIBLE | SS_LEFT,
+        1030, 40, 250, 600,
         hWnd, (HMENU)4, hInst, nullptr);
 
-    // Создаем панель "Scene"
-    HWND hScenePane = CreateWindowEx(WS_EX_CLIENTEDGE, L"STATIC", L"Scene Pane",
-        WS_CHILD | WS_VISIBLE | SS_LEFT, 
-        panelWidth, 0, width - 2 * panelWidth, height / 2, 
+    // Панель "Scene"
+    hScenePane = CreateWindowEx(WS_EX_CLIENTEDGE, L"STATIC", L"Scene Pane",
+        WS_CHILD | WS_VISIBLE | SS_LEFT,
+        250, 40, 780, 300,
         hWnd, (HMENU)5, hInst, nullptr);
 
-    // Создаем панель "Game"
-    HWND hGamePane = CreateWindowEx(WS_EX_CLIENTEDGE, L"STATIC", L"Game Pane",
-        WS_CHILD | WS_VISIBLE | SS_LEFT, 
-        panelWidth, height / 2, width - 2 * panelWidth, height / 2, 
+    // Панель "Game"
+    hGamePane = CreateWindowEx(WS_EX_CLIENTEDGE, L"STATIC", L"Game Pane",
+        WS_CHILD | WS_VISIBLE | SS_LEFT,
+        250, 340, 780, 260,
         hWnd, (HMENU)6, hInst, nullptr);
 
-    // Создаем панель "Console"
-    HWND hConsolePane = CreateWindowEx(WS_EX_CLIENTEDGE, L"STATIC", L"Console Pane",
-        WS_CHILD | WS_VISIBLE | SS_LEFT, 
-        0, height - panelHeight, width, panelHeight, 
+    // Панель "Console"
+    hConsolePane = CreateWindowEx(WS_EX_CLIENTEDGE, WC_LISTBOX, nullptr,
+        WS_CHILD | WS_VISIBLE | LBS_NOINTEGRALHEIGHT,
+        10, 620, 960, 80,
         hWnd, (HMENU)7, hInst, nullptr);
+
+    // Добавляем сообщения в консоль
+    SendMessage(hConsolePane, LB_ADDSTRING, 0, (LPARAM)L"Console initialized.");
 }
 
-// Остальная часть кода...
+// Улучшение дизайна докируемых панелей
+void RenderDockablePane(HWND pane, const std::wstring& title)
+{
+    // Здесь можно добавить более сложную отрисовку панелей с использованием GDI+
+    // Например, нарисовать заголовок панели
+    PAINTSTRUCT ps;
+    HDC hdc = BeginPaint(pane, &ps);
+
+    Graphics graphics(hdc);
+    graphics.SetSmoothingMode(SmoothingModeAntiAlias);
+    graphics.SetTextRenderingHint(TextRenderingHintClearTypeGridFit);
+
+    // Рисуем заголовок панели
+    FontFamily fontFamily(L"Segoe UI");
+    Font font(&fontFamily, 14, FontStyleBold, UnitPixel);
+    SolidBrush brush(Color(255, 200, 200, 200));
+
+    RectF layoutRect(5, 5, 240, 20);
+    StringFormat format;
+    format.SetAlignment(StringAlignmentCenter);
+    format.SetLineAlignment(StringAlignmentCenter);
+
+    graphics.DrawString(title.c_str(), -1, &font, layoutRect, &format, &brush);
+
+    EndPaint(pane, &ps);
+}
+
+// Создание меню
+void CreateMenus(HWND hWnd)
+{
+    HMENU hMenuBar = CreateMenu();
+
+    HMENU hFileMenu = CreateMenu();
+    HMENU hEditMenu = CreateMenu();
+    HMENU hHelpMenu = CreateMenu();
+
+    // Файл
+    AppendMenu(hFileMenu, MF_STRING, IDM_FILE_NEW, L"&New Project\tCtrl+N");
+    AppendMenu(hFileMenu, MF_STRING, IDM_FILE_OPEN, L"&Open Project...\tCtrl+O");
+    AppendMenu(hFileMenu, MF_STRING, IDM_FILE_SAVE, L"&Save Project\tCtrl+S");
+    AppendMenu(hFileMenu, MF_SEPARATOR, 0, nullptr);
+    AppendMenu(hFileMenu, MF_STRING, IDM_FILE_EXIT, L"E&xit");
+
+    // Правка
+    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_UNDO, L"&Undo\tCtrl+Z");
+    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_REDO, L"&Redo\tCtrl+Y");
+    AppendMenu(hEditMenu, MF_SEPARATOR, 0, nullptr);
+    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_CUT, L"Cu&t\tCtrl+X");
+    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_COPY, L"&Copy\tCtrl+C");
+    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_PASTE, L"&Paste\tCtrl+V");
+
+    // Справка
+    AppendMenu(hHelpMenu, MF_STRING, IDM_HELP_ABOUT, L"&About");
+
+    // Добавляем меню "File", "Edit", "Help" в меню бар
+    AppendMenu(hMenuBar, MF_POPUP, (UINT_PTR)hFileMenu, L"&File");
+    AppendMenu(hMenuBar, MF_POPUP, (UINT_PTR)hEditMenu, L"&Edit");
+    AppendMenu(hMenuBar, MF_POPUP, (UINT_PTR)hHelpMenu, L"&Help");
+
+    SetMenu(hWnd, hMenuBar);
+}
+
+// Создание панели инструментов
+void CreateToolbar(HWND hWnd)
+{
+    // Создаем окно панели инструментов
+    hToolbar = CreateWindowEx(0, TOOLBARCLASSNAME, NULL,
+        WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | TBSTYLE_TOOLTIPS,
+        0, 0, 0, 0, hWnd, NULL, hInst, NULL);
+
+    SendMessage(hToolbar, TB_BUTTONSTRUCTSIZE, (WPARAM)sizeof(TBBUTTON), 0);
+
+    // Добавляем изображения в ImageList
+    HIMAGELIST hImageList = ImageList_Create(32, 32, ILC_COLOR32 | ILC_MASK, 5, 1);
+    HICON hIcon;
+
+    hIcon = LoadIcon(hInst, MAKEINTRESOURCE(IDI_FOLDER_ICON));
+    ImageList_AddIcon(hImageList, hIcon);
+    hIcon = LoadIcon(hInst, MAKEINTRESOURCE(IDI_SCRIPT_ICON));
+    ImageList_AddIcon(hImageList, hIcon);
+    hIcon = LoadIcon(hInst, MAKEINTRESOURCE(IDI_PLAY_ICON));
+    ImageList_AddIcon(hImageList, hIcon);
+    hIcon = LoadIcon(hInst, MAKEINTRESOURCE(IDI_STOP_ICON));
+    ImageList_AddIcon(hImageList, hIcon);
+
+    // Присваиваем ImageList панели инструментов
+    SendMessage(hToolbar, TB_SETIMAGELIST, 0, (LPARAM)hImageList);
+
+    // Определяем кнопки панели инструментов
+    TBBUTTON tbButtons[5];
+    ZeroMemory(tbButtons, sizeof(tbButtons));
+
+    // Кнопка "New Project"
+    tbButtons[0].iBitmap = 0;
+    tbButtons[0].idCommand = IDM_FILE_NEW;
+    tbButtons[0].fsState = TBSTATE_ENABLED;
+    tbButtons[0].fsStyle = TBSTYLE_BUTTON;
+    tbButtons[0].iString = 0;
+
+    // Кнопка "Open Project"
+    tbButtons[1].iBitmap = 1;
+    tbButtons[1].idCommand = IDM_FILE_OPEN;
+    tbButtons[1].fsState = TBSTATE_ENABLED;
+    tbButtons[1].fsStyle = TBSTYLE_BUTTON;
+    tbButtons[1].iString = 0;
+
+    // Кнопка "Save Project"
+    tbButtons[2].iBitmap = 2;
+    tbButtons[2].idCommand = IDM_FILE_SAVE;
+    tbButtons[2].fsState = TBSTATE_ENABLED;
+    tbButtons[2].fsStyle = TBSTYLE_BUTTON;
+    tbButtons[2].iString = 0;
+
+    // Разделитель
+    tbButtons[3].fsStyle = TBSTYLE_SEP;
+
+    // Кнопка "Play"
+    tbButtons[4].iBitmap = 3;
+    tbButtons[4].idCommand = IDM_HELP_ABOUT; // Пример, замените на свой ID
+    tbButtons[4].fsState = TBSTATE_ENABLED;
+    tbButtons[4].fsStyle = TBSTYLE_BUTTON;
+    tbButtons[4].iString = 0;
+
+    // Добавляем кнопки в панель инструментов
+    SendMessage(hToolbar, TB_ADDBUTTONS, 5, (LPARAM)&tbButtons);
+}
+
+// Создание статусной строки
+void CreateStatusBar(HWND hWnd)
+{
+    hStatusBar = CreateWindowEx(0, STATUSCLASSNAME, NULL,
+        WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP,
+        0, 0, 0, 0, hWnd, (HMENU)1, hInst, NULL);
+
+    int statwidths[] = { 200, -1 };
+    SendMessage(hStatusBar, SB_SETPARTS, sizeof(statwidths)/sizeof(int), (LPARAM)statwidths);
+    SendMessage(hStatusBar, SB_SETTEXT, 0, (LPARAM)L"Ready");
+}
+
+// Инициализация иконок приложений (пример с ресурсов)
+void InitializeAppIcons()
+{
+    // Пример добавления иконок приложений
+    AppIcon app;
+
+    // Настройки
+    app.image = new Bitmap(L"SettingsIcon.png"); // Замените на реальные пути к иконкам или загрузите из ресурсов
+    app.label = L"Settings";
+    app.sizeFactor = 1.0f;
+    g_appIcons.push_back(app);
+
+    // Файлы
+    app.image = new Bitmap(L"FilesIcon.png");
+    app.label = L"Files";
+    app.sizeFactor = 1.0f;
+    g_appIcons.push_back(app);
+
+    // Камера
+    app.image = new Bitmap(L"CameraIcon.png");
+    app.label = L"Camera";
+    app.sizeFactor = 1.0f;
+    g_appIcons.push_back(app);
+
+    // Браузер
+    app.image = new Bitmap(L"BrowserIcon.png");
+    app.label = L"Browser";
+    app.sizeFactor = 1.0f;
+    g_appIcons.push_back(app);
+
+    // Почта
+    app.image = new Bitmap(L"MailIcon.png");
+    app.label = L"Mail";
+    app.sizeFactor = 1.0f;
+    g_appIcons.push_back(app);
+
+    // Музыка
+    app.image = new Bitmap(L"MusicIcon.png");
+    app.label = L"Music";
+    app.sizeFactor = 1.0f;
+    g_appIcons.push_back(app);
+
+    // Календарь
+    app.image = new Bitmap(L"CalendarIcon.png");
+    app.label = L"Calendar";
+    app.sizeFactor = 1.0f;
+    g_appIcons.push_back(app);
+
+    // Заметки
+    app.image = new Bitmap(L"NotesIcon.png");
+    app.label = L"Notes";
+    app.sizeFactor = 1.0f;
+    g_appIcons.push_back(app);
+}
+
+// Создание докируемых панелей
+void CreateDockablePanes(HWND hWnd)
+{
+    // Создадим область отрисовки для каждой докируемой панели
+    // Проектная панель
+    hProjectPane = CreateWindowEx(0, L"STATIC", L"Project",
+        WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE | WS_BORDER,
+        10, 50, 230, 50, hWnd, NULL, hInst, NULL);
+    RenderDockablePane(hProjectPane, L"Project");
+
+    // Иерархическая панель
+    hHierarchyPane = CreateWindowEx(0, L"STATIC", L"Hierarchy",
+        WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE | WS_BORDER,
+        10, 110, 230, 50, hWnd, NULL, hInst, NULL);
+    RenderDockablePane(hHierarchyPane, L"Hierarchy");
+
+    // Панель "Inspector"
+    hInspectorPane = CreateWindowEx(0, L"STATIC", L"Inspector",
+        WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE | WS_BORDER,
+        1040, 50, 230, 150, hWnd, NULL, hInst, NULL);
+    RenderDockablePane(hInspectorPane, L"Inspector");
+
+    // Панель "Scene"
+    hScenePane = CreateWindowEx(0, L"STATIC", L"Scene",
+        WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE | WS_BORDER,
+        250, 50, 780, 300, hWnd, NULL, hInst, NULL);
+    RenderDockablePane(hScenePane, L"Scene");
+
+    // Панель "Game"
+    hGamePane = CreateWindowEx(0, L"STATIC", L"Game",
+        WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE | WS_BORDER,
+        250, 360, 780, 300, hWnd, NULL, hInst, NULL);
+    RenderDockablePane(hGamePane, L"Game");
+
+    // Панель "Console"
+    hConsolePane = CreateWindowEx(0, WC_LISTBOX, L"Console",
+        WS_CHILD | WS_VISIBLE | WS_BORDER | LBS_NOINTEGRALHEIGHT | WS_VSCROLL,
+        10, 670, 960, 60, hWnd, NULL, hInst, NULL);
+    SendMessage(hConsolePane, LB_ADDSTRING, 0, (LPARAM)L"Console initialized.");
+}
+
+// Улучшение дизайна докируемых панелей
+void RenderDockablePane(HWND pane, const std::wstring& title)
+{
+    PAINTSTRUCT ps;
+    HDC hdc = BeginPaint(pane, &ps);
+
+    Graphics graphics(hdc);
+    graphics.SetSmoothingMode(SmoothingModeAntiAlias);
+    graphics.SetTextRenderingHint(TextRenderingHintClearTypeGridFit);
+
+    // Рисуем заголовок панели
+    FontFamily fontFamily(L"Segoe UI");
+    Font font(&fontFamily, 14, FontStyleBold, UnitPixel);
+    SolidBrush brush(Color(255, 200, 200, 200));
+
+    RectF layoutRect(5, 5, 220, 20);
+    StringFormat format;
+    format.SetAlignment(StringAlignmentCenter);
+    format.SetLineAlignment(StringAlignmentCenter);
+
+    graphics.DrawString(title.c_str(), -1, &font, layoutRect, &format, &brush);
+
+    EndPaint(pane, &ps);
+}
+
+// Обработчик окна
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
+    case WM_CREATE:
+        {
+            CreateMenus(hWnd);
+            CreateToolbar(hWnd);
+            CreateStatusBar(hWnd);
+            CreateDockablePanes(hWnd);
+            InitializeAppIcons();
+            break;
+        }
+    case WM_SIZE:
+        {
+            RECT rect;
+            GetClientRect(hWnd, &rect);
+            int width = rect.right - rect.left;
+            int height = rect.bottom - rect.top - 25; // Учитываем высоту статусной строки
+
+            // Обновляем статусную строку
+            SendMessage(hStatusBar, WM_SIZE, 0, 0);
+
+            // Обновляем размеры панелей
+            MoveWindow(hProjectPane, 10, 50, 230, 50, TRUE);
+            MoveWindow(hHierarchyPane, 10, 110, 230, 50, TRUE);
+            MoveWindow(hInspectorPane, width - 240, 50, 230, 150, TRUE); // Отступ 10 пикселей
+            MoveWindow(hScenePane, 250, 50, width - 500, 300, TRUE); // Отступы от сторон
+            MoveWindow(hGamePane, 250, 360, width - 500, 300, TRUE);
+            MoveWindow(hConsolePane, 10, 670, 960, 60, TRUE);
+            MoveWindow(hToolbar, 0, 0, width, 40, TRUE);
+        }
+        break;
+    case WM_LBUTTONDOWN:
+        {
+            int xPos = GET_X_LPARAM(lParam);
+            int yPos = GET_Y_LPARAM(lParam);
+            // Проверка, попадает ли клик в область времени или даты
+            bool clickedOnTime = (xPos >= timeRect.left && xPos <= timeRect.right &&
+                                   yPos >= timeRect.top && yPos <= timeRect.bottom);
+            bool clickedOnDate = (xPos >= dateRect.left && xPos <= dateRect.right &&
+                                   yPos >= dateRect.top && yPos <= dateRect.bottom);
+
+            // Проверить, находится ли клик на какой-либо иконке приложения
+            int appIndex = -1;
+            for (size_t i = 0; i < g_appIcons.size(); ++i)
+            {
+                AppIcon& app = g_appIcons[i];
+                if (PtInRect(&app.drawRect, POINT{ xPos, yPos }))
+                {
+                    appIndex = static_cast<int>(i);
+                    break;
+                }
+            }
+
+            if (clickedOnTime || clickedOnDate)
+            {
+                isDragging = true;
+                if (clickedOnTime)
+                {
+                    dragStartPoint.x = xPos - timeRect.left;
+                    dragStartPoint.y = yPos - timeRect.top;
+                }
+                else
+                {
+                    dragStartPoint.x = xPos - dateRect.left;
+                    dragStartPoint.y = yPos - dateRect.top;
+                }
+                SetCapture(hWnd);
+            }
+            else if (appIndex != -1)
+            {
+                // Увеличить масштаб иконки при клике
+                AppIcon& app = g_appIcons[appIndex];
+                if (app.sizeFactor < 1.5f) // Максимальный масштаб 1.5x
+                {
+                    app.sizeFactor += 0.2f; // Увеличить на 20%
+                    InvalidateRect(hProjectPane, NULL, TRUE);
+                    InvalidateRect(hHierarchyPane, NULL, TRUE);
+                    InvalidateRect(hInspectorPane, NULL, TRUE);
+                    InvalidateRect(hScenePane, NULL, TRUE);
+                    InvalidateRect(hGamePane, NULL, TRUE);
+                    InvalidateRect(hConsolePane, NULL, TRUE);
+                }
+            }
+        }
+        break;
+    case WM_MOUSEMOVE:
+        {
+            if (isDragging)
+            {
+                int xPos = GET_X_LPARAM(lParam);
+                int yPos = GET_Y_LPARAM(lParam);
+
+                if (selectedAppIndex != -1)
+                {
+                    // Перемещение иконки приложения
+                    AppIcon& app = g_appIcons[selectedAppIndex];
+                    int newLeft = xPos - dragStartPoint.x;
+                    int newTop = yPos - dragStartPoint.y;
+
+                    // Ограничить перемещение внутри окна
+                    RECT rect;
+                    GetClientRect(hMainWnd, &rect);
+                    int iconSize = static_cast<int>(app.sizeFactor * 10.0f); // Примерное вычисление размера
+                    if (newLeft < 0) newLeft = 0;
+                    if (newTop < 0) newTop = 0;
+                    if (newLeft + iconSize > rect.right) newLeft = rect.right - iconSize;
+                    if (newTop + iconSize > rect.bottom) newTop = rect.bottom - iconSize;
+
+                    // Обновляем положение иконки
+                    app.drawRect.left = newLeft;
+                    app.drawRect.top = newTop;
+                    app.drawRect.right = newLeft + iconSize;
+                    app.drawRect.bottom = newTop + iconSize;
+
+                    InvalidateRect(hMainWnd, NULL, TRUE);
+                }
+                else
+                {
+                    // Перемещение времени или даты
+                    int width, height;
+                    GetClientRect(hMainWnd, &rect);
+                    width = rect.right - rect.left;
+                    height = rect.bottom - rect.top - 25; // Учитываем статусную строку
+
+                    int newLeft = xPos - dragStartPoint.x;
+                    int newTop = yPos - dragStartPoint.y;
+
+                    // Ограничить перемещение внутри окна
+                    int timeWidth = timeRect.right - timeRect.left;
+                    int timeHeight = timeRect.bottom - timeRect.top;
+                    if (newLeft < 0) newLeft = 0;
+                    if (newTop < 0) newTop = 0;
+                    if (newLeft + timeWidth > width) newLeft = width - timeWidth;
+                    if (newTop + timeHeight > height) newTop = height - timeHeight;
+
+                    // Обновить положение времени и даты
+                    timeRect.left = newLeft;
+                    timeRect.top = newTop;
+                    timeRect.right = newLeft + timeWidth;
+                    timeRect.bottom = newTop + timeHeight;
+
+                    // Обновить положение даты под временем
+                    int dateWidth = dateRect.right - dateRect.left;
+                    int dateHeight = dateRect.bottom - dateRect.top;
+                    dateRect.left = newLeft;
+                    dateRect.top = newTop + timeHeight + 5; // 5 пикселей отступа
+                    dateRect.right = newLeft + dateWidth;
+                    dateRect.bottom = dateRect.top + dateHeight;
+
+                    InvalidateRect(hMainWnd, NULL, TRUE);
+                }
+            }
+        }
+        break;
+    case WM_LBUTTONUP:
+        {
+            if (isDragging)
+            {
+                isDragging = false;
+                ReleaseCapture();
+            }
+        }
+        break;
+    case WM_RBUTTONDOWN:
+        {
+            // Проверить, находится ли клик на какой-либо иконке приложения
+            int xPos = GET_X_LPARAM(lParam);
+            int yPos = GET_Y_LPARAM(lParam);
+            int appIndex = -1;
+            for (size_t i = 0; i < g_appIcons.size(); ++i)
+            {
+                AppIcon& app = g_appIcons[i];
+                if (PtInRect(&app.drawRect, POINT{ xPos, yPos }))
+                {
+                    appIndex = static_cast<int>(i);
+                    break;
+                }
+            }
+
+            if (appIndex != -1)
+            {
+                // Создать контекстное меню для выбранной иконки
+                HMENU hMenu = CreatePopupMenu();
+                if (hMenu)
+                {
+                    AppendMenu(hMenu, MF_STRING, 6001, L"Увеличить размер");
+                    AppendMenu(hMenu, MF_STRING, 6002, L"Уменьшить размер");
+                    AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
+                    AppendMenu(hMenu, MF_STRING, 6003, L"Восстановить размер");
+
+                    POINT cursorPos;
+                    GetCursorPos(&cursorPos);
+                    TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, cursorPos.x, cursorPos.y, 0, hWnd, NULL);
+                    DestroyMenu(hMenu);
+                }
+            }
+            else if (PtInRect(&timeRect, POINT{ GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) }) ||
+                     PtInRect(&dateRect, POINT{ GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) }))
+            {
+                // Добавим контекстное меню для изменения цвета и размера времени и даты
+                HMENU hMenu = CreatePopupMenu();
+                if (hMenu)
+                {
+                    AppendMenu(hMenu, MF_STRING, 7001, L"Изменить цвет времени");
+                    AppendMenu(hMenu, MF_STRING, 7002, L"Увеличить размер времени");
+                    AppendMenu(hMenu, MF_STRING, 7003, L"Уменьшить размер времени");
+                    AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
+                    AppendMenu(hMenu, MF_STRING, 7004, L"Изменить цвет даты");
+                    AppendMenu(hMenu, MF_STRING, 7005, L"Увеличить размер даты");
+                    AppendMenu(hMenu, MF_STRING, 7006, L"Уменьшить размер даты");
+
+                    POINT cursorPos;
+                    GetCursorPos(&cursorPos);
+                    TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, cursorPos.x, cursorPos.y, 0, hWnd, NULL);
+                    DestroyMenu(hMenu);
+                }
+            }
+        }
+        break;
+    case WM_COMMAND:
+        {
+            int wmId = LOWORD(wParam);
+            // Обработка команд меню и контекстного меню
+            switch (wmId)
+            {
+            // Меню "File"
+            case IDM_FILE_NEW:
+                MessageBox(hWnd, L"Новый проект создан.", L"Файл", MB_OK);
+                break;
+            case IDM_FILE_OPEN:
+                MessageBox(hWnd, L"Открытие проекта.", L"Файл", MB_OK);
+                break;
+            case IDM_FILE_SAVE:
+                MessageBox(hWnd, L"Проект сохранен.", L"Файл", MB_OK);
+                break;
+            case IDM_FILE_EXIT:
+                DestroyWindow(hWnd);
+                break;
+    
+            // Меню "Edit"
+            case IDM_EDIT_UNDO:
+                MessageBox(hWnd, L"Отменить действие.", L"Правка", MB_OK);
+                break;
+            case IDM_EDIT_REDO:
+                MessageBox(hWnd, L"Повторить действие.", L"Правка", MB_OK);
+                break;
+            case IDM_EDIT_CUT:
+                MessageBox(hWnd, L"Вырезать.", L"Правка", MB_OK);
+                break;
+            case IDM_EDIT_COPY:
+                MessageBox(hWnd, L"Копировать.", L"Правка", MB_OK);
+                break;
+            case IDM_EDIT_PASTE:
+                MessageBox(hWnd, L"Вставить.", L"Правка", MB_OK);
+                break;
+    
+            // Меню "Help"
+            case IDM_HELP_ABOUT:
+                MessageBox(hWnd, L"Unity Clone IDE\nВерсия 1.0", L"О программе", MB_OK);
+                break;
+    
+            // Контекстное меню для иконок приложений
+            case 6001: // Увеличить размер иконки
+            case 6002: // Уменьшить размер иконки
+            case 6003: // Восстановить размер иконки
+                {
+                    if (selectedAppIndex != -1)
+                    {
+                        AppIcon& app = g_appIcons[selectedAppIndex];
+                        if (wmId == 6001 && app.sizeFactor < 1.5f)
+                            app.sizeFactor += 0.2f;
+                        else if (wmId == 6002 && app.sizeFactor > 0.4f)
+                            app.sizeFactor -= 0.2f;
+                        else if (wmId == 6003)
+                            app.sizeFactor = 1.0f;
+                        InvalidateRect(hMainWnd, NULL, TRUE);
+                    }
+                }
+                break;
+    
+            // Контекстное меню для времени и даты
+            case 7001: // Изменить цвет времени
+                {
+                    BYTE r = rand() % 256;
+                    BYTE g = rand() % 256;
+                    BYTE b = rand() % 256;
+                    timeColor = Color(255, r, g, b);
+                    InvalidateRect(hMainWnd, NULL, TRUE);
+                }
+                break;
+            case 7002: // Увеличить размер времени
+                {
+                    timeFontSize += 2.0f; // Увеличить размер шрифта на 2 пикселя
+                    InvalidateRect(hMainWnd, NULL, TRUE);
+                }
+                break;
+            case 7003: // Уменьшить размер времени
+                {
+                    if (timeFontSize > 20.0f) // Минимальный размер шрифта
+                        timeFontSize -= 2.0f; // Уменьшить размер шрифта на 2 пикселя
+                    InvalidateRect(hMainWnd, NULL, TRUE);
+                }
+                break;
+            case 7004: // Изменить цвет даты
+                {
+                    BYTE r = rand() % 256;
+                    BYTE g = rand() % 256;
+                    BYTE b = rand() % 256;
+                    dateColor = Color(255, r, g, b);
+                    InvalidateRect(hMainWnd, NULL, TRUE);
+                }
+                break;
+            case 7005: // Увеличить размер даты
+                {
+                    dateFontSize += 2.0f; // Увеличить размер шрифта на 2 пикселя
+                    InvalidateRect(hMainWnd, NULL, TRUE);
+                }
+                break;
+            case 7006: // Уменьшить размер даты
+                {
+                    if (dateFontSize > 10.0f) // Минимальный размер шрифта
+                        dateFontSize -= 2.0f; // Уменьшить размер шрифта на 2 пикселя
+                    InvalidateRect(hMainWnd, NULL, TRUE);
+                }
+                break;
+    
+            default:
+                return DefWindowProc(hWnd, message, wParam, lParam);
+            }
+        }
+        break;
+    case WM_NOTIFY:
+        {
+            LPNMHDR lpnmh = (LPNMHDR)lParam;
+            if (lpnmh->hwndFrom == hProjectPane && lpnmh->code == LVN_ITEMCHANGED)
+            {
+                // Обработка изменений выбранного элемента в ListView
+            }
+            break;
+        }
+    case WM_PAINT:
+        {
+            PAINTSTRUCT ps;
+            BeginPaint(hMainWnd, &ps);
+
+            Graphics graphics(ps.hdc);
+            graphics.SetSmoothingMode(SmoothingModeAntiAlias);
+            graphics.SetTextRenderingHint(TextRenderingHintClearTypeGridFit);
+
+            // Отображение времени
+            FontFamily timeFontFamily(L"Segoe UI Semibold"); // Более современный шрифт
+            Font timeFont(&timeFontFamily, timeFontSize, FontStyleBold, UnitPixel);
+            SolidBrush timeBrush(timeColor);
+
+            StringFormat timeFormat;
+            timeFormat.SetAlignment(StringAlignmentCenter);
+            timeFormat.SetLineAlignment(StringAlignmentCenter);
+            timeFormat.SetFormatFlags(StringFormatFlagsNoWrap);
+            timeFormat.SetTrimming(StringTrimmingEllipsisCharacter);
+
+            RectF currentTimeRect(static_cast<float>(timeRect.left),
+                static_cast<float>(timeRect.top),
+                static_cast<float>(timeRect.right - timeRect.left),
+                static_cast<float>(timeRect.bottom - timeRect.top));
+
+            graphics.DrawString(
+                currentTime.c_str(),
+                -1,
+                &timeFont,
+                currentTimeRect,
+                &timeFormat,
+                &timeBrush
+            );
+
+            // Отображение даты
+            FontFamily dateFontFamily(L"Segoe UI");
+            Font dateFont(&dateFontFamily, dateFontSize, FontStyleRegular, UnitPixel);
+            SolidBrush dateBrush(dateColor);
+
+            StringFormat dateFormat;
+            dateFormat.SetAlignment(StringAlignmentCenter);
+            dateFormat.SetLineAlignment(StringAlignmentCenter);
+            dateFormat.SetFormatFlags(StringFormatFlagsNoWrap);
+            dateFormat.SetTrimming(StringTrimmingEllipsisCharacter);
+
+            RectF currentDateRect(static_cast<float>(dateRect.left),
+                static_cast<float>(dateRect.top),
+                static_cast<float>(dateRect.right - dateRect.left),
+                static_cast<float>(dateRect.bottom - dateRect.top));
+
+            graphics.DrawString(
+                currentDate.c_str(),
+                -1,
+                &dateFont,
+                currentDateRect,
+                &dateFormat,
+                &dateBrush
+            );
+
+            EndPaint(hMainWnd, &ps);
+        }
+        break;
+    case WM_CTLCOLORSTATIC:
+        {
+            HDC hdcStatic = (HDC)wParam;
+            SetBkMode(hdcStatic, TRANSPARENT);
+            SetTextColor(hdcStatic, RGB(255, 255, 255)); // Белый текст
+            return (INT_PTR)CreateSolidBrush(RGB(30, 30, 30)); // Темный фон
+        }
+    default:
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+    return 0;
+}

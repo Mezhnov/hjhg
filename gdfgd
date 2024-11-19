@@ -1,6 +1,6 @@
-html:
-  head:
-    title: My Page
-  body:
-    h1: Welcome to my page
-    p: This is a sample paragraph.
+body:
+  background-color: #f0f0f0
+h1:
+  color: blue
+p:
+  font-size: 14px

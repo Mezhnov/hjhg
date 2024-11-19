@@ -186,3 +186,30 @@ std::string ParseStylin(const std::string& stylinCode)
     // Для упрощения возвращаем заглушку
     return "body { font-family: Arial; } h1 { color: blue; }";
 }
+Сборка начата в 22:52...
+1>------ Сборка начата: проект: тторор, Конфигурация: Debug x64 ------
+1>тторор.cpp
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(113,10): error C2039: "wstring_convert": не является членом "std".
+1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\fstream(20,1):
+1>     см. объявление "std"
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(113,10): error C2065: wstring_convert: необъявленный идентификатор
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(113,31): error C2039: "codecvt_utf8_utf16": не является членом "std".
+1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\fstream(20,1):
+1>     см. объявление "std"
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(113,31): error C2065: codecvt_utf8_utf16: необъявленный идентификатор
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(113,50): error C2062: тип "wchar_t" не требуется
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(114,33): error C2065: converter: необъявленный идентификатор
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(133,18): error C2039: "wstring_convert": не является членом "std".
+1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\fstream(20,1):
+1>     см. объявление "std"
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(133,18): error C2065: wstring_convert: необъявленный идентификатор
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(133,39): error C2039: "codecvt_utf8_utf16": не является членом "std".
+1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\fstream(20,1):
+1>     см. объявление "std"
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(133,39): error C2065: codecvt_utf8_utf16: необъявленный идентификатор
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(133,58): error C2062: тип "wchar_t" не требуется
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(134,37): error C2065: converter: необъявленный идентификатор
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(139,38): error C2065: converter: необъявленный идентификатор
+1>Сборка проекта "тторор.vcxproj" завершена с ошибкой.
+========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
+========== Сборка завершено в 22:52 и заняло 02,121 с ==========

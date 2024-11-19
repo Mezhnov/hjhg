@@ -1,465 +1,188 @@
-// Подключаем необходимые заголовочные файлы
 #include <windows.h>
-#include <gdiplus.h>
+#include <richedit.h>
 #include <string>
-#include <vector>
-#include <map>
-#include <commctrl.h>
-#include <shellapi.h> // Для Shell_NotifyIcon
-#include <sstream>
-
-#pragma comment(lib, "gdiplus.lib")
-#pragma comment(lib, "Comctl32.lib")
-
-// Определение идентификаторов
-#define IDM_FILE_NEW        1001
-#define IDM_FILE_OPEN       1002
-#define IDM_FILE_SAVE       1003
-#define IDM_FILE_EXIT       1004
-#define IDM_EDIT_UNDO       2001
-#define IDM_EDIT_REDO       2002
-#define IDM_EDIT_CUT        2003
-#define IDM_EDIT_COPY       2004
-#define IDM_EDIT_PASTE      2005
-#define IDM_HELP_ABOUT      3001
-
-// Идентификаторы элементов управления
-#define IDC_PROJECT_PANE    4001
-#define IDC_HIERARCHY_PANE  4002
-#define IDC_INSPECTOR_PANE  4003
-#define IDC_SCENE_PANE      4004
-#define IDC_GAME_PANE       4005
-#define IDC_CONSOLE_PANE    4006
-#define IDC_TOOLBAR         4007
-#define IDC_STATUSBAR       4008
+#include <fstream>
 
 // Глобальные переменные
 HINSTANCE hInst;
-HWND hMainWnd;
-HWND hProjectPane, hHierarchyPane, hInspectorPane, hScenePane, hGamePane, hConsolePane;
-HWND hToolbar, hStatusBar;
-ULONG_PTR gdiplusToken;
+HWND hMarkyEdit;
+HWND hStylinEdit;
+HWND hOutputWindow;
 
-// Прототипы функций
+// Декларация функций
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
-void CreateMenus(HWND hWnd);
-void CreateToolbar(HWND hWnd);
-void CreateStatusBar(HWND hWnd);
-void CreateDockablePanes(HWND hWnd);
-void LoadImages();
-void ApplyDarkTheme(HWND hWnd);
-HIMAGELIST hImageListSmall;
-HIMAGELIST hImageListLarge;
+LRESULT CALLBACK OutputWndProc(HWND, UINT, WPARAM, LPARAM);
 
-// Функция для инициализации GDI+
-void InitGDIPlus()
-{
-    Gdiplus::GdiplusStartupInput gdiplusStartupInput;
-    Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
-}
+std::string ParseMarky(const std::string& markyCode);
+std::string ParseStylin(const std::string& stylinCode);
 
-// Функция для завершения работы GDI+
-void ShutdownGDIPlus()
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 {
-    Gdiplus::GdiplusShutdown(gdiplusToken);
-}
-
-// Главная функция
-int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
-{
+    LoadLibrary(TEXT("Riched20.dll")); // Загрузка библиотеки RichEdit
     hInst = hInstance;
 
-    // Инициализируем GDI+
-    InitGDIPlus();
+    WNDCLASS wc = {};
+    wc.lpfnWndProc = WndProc;
+    wc.hInstance = hInstance;
+    wc.lpszClassName = TEXT("MarkyStylinIDE");
 
-    // Инициализируем common controls
-    INITCOMMONCONTROLSEX icex = { sizeof(INITCOMMONCONTROLSEX) };
-    icex.dwICC = ICC_WIN95_CLASSES | ICC_BAR_CLASSES | ICC_LISTVIEW_CLASSES | ICC_TREEVIEW_CLASSES;
-    InitCommonControlsEx(&icex);
+    RegisterClass(&wc);
 
-    // Регистрируем класс окна
-    WNDCLASSEX wcex = { 0 };
-    wcex.cbSize = sizeof(WNDCLASSEX);
-    wcex.style = CS_HREDRAW | CS_VREDRAW;
-    wcex.lpfnWndProc = WndProc;
-    wcex.hInstance = hInst;
-    wcex.hIcon = static_cast<HICON>(LoadImage(hInst, L"app_icon.ico", IMAGE_ICON, 32, 32, LR_LOADFROMFILE));
-    wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground = CreateSolidBrush(RGB(45, 45, 48)); // Темный фон
-    wcex.lpszClassName = L"UnityCloneClass";
-    wcex.hIconSm = static_cast<HICON>(LoadImage(hInst, L"app_icon.ico", IMAGE_ICON, 16, 16, LR_LOADFROMFILE));
+    HWND hwnd = CreateWindowEx(
+        0,
+        wc.lpszClassName,
+        TEXT("Marky & Stylin IDE"),
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT, 800, 600,
+        nullptr,
+        nullptr,
+        hInstance,
+        nullptr
+    );
 
-    RegisterClassEx(&wcex);
+    ShowWindow(hwnd, nCmdShow);
 
-    // Создаем главное окно
-    hMainWnd = CreateWindowW(L"UnityCloneClass", L"Unity Clone IDE", WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, 0, 1280, 720, nullptr, nullptr, hInst, nullptr);
-
-    if (!hMainWnd)
-    {
-        MessageBox(nullptr, L"Не удалось создать главное окно!", L"Ошибка", MB_OK);
-        return FALSE;
-    }
-
-    ShowWindow(hMainWnd, nCmdShow);
-    UpdateWindow(hMainWnd);
-
-    // Загружаем изображения и иконки
-    LoadImages();
-
-    // Применяем темную тему к главным элементам
-    ApplyDarkTheme(hMainWnd);
-
-    // Главный цикл сообщений
-    MSG msg;
+    // Цикл сообщений
+    MSG msg = {};
     while (GetMessage(&msg, nullptr, 0, 0))
     {
-        // Переводим и отправляем сообщения
         TranslateMessage(&msg);
         DispatchMessage(&msg);
-    }
-
-    // Завершаем GDI+
-    ShutdownGDIPlus();
-
-    return (int)msg.wParam;
-}
-
-// Обработчик окна
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-    switch (message)
-    {
-    case WM_CREATE:
-        CreateMenus(hWnd);
-        CreateToolbar(hWnd);
-        CreateStatusBar(hWnd);
-        CreateDockablePanes(hWnd);
-        break;
-
-    case WM_SIZE:
-    {
-        RECT rect;
-        GetClientRect(hWnd, &rect);
-
-        // Обновляем размер статусной строки
-        SendMessage(hStatusBar, WM_SIZE, 0, 0);
-
-        // Получаем размеры панели инструментов
-        RECT toolbarRect;
-        GetWindowRect(hToolbar, &toolbarRect);
-        int toolbarHeight = toolbarRect.bottom - toolbarRect.top;
-
-        // Обновляем размеры панелей
-        int width = rect.right - rect.left;
-        int height = rect.bottom - rect.top - toolbarHeight - 20; // Учитываем высоту панели инструментов и статусной строки
-
-        int panelWidth = 250;
-        int panelHeight = 200;
-
-        MoveWindow(hProjectPane, 0, toolbarHeight, panelWidth, height - panelHeight, TRUE);
-        MoveWindow(hHierarchyPane, 0, toolbarHeight + height - panelHeight, panelWidth, panelHeight, TRUE);
-        MoveWindow(hInspectorPane, width - panelWidth, toolbarHeight, panelWidth, height, TRUE);
-        MoveWindow(hScenePane, panelWidth, toolbarHeight, width - 2 * panelWidth, height / 2, TRUE);
-        MoveWindow(hGamePane, panelWidth, toolbarHeight + height / 2, width - 2 * panelWidth, height / 2, TRUE);
-        MoveWindow(hConsolePane, 0, toolbarHeight + height, width, panelHeight, TRUE);
-    }
-    break;
-
-    case WM_COMMAND:
-    {
-        int wmId = LOWORD(wParam);
-        // Обработка команд меню
-        switch (wmId)
-        {
-        case IDM_FILE_NEW:
-            MessageBox(hWnd, L"Новый проект создан.", L"Файл", MB_OK);
-            break;
-        case IDM_FILE_OPEN:
-            MessageBox(hWnd, L"Открытие проекта.", L"Файл", MB_OK);
-            break;
-        case IDM_FILE_SAVE:
-            MessageBox(hWnd, L"Проект сохранен.", L"Файл", MB_OK);
-            break;
-        case IDM_FILE_EXIT:
-            DestroyWindow(hWnd);
-            break;
-        case IDM_EDIT_UNDO:
-            MessageBox(hWnd, L"Отменить действие.", L"Правка", MB_OK);
-            break;
-        case IDM_EDIT_REDO:
-            MessageBox(hWnd, L"Повторить действие.", L"Правка", MB_OK);
-            break;
-        case IDM_EDIT_CUT:
-            MessageBox(hWnd, L"Вырезать.", L"Правка", MB_OK);
-            break;
-        case IDM_EDIT_COPY:
-            MessageBox(hWnd, L"Копировать.", L"Правка", MB_OK);
-            break;
-        case IDM_EDIT_PASTE:
-            MessageBox(hWnd, L"Вставить.", L"Правка", MB_OK);
-            break;
-        case IDM_HELP_ABOUT:
-            MessageBox(hWnd, L"Unity Clone IDE\nВерсия 1.0", L"О программе", MB_OK);
-            break;
-        default:
-            return DefWindowProc(hWnd, message, wParam, lParam);
-        }
-    }
-    break;
-
-    case WM_NOTIFY:
-        // Обработка уведомлений от элементов управления
-        break;
-
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        break;
-
-    case WM_CTLCOLORSTATIC:
-    case WM_CTLCOLORBTN:
-    case WM_CTLCOLOREDIT:
-    case WM_CTLCOLORLISTBOX:
-    {
-        HDC hdc = (HDC)wParam;
-        SetBkMode(hdc, TRANSPARENT);
-        SetTextColor(hdc, RGB(241, 241, 241)); // Светлый текст
-        return (INT_PTR)CreateSolidBrush(RGB(45, 45, 48)); // Темный фон
-    }
-
-    default:
-        return DefWindowProc(hWnd, message, wParam, lParam);
     }
     return 0;
 }
 
-// Создание меню
-void CreateMenus(HWND hWnd)
+void CreateControls(HWND hwnd)
 {
-    HMENU hMenuBar = CreateMenu();
+    CreateWindow(TEXT("STATIC"), TEXT("Marky Code:"),
+        WS_VISIBLE | WS_CHILD,
+        10, 10, 100, 20,
+        hwnd, nullptr, hInst, nullptr);
 
-    HMENU hFileMenu = CreateMenu();
-    HMENU hEditMenu = CreateMenu();
-    HMENU hHelpMenu = CreateMenu();
+    hMarkyEdit = CreateWindowEx(WS_EX_CLIENTEDGE, RICHEDIT_CLASS, TEXT(""),
+        WS_VISIBLE | WS_CHILD | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL,
+        10, 30, 360, 200,
+        hwnd, nullptr, hInst, nullptr);
 
-    AppendMenu(hFileMenu, MF_STRING, IDM_FILE_NEW, L"&Новый проект\tCtrl+N");
-    AppendMenu(hFileMenu, MF_STRING, IDM_FILE_OPEN, L"&Открыть проект...\tCtrl+O");
-    AppendMenu(hFileMenu, MF_STRING, IDM_FILE_SAVE, L"&Сохранить проект\tCtrl+S");
-    AppendMenu(hFileMenu, MF_SEPARATOR, 0, nullptr);
-    AppendMenu(hFileMenu, MF_STRING, IDM_FILE_EXIT, L"&Выход");
+    CreateWindow(TEXT("STATIC"), TEXT("Stylin Code:"),
+        WS_VISIBLE | WS_CHILD,
+        380, 10, 100, 20,
+        hwnd, nullptr, hInst, nullptr);
 
-    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_UNDO, L"&Отменить\tCtrl+Z");
-    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_REDO, L"&Повторить\tCtrl+Y");
-    AppendMenu(hEditMenu, MF_SEPARATOR, 0, nullptr);
-    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_CUT, L"&Вырезать\tCtrl+X");
-    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_COPY, L"&Копировать\tCtrl+C");
-    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_PASTE, L"&Вставить\tCtrl+V");
+    hStylinEdit = CreateWindowEx(WS_EX_CLIENTEDGE, RICHEDIT_CLASS, TEXT(""),
+        WS_VISIBLE | WS_CHILD | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL,
+        380, 30, 360, 200,
+        hwnd, nullptr, hInst, nullptr);
 
-    AppendMenu(hHelpMenu, MF_STRING, IDM_HELP_ABOUT, L"&О программе");
-
-    AppendMenu(hMenuBar, MF_POPUP, (UINT_PTR)hFileMenu, L"&Файл");
-    AppendMenu(hMenuBar, MF_POPUP, (UINT_PTR)hEditMenu, L"&Правка");
-    AppendMenu(hMenuBar, MF_POPUP, (UINT_PTR)hHelpMenu, L"&Справка");
-
-    SetMenu(hWnd, hMenuBar);
+    HWND hRunButton = CreateWindow(TEXT("BUTTON"), TEXT("Запустить"),
+        WS_VISIBLE | WS_CHILD,
+        10, 240, 100, 30,
+        hwnd, (HMENU)1, hInst, nullptr);
 }
 
-// Создание панели инструментов
-void CreateToolbar(HWND hWnd)
+void OpenOutputWindow(const std::string& htmlContent)
 {
-    hToolbar = CreateWindowEx(0, TOOLBARCLASSNAME, nullptr,
-        WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | TBSTYLE_TRANSPARENT,
-        0, 0, 0, 0, hWnd, (HMENU)IDC_TOOLBAR, hInst, nullptr);
+    WNDCLASS wc = {};
+    wc.lpfnWndProc = OutputWndProc;
+    wc.hInstance = hInst;
+    wc.lpszClassName = TEXT("OutputWindowClass");
 
-    SendMessage(hToolbar, TB_BUTTONSTRUCTSIZE, (WPARAM)sizeof(TBBUTTON), 0);
+    RegisterClass(&wc);
 
-    // Загрузка изображений для панели инструментов
-    HIMAGELIST hImageListToolbar = ImageList_Create(24, 24, ILC_COLOR32, 5, 5);
+    hOutputWindow = CreateWindowEx(
+        0,
+        wc.lpszClassName,
+        TEXT("Результат"),
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT, 800, 600,
+        nullptr,
+        nullptr,
+        hInst,
+        nullptr
+    );
 
-    HICON hIconNew = static_cast<HICON>(LoadImage(hInst, L"icon_new.ico", IMAGE_ICON, 24, 24, LR_LOADFROMFILE));
-    HICON hIconOpen = static_cast<HICON>(LoadImage(hInst, L"icon_open.ico", IMAGE_ICON, 24, 24, LR_LOADFROMFILE));
-    HICON hIconSave = static_cast<HICON>(LoadImage(hInst, L"icon_save.ico", IMAGE_ICON, 24, 24, LR_LOADFROMFILE));
+    ShowWindow(hOutputWindow, SW_SHOW);
 
-    ImageList_AddIcon(hImageListToolbar, hIconNew);
-    ImageList_AddIcon(hImageListToolbar, hIconOpen);
-    ImageList_AddIcon(hImageListToolbar, hIconSave);
+    // Здесь можно использовать WebBrowser Control для отображения HTML
+    // Или отобразить текст в статическом контроле
+    HWND hContent = CreateWindowEx(WS_EX_CLIENTEDGE, RICHEDIT_CLASS, TEXT(""),
+        WS_VISIBLE | WS_CHILD | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
+        10, 10, 760, 540,
+        hOutputWindow, nullptr, hInst, nullptr);
 
-    SendMessage(hToolbar, TB_SETIMAGELIST, 0, (LPARAM)hImageListToolbar);
+    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+    std::wstring wHtmlContent = converter.from_bytes(htmlContent);
 
-    TBBUTTON tbb[3];
-    ZeroMemory(tbb, sizeof(tbb));
-
-    tbb[0].iBitmap = 0;
-    tbb[0].idCommand = IDM_FILE_NEW;
-    tbb[0].fsState = TBSTATE_ENABLED;
-    tbb[0].fsStyle = TBSTYLE_BUTTON;
-
-    tbb[1].iBitmap = 1;
-    tbb[1].idCommand = IDM_FILE_OPEN;
-    tbb[1].fsState = TBSTATE_ENABLED;
-    tbb[1].fsStyle = TBSTYLE_BUTTON;
-
-    tbb[2].iBitmap = 2;
-    tbb[2].idCommand = IDM_FILE_SAVE;
-    tbb[2].fsState = TBSTATE_ENABLED;
-    tbb[2].fsStyle = TBSTYLE_BUTTON;
-
-    SendMessage(hToolbar, TB_ADDBUTTONS, 3, (LPARAM)&tbb);
-
-    // Настройки панели инструментов
-    SendMessage(hToolbar, TB_AUTOSIZE, 0, 0);
-    SetWindowPos(hToolbar, NULL, 0, 0, 0, 0, SWP_NOZORDER | SWP_NOMOVE | SWP_NOSIZE);
+    SetWindowText(hContent, wHtmlContent.c_str());
 }
 
-// Создание статусной строки
-void CreateStatusBar(HWND hWnd)
+LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-    hStatusBar = CreateWindowEx(0, STATUSCLASSNAME, nullptr,
-        WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP,
-        0, 0, 0, 0, hWnd, (HMENU)IDC_STATUSBAR, hInst, nullptr);
-
-    int statwidths[] = { 100, -1 };
-    SendMessage(hStatusBar, SB_SETPARTS, sizeof(statwidths) / sizeof(int), (LPARAM)statwidths);
-    SendMessage(hStatusBar, SB_SETTEXT, 0, (LPARAM)L"Готово");
-}
-
-// Создание докируемых панелей
-void CreateDockablePanes(HWND hWnd)
-{
-    // Размеры окна
-    RECT rect;
-    GetClientRect(hWnd, &rect);
-
-    // Получаем размеры панели инструментов
-    RECT toolbarRect;
-    GetWindowRect(hToolbar, &toolbarRect);
-    int toolbarHeight = toolbarRect.bottom - toolbarRect.top;
-
-    int width = rect.right - rect.left;
-    int height = rect.bottom - rect.top - toolbarHeight - 20; // Учитываем высоту панели инструментов и статусной строки
-    int panelWidth = 250;
-    int panelHeight = 200;
-
-    // Создаем окно списка для панели "Project"
-    hProjectPane = CreateWindowEx(WS_EX_CLIENTEDGE, WC_LISTVIEW, nullptr,
-        WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_ICON | LVS_AUTOARRANGE,
-        0, toolbarHeight, panelWidth, height - panelHeight,
-        hWnd, (HMENU)IDC_PROJECT_PANE, hInst, nullptr);
-
-    // Настраиваем список панели "Project"
-    SendMessage(hProjectPane, LVM_SETIMAGELIST, LVSIL_SMALL, (LPARAM)hImageListSmall);
-    SendMessage(hProjectPane, LVM_SETIMAGELIST, LVSIL_NORMAL, (LPARAM)hImageListLarge);
-
-    // Добавление элементов в панель "Project"
-    LVITEM lvItem = { 0 };
-    lvItem.mask = LVIF_TEXT | LVIF_IMAGE;
-    lvItem.iItem = 0;
-    lvItem.pszText = const_cast<LPWSTR>(L"Assets");
-    lvItem.iImage = 0;
-    SendMessage(hProjectPane, LVM_INSERTITEM, 0, (LPARAM)&lvItem);
-
-    lvItem.iItem = 1;
-    lvItem.pszText = const_cast<LPWSTR>(L"Scripts");
-    lvItem.iImage = 0;
-    SendMessage(hProjectPane, LVM_INSERTITEM, 0, (LPARAM)&lvItem);
-
-    // Создаем окно дерева для панели "Hierarchy"
-    hHierarchyPane = CreateWindowEx(WS_EX_CLIENTEDGE, WC_TREEVIEW, nullptr,
-        WS_CHILD | WS_VISIBLE | TVS_HASLINES | TVS_HASBUTTONS | TVS_LINESATROOT,
-        0, toolbarHeight + height - panelHeight, panelWidth, panelHeight,
-        hWnd, (HMENU)IDC_HIERARCHY_PANE, hInst, nullptr);
-
-    // Настраиваем дерево панели "Hierarchy"
-    SendMessage(hHierarchyPane, TVM_SETIMAGELIST, TVSIL_NORMAL, (LPARAM)hImageListSmall);
-
-    // Добавление элементов в панель "Hierarchy"
-    TVINSERTSTRUCT tvInsert = { 0 };
-    tvInsert.hParent = TVI_ROOT;
-    tvInsert.hInsertAfter = TVI_LAST;
-    tvInsert.item.mask = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE;
-    tvInsert.item.pszText = const_cast<LPWSTR>(L"Main Camera");
-    tvInsert.item.iImage = 1;
-    tvInsert.item.iSelectedImage = 1;
-    HTREEITEM hCamera = (HTREEITEM)SendMessage(hHierarchyPane, TVM_INSERTITEM, 0, (LPARAM)&tvInsert);
-
-    tvInsert.item.pszText = const_cast<LPWSTR>(L"Directional Light");
-    tvInsert.item.iImage = 2;
-    tvInsert.item.iSelectedImage = 2;
-    HTREEITEM hLight = (HTREEITEM)SendMessage(hHierarchyPane, TVM_INSERTITEM, 0, (LPARAM)&tvInsert);
-
-    // Создаем окно для панели "Inspector"
-    hInspectorPane = CreateWindowEx(WS_EX_CLIENTEDGE, L"STATIC", nullptr,
-        WS_CHILD | WS_VISIBLE | SS_LEFT,
-        width - panelWidth, toolbarHeight, panelWidth, height,
-        hWnd, (HMENU)IDC_INSPECTOR_PANE, hInst, nullptr);
-
-    // Создаем окно для панели "Scene"
-    hScenePane = CreateWindowEx(WS_EX_CLIENTEDGE, L"STATIC", nullptr,
-        WS_CHILD | WS_VISIBLE | SS_LEFT,
-        panelWidth, toolbarHeight, width - 2 * panelWidth, height / 2,
-        hWnd, (HMENU)IDC_SCENE_PANE, hInst, nullptr);
-
-    // Создаем окно для панели "Game"
-    hGamePane = CreateWindowEx(WS_EX_CLIENTEDGE, L"STATIC", nullptr,
-        WS_CHILD | WS_VISIBLE | SS_LEFT,
-        panelWidth, toolbarHeight + height / 2, width - 2 * panelWidth, height / 2,
-        hWnd, (HMENU)IDC_GAME_PANE, hInst, nullptr);
-
-    // Создаем окно списка для панели "Console"
-    hConsolePane = CreateWindowEx(WS_EX_CLIENTEDGE, WC_LISTBOX, nullptr,
-        WS_CHILD | WS_VISIBLE | LBS_NOINTEGRALHEIGHT,
-        0, toolbarHeight + height, width, panelHeight,
-        hWnd, (HMENU)IDC_CONSOLE_PANE, hInst, nullptr);
-
-    // Добавляем сообщения в консоль
-    SendMessage(hConsolePane, LB_ADDSTRING, 0, (LPARAM)L"Консоль инициализирована.");
-}
-
-// Загрузка изображений и иконок
-void LoadImages()
-{
-    // Создаем списки изображений
-    hImageListSmall = ImageList_Create(16, 16, ILC_COLOR32, 3, 3);
-    hImageListLarge = ImageList_Create(32, 32, ILC_COLOR32, 3, 3);
-
-    // Загружаем иконки
-    HICON hIconFolderSmall = static_cast<HICON>(LoadImage(hInst, L"icon_folder_small.ico", IMAGE_ICON, 16, 16, LR_LOADFROMFILE));
-    HICON hIconCameraSmall = static_cast<HICON>(LoadImage(hInst, L"icon_camera_small.ico", IMAGE_ICON, 16, 16, LR_LOADFROMFILE));
-    HICON hIconLightSmall = static_cast<HICON>(LoadImage(hInst, L"icon_light_small.ico", IMAGE_ICON, 16, 16, LR_LOADFROMFILE));
-
-    HICON hIconFolderLarge = static_cast<HICON>(LoadImage(hInst, L"icon_folder_large.ico", IMAGE_ICON, 32, 32, LR_LOADFROMFILE));
-    HICON hIconCameraLarge = static_cast<HICON>(LoadImage(hInst, L"icon_camera_large.ico", IMAGE_ICON, 32, 32, LR_LOADFROMFILE));
-    HICON hIconLightLarge = static_cast<HICON>(LoadImage(hInst, L"icon_light_large.ico", IMAGE_ICON, 32, 32, LR_LOADFROMFILE));
-
-    // Добавляем иконки в списки изображений
-    ImageList_AddIcon(hImageListSmall, hIconFolderSmall); // Индекс 0
-    ImageList_AddIcon(hImageListSmall, hIconCameraSmall); // Индекс 1
-    ImageList_AddIcon(hImageListSmall, hIconLightSmall);  // Индекс 2
-
-    ImageList_AddIcon(hImageListLarge, hIconFolderLarge); // Индекс 0
-    ImageList_AddIcon(hImageListLarge, hIconCameraLarge); // Индекс 1
-    ImageList_AddIcon(hImageListLarge, hIconLightLarge);  // Индекс 2
-}
-
-// Применение темной темы к элементам
-void ApplyDarkTheme(HWND hWnd)
-{
-    typedef BOOL(WINAPI* SetWindowThemeProc)(HWND, LPCWSTR, LPCWSTR);
-    HMODULE hUxTheme = LoadLibrary(L"uxtheme.dll");
-    if (hUxTheme)
+    switch (msg)
     {
-        SetWindowThemeProc SetWindowTheme = (SetWindowThemeProc)GetProcAddress(hUxTheme, "SetWindowTheme");
-        if (SetWindowTheme)
+    case WM_CREATE:
+        CreateControls(hwnd);
+        break;
+    case WM_COMMAND:
+        if (LOWORD(wParam) == 1) // Нажата кнопка "Запустить"
         {
-            SetWindowTheme(hProjectPane, L"DarkMode_Explorer", NULL);
-            SetWindowTheme(hHierarchyPane, L"DarkMode_Explorer", NULL);
-            SetWindowTheme(hInspectorPane, L"DarkMode_Explorer", NULL);
-            SetWindowTheme(hScenePane, L"DarkMode_Explorer", NULL);
-            SetWindowTheme(hGamePane, L"DarkMode_Explorer", NULL);
-            SetWindowTheme(hConsolePane, L"DarkMode_Explorer", NULL);
-            SetWindowTheme(hToolbar, L"DarkMode_Explorer", NULL);
-            SetWindowTheme(hStatusBar, L"DarkMode_Explorer", NULL);
+            // Получаем код из контролов
+            TCHAR markyBuffer[10000];
+            GetWindowText(hMarkyEdit, markyBuffer, 10000);
+            std::wstring wMarkyCode = markyBuffer;
+            std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+            std::string markyCode = converter.to_bytes(wMarkyCode);
+
+            TCHAR stylinBuffer[10000];
+            GetWindowText(hStylinEdit, stylinBuffer, 10000);
+            std::wstring wStylinCode = stylinBuffer;
+            std::string stylinCode = converter.to_bytes(wStylinCode);
+
+            // Парсим код
+            std::string htmlContent = ParseMarky(markyCode);
+            std::string cssContent = ParseStylin(stylinCode);
+
+            // Объединяем HTML и CSS
+            std::string fullContent = "<html><head><style>" + cssContent + "</style></head><body>" + htmlContent + "</body></html>";
+
+            // Открываем окно вывода
+            OpenOutputWindow(fullContent);
         }
-        FreeLibrary(hUxTheme);
+        break;
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+    default:
+        return DefWindowProc(hwnd, msg, wParam, lParam);
     }
+    return 0;
+}
+
+LRESULT CALLBACK OutputWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    switch (msg)
+    {
+    case WM_DESTROY:
+        hOutputWindow = nullptr;
+        break;
+    default:
+        return DefWindowProc(hwnd, msg, wParam, lParam);
+    }
+    return 0;
+}
+
+// Простейший парсер Marky
+std::string ParseMarky(const std::string& markyCode)
+{
+    // Здесь должен быть парсер Marky, преобразующий код в HTML
+    // Для упрощения возвращаем заглушку
+    return "<h1>Заголовок из Marky</h1><p>Текст из Marky</p>";
+}
+
+// Простейший парсер Stylin
+std::string ParseStylin(const std::string& stylinCode)
+{
+    // Здесь должен быть парсер Stylin, преобразующий код в CSS
+    // Для упрощения возвращаем заглушку
+    return "body { font-family: Arial; } h1 { color: blue; }";
 }

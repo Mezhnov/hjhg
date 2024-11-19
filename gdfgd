@@ -1,3 +1,5 @@
+// Исправленный код
+
 #include <windows.h>
 #include <richedit.h>
 #include <string>
@@ -6,6 +8,22 @@
 #include <vector>
 #include <map>
 #include <regex>
+
+// Добавляем необходимые заголовочные файлы
+#include <comutil.h>
+#include <Exdisp.h>
+#include <MsHTML.h>
+#include <atlbase.h>
+#include <atlcom.h>
+#include <atlctl.h>
+#include <atlhost.h>
+
+// Необходим для линковки с библиотекой comsuppw.lib
+#pragma comment(lib, "comsuppw.lib")
+
+// Необходим для использования ATL
+CComModule _Module;
+#include <atlwin.h>
 
 // Глобальные переменные
 HINSTANCE hInst;
@@ -126,61 +144,66 @@ void OpenOutputWindow(const std::string& htmlContent)
 
     ShowWindow(hOutputWindow, SW_SHOW);
 
-    // Используем WebBrowser Control для отображения HTML
     // Инициализация COM
-    CoInitialize(nullptr);
-
-    // Создаем контрол WebBrowser
-    IWebBrowser2* pWebBrowser2 = nullptr;
-    HWND hBrowserWnd = CreateWindow(TEXT("AtlAxWin140"), TEXT(""),
-        WS_CHILD | WS_VISIBLE,
-        0, 0, 800, 600,
-        hOutputWindow, nullptr, hInst, nullptr);
-
-    HRESULT hr = AtlAxGetControl(hBrowserWnd, (IUnknown**)&pWebBrowser2);
+    HRESULT hr = CoInitialize(NULL);
     if (SUCCEEDED(hr))
     {
-        // Загружаем HTML из строки
-        std::wstring wHtmlContent = utf8_to_wstring(htmlContent);
-        VARIANT myVar;
-        VariantInit(&myVar);
-        BSTR bstr = SysAllocString(wHtmlContent.c_str());
-        myVar.vt = VT_BSTR;
-        myVar.bstrVal = bstr;
+        // Создаем контрол WebBrowser
+        CComPtr<IWebBrowser2> pWebBrowser2;
 
-        pWebBrowser2->Navigate(L"about:blank", nullptr, nullptr, nullptr, nullptr);
+        // Создаем экземпляр WebBrowser в окне
+        CAxWindow* pAxWindow = new CAxWindow(hOutputWindow);
+        RECT rc;
+        GetClientRect(hOutputWindow, &rc);
+        pAxWindow->Create(hOutputWindow, rc, NULL, WS_CHILD | WS_VISIBLE);
 
-        IDispatch* pDocDispatch = nullptr;
-        pWebBrowser2->get_Document(&pDocDispatch);
-        if (pDocDispatch)
+        hr = pAxWindow->CreateControl(CComBSTR(L"Shell.Explorer"));
+        if (SUCCEEDED(hr))
         {
-            IHTMLDocument2* pDoc;
-            pDocDispatch->QueryInterface(IID_IHTMLDocument2, (void**)&pDoc);
-            if (pDoc)
+            hr = pAxWindow->QueryControl(&pWebBrowser2);
+            if (SUCCEEDED(hr))
             {
-                SAFEARRAY* psaStrings = SafeArrayCreateVector(VT_VARIANT, 0, 1);
-                if (psaStrings)
+                // Загружаем HTML из строки
+                std::wstring wHtmlContent = utf8_to_wstring(htmlContent);
+                VARIANT myVar;
+                VariantInit(&myVar);
+                BSTR bstr = SysAllocString(wHtmlContent.c_str());
+                myVar.vt = VT_BSTR;
+                myVar.bstrVal = bstr;
+
+                pWebBrowser2->Navigate(L"about:blank", nullptr, nullptr, nullptr, nullptr);
+
+                // Получаем документ
+                CComPtr<IDispatch> pDocDispatch;
+                pWebBrowser2->get_Document(&pDocDispatch);
+                if (pDocDispatch)
                 {
-                    VARIANT* param;
-                    SafeArrayAccessData(psaStrings, (LPVOID*)&param);
-                    param->vt = VT_BSTR;
-                    param->bstrVal = bstr;
-                    SafeArrayUnaccessData(psaStrings);
+                    CComPtr<IHTMLDocument2> pDoc;
+                    pDocDispatch->QueryInterface(IID_IHTMLDocument2, (void**)&pDoc);
+                    if (pDoc)
+                    {
+                        SAFEARRAY* psaStrings = SafeArrayCreateVector(VT_VARIANT, 0, 1);
+                        if (psaStrings)
+                        {
+                            VARIANT* param;
+                            SafeArrayAccessData(psaStrings, (LPVOID*)&param);
+                            param->vt = VT_BSTR;
+                            param->bstrVal = bstr;
+                            SafeArrayUnaccessData(psaStrings);
 
-                    pDoc->write(psaStrings);
-                    pDoc->close();
-                    SafeArrayDestroy(psaStrings);
+                            pDoc->write(psaStrings);
+                            pDoc->close();
+                            SafeArrayDestroy(psaStrings);
+                        }
+                    }
                 }
-                pDoc->Release();
+                SysFreeString(bstr);
             }
-            pDocDispatch->Release();
         }
-        SysFreeString(bstr);
-        pWebBrowser2->Release();
-    }
 
-    // Освобождаем COM
-    CoUninitialize();
+        // Освобождаем COM
+        CoUninitialize();
+    }
 }
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -230,7 +253,7 @@ LRESULT CALLBACK OutputWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
     {
     case WM_SIZE:
         {
-            HWND hChild = FindWindowEx(hwnd, nullptr, nullptr, nullptr);
+            HWND hChild = FindWindowEx(hwnd, nullptr, L"AtlAxWin140", nullptr);
             if (hChild)
             {
                 MoveWindow(hChild, 0, 0, LOWORD(lParam), HIWORD(lParam), TRUE);
@@ -511,155 +534,3 @@ std::string ParseStylin(const std::string& stylinCode)
     }
     return css;
 }
-Сборка начата в 23:36...
-1>------ Сборка начата: проект: тторор, Конфигурация: Debug x64 ------
-1>тторор.cpp
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(134,5): error C2065: IWebBrowser2: необъявленный идентификатор
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(134,19): error C2065: pWebBrowser2: необъявленный идентификатор
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(140,60): error C2065: pWebBrowser2: необъявленный идентификатор
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(140,18): error C3861: AtlAxGetControl: идентификатор не найден
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(151,9): error C2065: pWebBrowser2: необъявленный идентификатор
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(154,9): error C2065: pWebBrowser2: необъявленный идентификатор
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(157,13): error C2065: IHTMLDocument2: необъявленный идентификатор
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(157,29): error C2065: pDoc: необъявленный идентификатор
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(158,42): error C2065: IID_IHTMLDocument2: необъявленный идентификатор
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(158,71): error C2065: pDoc: необъявленный идентификатор
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(159,17): error C2065: pDoc: необъявленный идентификатор
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(170,21): error C2065: pDoc: необъявленный идентификатор
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(171,21): error C2065: pDoc: необъявленный идентификатор
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(174,17): error C2065: pDoc: необъявленный идентификатор
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(179,9): error C2065: pWebBrowser2: необъявленный идентификатор
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(304,64): error C2017: недопустимая escape-последовательность
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(304,65): error C2065: w: необъявленный идентификатор
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(304,69): error C2059: синтаксическая ошибка: )
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(304,70): error C2017: недопустимая escape-последовательность
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(304,76): error C2017: недопустимая escape-последовательность
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(304,82): error C2017: недопустимая escape-последовательность
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(304,92): error C2017: недопустимая escape-последовательность
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(304,98): error C2017: недопустимая escape-последовательность
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(304,104): error C2017: недопустимая escape-последовательность
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(304,110): error C2017: недопустимая escape-последовательность
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(304,117): error C2001: newline в константе
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,32): error C2065: attrBegin: необъявленный идентификатор
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43): error C2679: бинарный "!=": не найден оператор, принимающий правый операнд типа "std::sregex_iterator" (или приемлемое преобразование отсутствует)
-1>    C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\shared\guiddef.h(197,15):
-1>    может быть "bool operator !=(const GUID &,const GUID &)"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        "bool operator !=(const GUID &,const GUID &)": невозможно преобразовать аргумент 2 из "std::sregex_iterator" в "const GUID &"
-1>            C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,49):
-1>            Причина: невозможно преобразовать "std::sregex_iterator" в "const GUID"
-1>            C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,49):
-1>            Для выполнения данного преобразования нет доступного оператора преобразования, определенного пользователем, или вызов оператора невозможен
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\utility(499,27):
-1>    или       "bool std::operator !=(const std::pair<_Ty1,_Ty2> &,const std::pair<_Uty1,_Uty2> &)"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const std::pair<_Ty1,_Ty2> &,const std::pair<_Uty1,_Uty2> &)': не удалось вывести аргумент шаблон для 'const std::pair<_Ty1,_Ty2> &' из 'unknown-type'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xutility(1839,5):
-1>    или       "bool std::operator !=(const std::reverse_iterator<_BidIt> &,const std::reverse_iterator<_BidIt2> &) noexcept(<expr>)"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const std::reverse_iterator<_BidIt> &,const std::reverse_iterator<_BidIt2> &) noexcept(<expr>)': не удалось вывести аргумент шаблон для 'const std::reverse_iterator<_BidIt> &' из 'unknown-type'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xutility(4388,30):
-1>    или       "bool std::operator !=(const std::move_iterator<_Iter> &,const std::move_iterator<_Iter2> &) noexcept(<expr>)"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const std::move_iterator<_Iter> &,const std::move_iterator<_Iter2> &) noexcept(<expr>)': не удалось вывести аргумент шаблон для 'const std::move_iterator<_Iter> &' из 'unknown-type'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xmemory(1020,17):
-1>    или       "bool std::operator !=(const std::allocator<_Ty> &,const std::allocator<_Other> &) noexcept"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const std::allocator<_Ty> &,const std::allocator<_Other> &) noexcept': не удалось вывести аргумент шаблон для 'const std::allocator<_Ty> &' из 'unknown-type'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xstring(3264,17):
-1>    или       "bool std::operator !=(const std::basic_string<_Elem,_Traits,_Alloc> &,const std::basic_string<_Elem,_Traits,_Alloc> &) noexcept"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const std::basic_string<_Elem,_Traits,_Alloc> &,const std::basic_string<_Elem,_Traits,_Alloc> &) noexcept': не удалось вывести аргумент шаблон для 'const std::basic_string<_Elem,_Traits,_Alloc> &' из 'unknown-type'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xstring(3270,17):
-1>    или       "bool std::operator !=(const _Elem *const ,const std::basic_string<_Elem,_Traits,_Alloc> &) noexcept"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const _Elem *const ,const std::basic_string<_Elem,_Traits,_Alloc> &) noexcept': не удалось вывести аргумент шаблон для 'const _Elem *const ' из 'unknown-type'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xstring(3276,17):
-1>    или       "bool std::operator !=(const std::basic_string<_Elem,_Traits,_Alloc> &,const _Elem *const ) noexcept"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const std::basic_string<_Elem,_Traits,_Alloc> &,const _Elem *const ) noexcept': не удалось вывести аргумент шаблон для 'const std::basic_string<_Elem,_Traits,_Alloc> &' из 'unknown-type'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\memory(1886,17):
-1>    или       "bool std::operator !=(const std::shared_ptr<_Ty> &,const std::shared_ptr<_Ty0> &) noexcept"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const std::shared_ptr<_Ty> &,const std::shared_ptr<_Ty0> &) noexcept': не удалось вывести аргумент шаблон для 'const std::shared_ptr<_Ty> &' из 'unknown-type'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\memory(1928,17):
-1>    или       "bool std::operator !=(const std::shared_ptr<_Ty> &,std::nullptr_t) noexcept"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const std::shared_ptr<_Ty> &,std::nullptr_t) noexcept': не удалось вывести аргумент шаблон для 'const std::shared_ptr<_Ty> &' из 'unknown-type'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\memory(1933,17):
-1>    или       "bool std::operator !=(std::nullptr_t,const std::shared_ptr<_Ty> &) noexcept"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(std::nullptr_t,const std::shared_ptr<_Ty> &) noexcept': не удалось вывести аргумент шаблон для 'const std::shared_ptr<_Ty> &' из 'std::sregex_iterator'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\memory(3639,17):
-1>    или       "bool std::operator !=(const std::unique_ptr<_Ty,_Dx> &,const std::unique_ptr<_Ty2,_Dx2> &)"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const std::unique_ptr<_Ty,_Dx> &,const std::unique_ptr<_Ty2,_Dx2> &)': не удалось вывести аргумент шаблон для 'const std::unique_ptr<_Ty,_Dx> &' из 'unknown-type'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\memory(3692,17):
-1>    или       "bool std::operator !=(const std::unique_ptr<_Ty,_Dx> &,std::nullptr_t) noexcept"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const std::unique_ptr<_Ty,_Dx> &,std::nullptr_t) noexcept': не удалось вывести аргумент шаблон для 'const std::unique_ptr<_Ty,_Dx> &' из 'unknown-type'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\memory(3697,17):
-1>    или       "bool std::operator !=(std::nullptr_t,const std::unique_ptr<_Ty,_Dx> &) noexcept"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(std::nullptr_t,const std::unique_ptr<_Ty,_Dx> &) noexcept': не удалось вывести аргумент шаблон для 'const std::unique_ptr<_Ty,_Dx> &' из 'std::sregex_iterator'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\iterator(313,17):
-1>    или       "bool std::operator !=(const std::istream_iterator<_Ty,_Elem,_Traits,_Diff> &,const std::istream_iterator<_Ty,_Elem,_Traits,_Diff> &) noexcept"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const std::istream_iterator<_Ty,_Elem,_Traits,_Diff> &,const std::istream_iterator<_Ty,_Elem,_Traits,_Diff> &) noexcept': не удалось вывести аргумент шаблон для 'const std::istream_iterator<_Ty,_Elem,_Traits,_Diff> &' из 'unknown-type'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\iterator(495,17):
-1>    или       "bool std::operator !=(const std::istreambuf_iterator<_Elem,_Traits> &,const std::istreambuf_iterator<_Elem,_Traits> &)"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const std::istreambuf_iterator<_Elem,_Traits> &,const std::istreambuf_iterator<_Elem,_Traits> &)': не удалось вывести аргумент шаблон для 'const std::istreambuf_iterator<_Elem,_Traits> &' из 'unknown-type'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\vector(2239,17):
-1>    или       "bool std::operator !=(const std::vector<_Ty,_Alloc> &,const std::vector<_Ty,_Alloc> &)"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const std::vector<_Ty,_Alloc> &,const std::vector<_Ty,_Alloc> &)': не удалось вывести аргумент шаблон для 'const std::vector<_Ty,_Alloc> &' из 'unknown-type'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\tuple(877,27):
-1>    или       "bool std::operator !=(const std::tuple<_Types...> &,const std::tuple<_Types...> &)"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const std::tuple<_Types...> &,const std::tuple<_Types...> &)': не удалось вывести аргумент шаблон для 'const std::tuple<_Types...> &' из 'unknown-type'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\map(414,17):
-1>    или       "bool std::operator !=(const std::map<_Kty,_Ty,_Pr,_Alloc> &,const std::map<_Kty,_Ty,_Pr,_Alloc> &)"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const std::map<_Kty,_Ty,_Pr,_Alloc> &,const std::map<_Kty,_Ty,_Pr,_Alloc> &)': не удалось вывести аргумент шаблон для 'const std::map<_Kty,_Ty,_Pr,_Alloc> &' из 'unknown-type'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\map(646,17):
-1>    или       "bool std::operator !=(const std::multimap<_Kty,_Ty,_Pr,_Alloc> &,const std::multimap<_Kty,_Ty,_Pr,_Alloc> &)"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const std::multimap<_Kty,_Ty,_Pr,_Alloc> &,const std::multimap<_Kty,_Ty,_Pr,_Alloc> &)': не удалось вывести аргумент шаблон для 'const std::multimap<_Kty,_Ty,_Pr,_Alloc> &' из 'unknown-type'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\regex(741,17):
-1>    или       "bool std::operator !=(const std::sub_match<_BidIt> &,const std::sub_match<_BidIt> &)"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const std::sub_match<_BidIt> &,const std::sub_match<_BidIt> &)': не удалось вывести аргумент шаблон для 'const std::sub_match<_BidIt> &' из 'unknown-type'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\regex(783,17):
-1>    или       "bool std::operator !=(const iterator_traits<_Iter>::value_type *,const std::sub_match<_BidIt> &)"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const iterator_traits<_Iter>::value_type *,const std::sub_match<_BidIt> &)': не удалось вывести аргумент шаблон для 'const std::sub_match<_BidIt> &' из 'std::sregex_iterator'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\regex(808,17):
-1>    или       "bool std::operator !=(const std::sub_match<_BidIt> &,const iterator_traits<_Iter>::value_type *)"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const std::sub_match<_BidIt> &,const iterator_traits<_Iter>::value_type *)': не удалось вывести аргумент шаблон для 'const std::sub_match<_BidIt> &' из 'unknown-type'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\regex(850,17):
-1>    или       "bool std::operator !=(const iterator_traits<_Iter>::value_type &,const std::sub_match<_BidIt> &)"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const iterator_traits<_Iter>::value_type &,const std::sub_match<_BidIt> &)': не удалось вывести аргумент шаблон для 'const std::sub_match<_BidIt> &' из 'std::sregex_iterator'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\regex(875,17):
-1>    или       "bool std::operator !=(const std::sub_match<_BidIt> &,const iterator_traits<_Iter>::value_type &)"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const std::sub_match<_BidIt> &,const iterator_traits<_Iter>::value_type &)': не удалось вывести аргумент шаблон для 'const std::sub_match<_BidIt> &' из 'unknown-type'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\regex(920,17):
-1>    или       "bool std::operator !=(const std::basic_string<iterator_traits<_Iter>::value_type,_Traits,_Alloc> &,const std::sub_match<_BidIt> &)"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const std::basic_string<iterator_traits<_Iter>::value_type,_Traits,_Alloc> &,const std::sub_match<_BidIt> &)': не удалось вывести аргумент шаблон для 'const std::basic_string<iterator_traits<_Iter>::value_type,_Traits,_Alloc> &' из 'unknown-type'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\regex(950,17):
-1>    или       "bool std::operator !=(const std::sub_match<_BidIt> &,const std::basic_string<iterator_traits<_Iter>::value_type,_Traits,_Alloc> &)"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const std::sub_match<_BidIt> &,const std::basic_string<iterator_traits<_Iter>::value_type,_Traits,_Alloc> &)': не удалось вывести аргумент шаблон для 'const std::sub_match<_BidIt> &' из 'unknown-type'
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\regex(1196,17):
-1>    или       "bool std::operator !=(const std::match_results<_BidIt,_Alloc> &,const std::match_results<_BidIt,_Alloc> &)"
-1>        C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>        'bool std::operator !=(const std::match_results<_BidIt,_Alloc> &,const std::match_results<_BidIt,_Alloc> &)': не удалось вывести аргумент шаблон для 'const std::match_results<_BidIt,_Alloc> &' из 'unknown-type'
-1>    C:\Users\User\source\repos\тторор\тторор\тторор.cpp(307,43):
-1>    при попытке сопоставить список аргументов "(unknown-type, std::sregex_iterator)"
-1>Сборка проекта "тторор.vcxproj" завершена с ошибкой.
-========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
-========== Сборка завершено в 23:36 и заняло 01,824 с ==========

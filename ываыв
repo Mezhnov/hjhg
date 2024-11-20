@@ -523,3 +523,24 @@ Gdiplus::Bitmap* LoadImageFromURL(const std::wstring& url) {
     }
     return nullptr;
 }
+Сборка начата в 11:25...
+1>------ Сборка начата: проект: тторор, Конфигурация: Debug x64 ------
+1>тторор.cpp
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(275,22): warning C4267: инициализация: преобразование из "size_t" в "int"; возможна потеря данных
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(314,30): warning C4267: инициализация: преобразование из "size_t" в "int"; возможна потеря данных
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(321,30): warning C4267: инициализация: преобразование из "size_t" в "int"; возможна потеря данных
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(469,14): error C2039: "replace": не является членом "std".
+1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\codecvt(20,1):
+1>     см. объявление "std"
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(469,14): error C3861: replace: идентификатор не найден
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(500,46): error C2440: приведение типов: невозможно преобразовать "ApplyStyle::<lambda_1>" в "LONG_PTR"
+1>    C:\Users\User\source\repos\тторор\тторор\тторор.cpp(500,46):
+1>    Для выполнения данного преобразования нет доступного оператора преобразования, определенного пользователем, или вызов оператора невозможен
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(500,5): error C2660: SetWindowLongPtrW: функция не принимает 2 аргументов
+1>    C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\um\winuser.h(9869,1):
+1>     см. объявление "SetWindowLongPtrW"
+1>    C:\Users\User\source\repos\тторор\тторор\тторор.cpp(500,5):
+1>    при попытке сопоставить список аргументов "(HWND, int)"
+1>Сборка проекта "тторор.vcxproj" завершена с ошибкой.
+========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
+========== Сборка завершено в 11:25 и заняло 01,330 с ==========

@@ -1,415 +1,394 @@
-// Включаем необходимые заголовочные файлы
 #include <windows.h>
 #include <gdiplus.h>
-#include <wininet.h>
+#include <urlmon.h>
+#include <shlwapi.h> // For path manipulation functions
 #include <string>
+#include <ctime>
 #include <vector>
-#include <chrono>
-#include <iomanip>
-#include <sstream>
-#include <locale>
 #include <windowsx.h>
-#include <mmsystem.h>  // Для PlaySound
-#include <CommCtrl.h>  // Для common controls
-#include <richedit.h>  // Для rich edit controls
+#include <cstdlib> // For rand()
+
+#pragma comment (lib,"Gdiplus.lib")
+#pragma comment (lib,"Urlmon.lib")
+#pragma comment (lib,"Shlwapi.lib")
+
+#include <sstream>
 #include <map>
-#include <functional>  // Для std::function
-#include <memory>      // Для std::shared_ptr
-#include <cctype>      // Для isdigit и isalpha
-#include <stack>       // Для std::stack
-#include <cmath>       // Для fmod
-
-// Линкуем необходимые библиотеки
-#pragma comment(lib, "gdiplus.lib")
-#pragma comment(lib, "wininet.lib")
-#pragma comment(lib, "comctl32.lib")
-#pragma comment(lib, "Winmm.lib")
-#pragma comment(lib, "UxTheme.lib")
-
-// Определение идентификаторов
-#define IDM_FILE_NEW        1001
-#define IDM_FILE_OPEN       1002
-#define IDM_FILE_SAVE       1003
-#define IDM_FILE_EXIT       1004
-#define IDM_EDIT_UNDO       2001
-#define IDM_EDIT_REDO       2002
-#define IDM_EDIT_CUT        2003
-#define IDM_EDIT_COPY       2004
-#define IDM_EDIT_PASTE      2005
-#define IDM_HELP_ABOUT      3001
-
-// Идентификаторы изображения
-#define IDB_TOOLBAR_IMAGES  4001
-#define IDI_APP_ICON        5001
-#define IDI_FOLDER_ICON     5002
 
 // Глобальные переменные
 HINSTANCE hInst;
+HWND hMarkyEdit;
+HWND hStylinEdit;
+HWND hRunButton;
 HWND hMainWnd;
-HWND hProjectPane, hHierarchyPane, hInspectorPane, hScenePane, hGamePane, hConsolePane;
 
-// Прототипы функций
-LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
-void CreateMenus(HWND hWnd);
-void CreateToolbar(HWND hWnd);
-void CreateStatusBar(HWND hWnd);
-void CreateDockablePanes(HWND hWnd);
+struct UIElement {
+    std::string type;
+    std::string id;
+    std::string text;
+    POINT position;
+    SIZE size;
+};
 
-// Добавляем поддержку тем
-BOOL EnableVisualStyles()
-{
-    HMODULE hMod = LoadLibrary(L"uxtheme.dll");
-    if (hMod)
-    {
-        typedef HRESULT(WINAPI* SetWindowThemeFunc)(HWND, LPCWSTR, LPCWSTR);
-        SetWindowThemeFunc SetWindowTheme = (SetWindowThemeFunc)GetProcAddress(hMod, "SetWindowTheme");
-        if (SetWindowTheme)
-        {
-            SetWindowTheme(hMainWnd, L"Explorer", NULL);
-            FreeLibrary(hMod);
-            return TRUE;
-        }
-        FreeLibrary(hMod);
-    }
-    return FALSE;
-}
+struct Style {
+    int fontSize;
+    COLORREF textColor;
+    COLORREF backgroundColor;
+};
 
-int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
-{
+// Словари для хранения элементов и стилей
+std::vector<UIElement> uiElements;
+std::map<std::string, Style> styles;
+
+// Функции для парсинга
+void ParseMarky(const std::string& markyCode);
+void ParseStylin(const std::string& stylinCode);
+
+// Функции для создания интерфейса
+void CreateUI(HWND parent);
+
+// Вспомогательные функции
+COLORREF ParseColor(const std::string& colorStr);
+
+// Прототипы оконных процедур
+LRESULT CALLBACK MainWndProc(HWND, UINT, WPARAM, LPARAM);
+LRESULT CALLBACK UIWndProc(HWND, UINT, WPARAM, LPARAM);
+
+// Главная функция
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     hInst = hInstance;
 
-    // Инициализируем GDI+
-    Gdiplus::GdiplusStartupInput gdiplusStartupInput;
-    ULONG_PTR gdiplusToken;
-    Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
+    // Регистрация класса окна
+    WNDCLASS wc = {};
+    wc.lpfnWndProc = MainWndProc;
+    wc.hInstance = hInstance;
+    wc.lpszClassName = TEXT("MarkyStylinIDE");
 
-    // Инициализируем common controls
-    INITCOMMONCONTROLSEX icex = { sizeof(INITCOMMONCONTROLSEX) };
-    icex.dwICC = ICC_WIN95_CLASSES | ICC_BAR_CLASSES;
-    InitCommonControlsEx(&icex);
+    RegisterClass(&wc);
 
-    // Регистрируем класс окна
-    WNDCLASSEX wcex = { 0 };
-    wcex.cbSize         = sizeof(WNDCLASSEX);
-    wcex.style          = CS_HREDRAW | CS_VREDRAW;
-    wcex.lpfnWndProc    = WndProc;
-    wcex.cbClsExtra     = 0;
-    wcex.cbWndExtra     = 0;
-    wcex.hInstance      = hInst;
-    wcex.hIcon          = LoadIcon(hInst, MAKEINTRESOURCE(IDI_APP_ICON));
-    wcex.hCursor        = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground  = CreateSolidBrush(RGB(56, 56, 56)); // Темный фон
-    wcex.lpszMenuName   = nullptr;
-    wcex.lpszClassName  = L"UnityCloneClass";
-    wcex.hIconSm        = LoadIcon(hInst, MAKEINTRESOURCE(IDI_APP_ICON));
-
-    RegisterClassEx(&wcex);
-
-    // Создаем главное окно
-    hMainWnd = CreateWindowW(L"UnityCloneClass", L"Unity Clone IDE", WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, 0, 1280, 720, nullptr, nullptr, hInst, nullptr);
-
-    if (!hMainWnd)
-    {
-        MessageBox(nullptr, L"Не удалось создать главное окно!", L"Ошибка", MB_OK);
-        return FALSE;
-    }
-
-    // Включаем визуальные стили
-    EnableVisualStyles();
+    // Создание главного окна
+    hMainWnd = CreateWindowEx(
+        0,
+        wc.lpszClassName,
+        TEXT("Marky & Stylin IDE"),
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT, 800, 600,
+        nullptr,
+        nullptr,
+        hInstance,
+        nullptr
+    );
 
     ShowWindow(hMainWnd, nCmdShow);
-    UpdateWindow(hMainWnd);
 
-    // Главный цикл сообщений
-    MSG msg;
-    while (GetMessage(&msg, nullptr, 0, 0))
-    {
-        // Если сообщение не обрабатывается, передаем его функцию перевода и отправки
-        if (!IsDialogMessage(hMainWnd, &msg))
-        {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
+    // Цикл сообщений
+    MSG msg = {};
+    while (GetMessage(&msg, nullptr, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
     }
-
-    // Завершаем GDI+
-    Gdiplus::GdiplusShutdown(gdiplusToken);
-
-    return (int)msg.wParam;
+    return 0;
 }
 
-// Обработчик окна
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-    static HWND hStatusBar;
+// Создание элементов управления в главном окне
+void CreateControls(HWND hwnd) {
+    CreateWindow(TEXT("STATIC"), TEXT("Marky Code:"),
+        WS_VISIBLE | WS_CHILD,
+        10, 10, 100, 20,
+        hwnd, nullptr, hInst, nullptr);
 
-    switch (message)
+    hMarkyEdit = CreateWindowEx(WS_EX_CLIENTEDGE, TEXT("EDIT"), TEXT(""),
+        WS_VISIBLE | WS_CHILD | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL,
+        10, 30, 360, 500,
+        hwnd, nullptr, hInst, nullptr);
+
+    CreateWindow(TEXT("STATIC"), TEXT("Stylin Code:"),
+        WS_VISIBLE | WS_CHILD,
+        380, 10, 100, 20,
+        hwnd, nullptr, hInst, nullptr);
+
+    hStylinEdit = CreateWindowEx(WS_EX_CLIENTEDGE, TEXT("EDIT"), TEXT(""),
+        WS_VISIBLE | WS_CHILD | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL,
+        380, 30, 360, 500,
+        hwnd, nullptr, hInst, nullptr);
+
+    hRunButton = CreateWindow(TEXT("BUTTON"), TEXT("Запустить"),
+        WS_VISIBLE | WS_CHILD,
+        10, 540, 100, 30,
+        hwnd, (HMENU)1, hInst, nullptr);
+}
+
+// Оконная процедура главного окна
+LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg)
     {
     case WM_CREATE:
-        CreateMenus(hWnd);
-        CreateToolbar(hWnd);
-        CreateStatusBar(hWnd);
-        CreateDockablePanes(hWnd);
-        break;
-    case WM_SIZE:
-        {
-            RECT rect;
-            GetClientRect(hWnd, &rect);
-
-            // Обновляем размер статусной строки
-            SendMessage(hStatusBar, WM_SIZE, 0, 0);
-
-            // Обновляем размеры панелей
-            int width = rect.right - rect.left;
-            int height = rect.bottom - rect.top - 20; // Учитываем высоту статусной строки
-
-            int panelWidth = 250;
-            int panelHeight = 200;
-
-            MoveWindow(hProjectPane, 0, 0, panelWidth, height - panelHeight, TRUE);
-            MoveWindow(hHierarchyPane, 0, height - panelHeight, panelWidth, panelHeight, TRUE);
-            MoveWindow(hInspectorPane, width - panelWidth, 0, panelWidth, height, TRUE);
-            MoveWindow(hScenePane, panelWidth, 0, width - 2 * panelWidth, height / 2, TRUE);
-            MoveWindow(hGamePane, panelWidth, height / 2, width - 2 * panelWidth, height / 2, TRUE);
-            MoveWindow(hConsolePane, 0, height - panelHeight, width, panelHeight, TRUE);
-        }
+        CreateControls(hwnd);
         break;
     case WM_COMMAND:
+        if (LOWORD(wParam) == 1) // Нажата кнопка "Запустить"
         {
-            int wmId = LOWORD(wParam);
-            // Обработка команд меню
-            switch (wmId)
-            {
-            case IDM_FILE_NEW:
-                MessageBox(hWnd, L"Новый проект создан.", L"Файл", MB_OK);
-                break;
-            case IDM_FILE_OPEN:
-                MessageBox(hWnd, L"Открытие проекта.", L"Файл", MB_OK);
-                break;
-            case IDM_FILE_SAVE:
-                MessageBox(hWnd, L"Проект сохранен.", L"Файл", MB_OK);
-                break;
-            case IDM_FILE_EXIT:
-                DestroyWindow(hWnd);
-                break;
-            case IDM_EDIT_UNDO:
-                MessageBox(hWnd, L"Отменить действие.", L"Правка", MB_OK);
-                break;
-            case IDM_EDIT_REDO:
-                MessageBox(hWnd, L"Повторить действие.", L"Правка", MB_OK);
-                break;
-            case IDM_EDIT_CUT:
-                MessageBox(hWnd, L"Вырезать.", L"Правка", MB_OK);
-                break;
-            case IDM_EDIT_COPY:
-                MessageBox(hWnd, L"Копировать.", L"Правка", MB_OK);
-                break;
-            case IDM_EDIT_PASTE:
-                MessageBox(hWnd, L"Вставить.", L"Правка", MB_OK);
-                break;
-            case IDM_HELP_ABOUT:
-                MessageBox(hWnd, L"Unity Clone IDE\nВерсия 1.0", L"О программе", MB_OK);
-                break;
-            default:
-                return DefWindowProc(hWnd, message, wParam, lParam);
-            }
-        }
-        break;
-    case WM_NOTIFY:
-        {
-            LPNMHDR lpnmh = (LPNMHDR)lParam;
-            if (lpnmh->hwndFrom == hProjectPane && lpnmh->code == NM_DBLCLK)
-            {
-                // Обработка двойного щелчка по элементу в панели проекта
-                MessageBox(hWnd, L"Вы открыли файл из панели проекта.", L"Информация", MB_OK);
-            }
+            // Получаем код из контролов
+            TCHAR markyBuffer[10000];
+            GetWindowText(hMarkyEdit, markyBuffer, 10000);
+            std::wstring wMarkyCode = markyBuffer;
+            std::string markyCode(wMarkyCode.begin(), wMarkyCode.end());
+
+            TCHAR stylinBuffer[10000];
+            GetWindowText(hStylinEdit, stylinBuffer, 10000);
+            std::wstring wStylinCode = stylinBuffer;
+            std::string stylinCode(wStylinCode.begin(), wStylinCode.end());
+
+            // Парсим код
+            ParseMarky(markyCode);
+            ParseStylin(stylinCode);
+
+            // Создаем новое окно для отображения интерфейса
+            WNDCLASS wc = {};
+            wc.lpfnWndProc = UIWndProc;
+            wc.hInstance = hInst;
+            wc.lpszClassName = TEXT("UIWindowClass");
+
+            RegisterClass(&wc);
+
+            HWND hUIWindow = CreateWindowEx(
+                0,
+                wc.lpszClassName,
+                TEXT("Результат"),
+                WS_OVERLAPPEDWINDOW,
+                CW_USEDEFAULT, CW_USEDEFAULT, 500, 400,
+                nullptr,
+                nullptr,
+                hInst,
+                nullptr
+            );
+
+            ShowWindow(hUIWindow, SW_SHOW);
         }
         break;
     case WM_DESTROY:
         PostQuitMessage(0);
         break;
-    case WM_CTLCOLORSTATIC:
-        {
-            HDC hdcStatic = (HDC)wParam;
-            SetBkMode(hdcStatic, TRANSPARENT);
-            SetTextColor(hdcStatic, RGB(220, 220, 220)); // Светлый текст
-            return (INT_PTR)CreateSolidBrush(RGB(56, 56, 56)); // Темный фон
-        }
     default:
-        return DefWindowProc(hWnd, message, wParam, lParam);
+        return DefWindowProc(hwnd, msg, wParam, lParam);
     }
     return 0;
 }
 
-// Создание меню
-void CreateMenus(HWND hWnd)
-{
-    HMENU hMenuBar = CreateMenu();
-
-    HMENU hFileMenu = CreateMenu();
-    HMENU hEditMenu = CreateMenu();
-    HMENU hWindowMenu = CreateMenu();
-    HMENU hHelpMenu = CreateMenu();
-
-    AppendMenu(hFileMenu, MF_STRING, IDM_FILE_NEW, L"&New Project\tCtrl+N");
-    AppendMenu(hFileMenu, MF_STRING, IDM_FILE_OPEN, L"&Open Project...\tCtrl+O");
-    AppendMenu(hFileMenu, MF_STRING, IDM_FILE_SAVE, L"&Save Project\tCtrl+S");
-    AppendMenu(hFileMenu, MF_SEPARATOR, 0, nullptr);
-    AppendMenu(hFileMenu, MF_STRING, IDM_FILE_EXIT, L"E&xit");
-
-    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_UNDO, L"&Undo\tCtrl+Z");
-    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_REDO, L"&Redo\tCtrl+Y");
-    AppendMenu(hEditMenu, MF_SEPARATOR, 0, nullptr);
-    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_CUT, L"Cu&t\tCtrl+X");
-    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_COPY, L"&Copy\tCtrl+C");
-    AppendMenu(hEditMenu, MF_STRING, IDM_EDIT_PASTE, L"&Paste\tCtrl+V");
-
-    AppendMenu(hHelpMenu, MF_STRING, IDM_HELP_ABOUT, L"&About");
-
-    AppendMenu(hMenuBar, MF_POPUP, (UINT_PTR)hFileMenu, L"&File");
-    AppendMenu(hMenuBar, MF_POPUP, (UINT_PTR)hEditMenu, L"&Edit");
-    AppendMenu(hMenuBar, MF_POPUP, (UINT_PTR)hWindowMenu, L"&Window");
-    AppendMenu(hMenuBar, MF_POPUP, (UINT_PTR)hHelpMenu, L"&Help");
-
-    SetMenu(hWnd, hMenuBar);
+// Оконная процедура окна интерфейса
+LRESULT CALLBACK UIWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg)
+    {
+    case WM_CREATE:
+        CreateUI(hwnd);
+        break;
+    case WM_DESTROY:
+        // Очищаем элементы и стили после закрытия окна
+        uiElements.clear();
+        styles.clear();
+        break;
+    default:
+        return DefWindowProc(hwnd, msg, wParam, lParam);
+    }
+    return 0;
 }
 
-// Создание панели инструментов
-void CreateToolbar(HWND hWnd)
-{
-    TBBUTTON tbb[3];
-    TBADDBITMAP tbab;
+// Функция парсинга Marky
+void ParseMarky(const std::string& markyCode) {
+    uiElements.clear();
 
-    HWND hToolbar = CreateWindowEx(0, TOOLBARCLASSNAME, nullptr,
-        WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | TBSTYLE_TOOLTIPS,
-        0, 0, 0, 0, hWnd, nullptr, hInst, nullptr);
+    std::istringstream iss(markyCode);
+    std::string line;
+    UIElement currentWindow;
+    bool inElements = false;
 
-    SendMessage(hToolbar, TB_BUTTONSTRUCTSIZE, (WPARAM)sizeof(TBBUTTON), 0);
+    while (std::getline(iss, line)) {
+        // Убираем начальные и конечные пробелы
+        line.erase(0, line.find_first_not_of(" \t"));
+        line.erase(line.find_last_not_of(" \t") + 1);
 
-    tbab.hInst = hInst;
-    tbab.nID = IDB_TOOLBAR_IMAGES;
+        if (line.empty() || line[0] == '#')
+            continue; // Пропускаем пустые строки и комментарии
 
-    SendMessage(hToolbar, TB_ADDBITMAP, 3, (LPARAM)&tbab);
+        if (line.find("window:") == 0) {
+            // Начало описания окна
+            inElements = false;
+        }
+        else if (line.find("title:") == 0) {
+            currentWindow.text = line.substr(6);
+            currentWindow.text.erase(0, currentWindow.text.find_first_not_of(" \""));
+            currentWindow.text.erase(currentWindow.text.find_last_not_of(" \"") + 1);
+        }
+        else if (line.find("size:") == 0) {
+            std::string sizeStr = line.substr(5);
+            sizeStr.erase(0, sizeStr.find_first_not_of(" \t"));
+            int xPos = sizeStr.find('x');
+            if (xPos != std::string::npos) {
+                currentWindow.size.cx = std::atoi(sizeStr.substr(0, xPos).c_str());
+                currentWindow.size.cy = std::atoi(sizeStr.substr(xPos + 1).c_str());
+            }
+        }
+        else if (line.find("elements:") == 0) {
+            inElements = true;
+        }
+        else if (inElements && line[0] == '-') {
+            // Начало описания элемента
+            UIElement element;
+            size_t pos = line.find(':');
+            if (pos != std::string::npos) {
+                element.type = line.substr(1, pos - 1);
+                element.type.erase(0, element.type.find_first_not_of(" \t"));
+                element.type.erase(element.type.find_last_not_of(" \t") + 1);
+            }
+            // Читаем свойства элемента
+            while (std::getline(iss, line)) {
+                line.erase(0, line.find_first_not_of(" \t"));
+                line.erase(line.find_last_not_of(" \t") + 1);
 
-    ZeroMemory(tbb, sizeof(tbb));
+                if (line.empty())
+                    break;
 
-    tbb[0].iBitmap = 0;
-    tbb[0].idCommand = IDM_FILE_NEW;
-    tbb[0].fsState = TBSTATE_ENABLED;
-    tbb[0].fsStyle = TBSTYLE_BUTTON;
-    tbb[0].iString = (INT_PTR)L"New";
+                if (line.find("id:") == 0) {
+                    element.id = line.substr(3);
+                    element.id.erase(0, element.id.find_first_not_of(" \""));
+                    element.id.erase(element.id.find_last_not_of(" \"") + 1);
+                }
+                else if (line.find("text:") == 0) {
+                    element.text = line.substr(5);
+                    element.text.erase(0, element.text.find_first_not_of(" \""));
+                    element.text.erase(element.text.find_last_not_of(" \"") + 1);
+                }
+                else if (line.find("position:") == 0) {
+                    std::string posStr = line.substr(9);
+                    posStr.erase(0, posStr.find_first_not_of(" \t"));
+                    int xPos = posStr.find('x');
+                    if (xPos != std::string::npos) {
+                        element.position.x = std::atoi(posStr.substr(0, xPos).c_str());
+                        element.position.y = std::atoi(posStr.substr(xPos + 1).c_str());
+                    }
+                }
+                else {
+                    break;
+                }
+            }
+            uiElements.push_back(element);
+        }
+    }
 
-    tbb[1].iBitmap = 1;
-    tbb[1].idCommand = IDM_FILE_OPEN;
-    tbb[1].fsState = TBSTATE_ENABLED;
-    tbb[1].fsStyle = TBSTYLE_BUTTON;
-    tbb[1].iString = (INT_PTR)L"Open";
-
-    tbb[2].iBitmap = 2;
-    tbb[2].idCommand = IDM_FILE_SAVE;
-    tbb[2].fsState = TBSTATE_ENABLED;
-    tbb[2].fsStyle = TBSTYLE_BUTTON;
-    tbb[2].iString = (INT_PTR)L"Save";
-
-    SendMessage(hToolbar, TB_ADDBUTTONS, 3, (LPARAM)&tbb);
+    // Устанавливаем параметры окна на основе парсинга
+    if (!currentWindow.text.empty()) {
+        // Здесь можно сохранить параметры окна, если потребуется
+    }
 }
 
-// Создание статусной строки
-void CreateStatusBar(HWND hWnd)
-{
-    HWND hStatus = CreateWindowEx(0, STATUSCLASSNAME, nullptr,
-        WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP,
-        0, 0, 0, 0, hWnd, (HMENU)1, hInst, nullptr);
+// Функция парсинга Stylin
+void ParseStylin(const std::string& stylinCode) {
+    styles.clear();
 
-    int statwidths[] = { 100, -1 };
-    SendMessage(hStatus, SB_SETPARTS, sizeof(statwidths) / sizeof(int), (LPARAM)statwidths);
-    SendMessage(hStatus, SB_SETTEXT, 0, (LPARAM)L"Готово");
+    std::istringstream iss(stylinCode);
+    std::string line;
+    std::string currentSelector;
 
-    // Сохраняем handle статусной строки для обновления в WndProc
-    SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR)hStatus);
+    while (std::getline(iss, line)) {
+        // Убираем начальные и конечные пробелы
+        line.erase(0, line.find_first_not_of(" \t"));
+        line.erase(line.find_last_not_of(" \t") + 1);
+
+        if (line.empty() || line[0] == '#')
+            continue; // Пропускаем пустые строки и комментарии
+
+        if (line.back() == ':') {
+            currentSelector = line.substr(0, line.length() - 1);
+        }
+        else {
+            size_t colonPos = line.find(':');
+            if (colonPos != std::string::npos) {
+                std::string property = line.substr(0, colonPos);
+                std::string value = line.substr(colonPos + 1);
+
+                property.erase(0, property.find_first_not_of(" \t"));
+                property.erase(property.find_last_not_of(" \t") + 1);
+                value.erase(0, value.find_first_not_of(" \t"));
+                value.erase(value.find_last_not_of(" \t") + 1);
+
+                Style& style = styles[currentSelector];
+
+                if (property == "font-size") {
+                    style.fontSize = std::atoi(value.c_str());
+                }
+                else if (property == "color" || property == "text-color") {
+                    style.textColor = ParseColor(value);
+                }
+                else if (property == "background-color") {
+                    style.backgroundColor = ParseColor(value);
+                }
+            }
+        }
+    }
 }
 
-// Создание докируемых панелей
-void CreateDockablePanes(HWND hWnd)
-{
-    // Размеры окна
-    RECT rect;
-    GetClientRect(hWnd, &rect);
+// Функция создания интерфейса на основе парсинга
+void CreateUI(HWND parent) {
+    for (const auto& element : uiElements) {
+        HWND hControl = nullptr;
+        if (element.type == "label") {
+            hControl = CreateWindow(TEXT("STATIC"), std::wstring(element.text.begin(), element.text.end()).c_str(),
+                WS_VISIBLE | WS_CHILD,
+                element.position.x, element.position.y, 200, 30,
+                parent, nullptr, hInst, nullptr);
 
-    int width = rect.right - rect.left;
-    int height = rect.bottom - rect.top - 20; // Учитываем высоту статусной строки
-    int panelWidth = 250;
-    int panelHeight = 200;
+            // Применяем стили
+            auto it = styles.find("label");
+            if (it != styles.end()) {
+                Style style = it->second;
 
-    // Создаем окно списка для панели "Project"
-    hProjectPane = CreateWindowEx(WS_EX_CLIENTEDGE, WC_LISTVIEW, nullptr,
-        WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_ICON,
-        0, 0, panelWidth, height - panelHeight,
-        hWnd, (HMENU)2, hInst, nullptr);
+                if (style.fontSize > 0) {
+                    // Изменяем размер шрифта
+                    HFONT hFont = CreateFont(style.fontSize, 0, 0, 0, FW_NORMAL,
+                        FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
+                        CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, VARIABLE_PITCH, TEXT("Arial"));
+                    SendMessage(hControl, WM_SETFONT, (WPARAM)hFont, TRUE);
+                }
 
-    // Настраиваем список панели "Project"
-    HIMAGELIST hImageList;
-    hImageList = ImageList_Create(32, 32, ILC_COLOR32, 1, 1);
-    HICON hIcon = LoadIcon(hInst, MAKEINTRESOURCE(IDI_FOLDER_ICON));
-    ImageList_AddIcon(hImageList, hIcon);
-    SendMessage(hProjectPane, LVM_SETIMAGELIST, LVSIL_NORMAL, (LPARAM)hImageList);
+                if (style.textColor != 0) {
+                    // Устанавливаем цвет текста
+                    SetTextColor(GetDC(hControl), style.textColor);
+                }
+            }
+        }
+        else if (element.type == "button") {
+            hControl = CreateWindow(TEXT("BUTTON"), std::wstring(element.text.begin(), element.text.end()).c_str(),
+                WS_VISIBLE | WS_CHILD,
+                element.position.x, element.position.y, 100, 30,
+                parent, nullptr, hInst, nullptr);
 
-    LVITEM lvItem = { 0 };
-    lvItem.mask = LVIF_TEXT | LVIF_IMAGE;
-    lvItem.iItem = 0;
-    lvItem.pszText = L"Assets";
-    lvItem.iImage = 0;
-    SendMessage(hProjectPane, LVM_INSERTITEM, 0, (LPARAM)&lvItem);
+            // Применяем стили
+            auto it = styles.find("button");
+            if (it != styles.end()) {
+                Style style = it->second;
 
-    lvItem.iItem = 1;
-    lvItem.pszText = L"Scripts";
-    lvItem.iImage = 0;
-    SendMessage(hProjectPane, LVM_INSERTITEM, 0, (LPARAM)&lvItem);
+                if (style.backgroundColor != 0) {
+                    // Устанавливаем цвет фона кнопки
+                    HBRUSH hBrush = CreateSolidBrush(style.backgroundColor);
+                    SetClassLongPtr(hControl, GCLP_HBRBACKGROUND, (LONG_PTR)hBrush);
+                }
 
-    // Создаем окно дерева для панели "Hierarchy"
-    hHierarchyPane = CreateWindowEx(WS_EX_CLIENTEDGE, WC_TREEVIEW, nullptr,
-        WS_CHILD | WS_VISIBLE | TVS_HASLINES | TVS_HASBUTTONS,
-        0, height - panelHeight, panelWidth, panelHeight,
-        hWnd, (HMENU)3, hInst, nullptr);
-
-    // Добавляем элементы в дерево
-    TVINSERTSTRUCT tvInsert = { 0 };
-    tvInsert.hParent = TVI_ROOT;
-    tvInsert.hInsertAfter = TVI_LAST;
-    tvInsert.item.mask = TVIF_TEXT;
-    tvInsert.item.pszText = L"Main Camera";
-    HTREEITEM hCamera = (HTREEITEM)SendMessage(hHierarchyPane, TVM_INSERTITEM, 0, (LPARAM)&tvInsert);
-
-    tvInsert.item.pszText = L"Directional Light";
-    HTREEITEM hLight = (HTREEITEM)SendMessage(hHierarchyPane, TVM_INSERTITEM, 0, (LPARAM)&tvInsert);
-
-    // Создаем статический контрол для панели "Inspector"
-    hInspectorPane = CreateWindowEx(WS_EX_CLIENTEDGE, L"STATIC", L"Inspector Pane",
-        WS_CHILD | WS_VISIBLE | SS_LEFT,
-        width - panelWidth, 0, panelWidth, height,
-        hWnd, (HMENU)4, hInst, nullptr);
-
-    // Создаем статический контрол для панели "Scene"
-    hScenePane = CreateWindowEx(WS_EX_CLIENTEDGE, L"STATIC", L"Scene Pane",
-        WS_CHILD | WS_VISIBLE | SS_LEFT,
-        panelWidth, 0, width - 2 * panelWidth, height / 2,
-        hWnd, (HMENU)5, hInst, nullptr);
-
-    // Создаем статический контрол для панели "Game"
-    hGamePane = CreateWindowEx(WS_EX_CLIENTEDGE, L"STATIC", L"Game Pane",
-        WS_CHILD | WS_VISIBLE | SS_LEFT,
-        panelWidth, height / 2, width - 2 * panelWidth, height / 2,
-        hWnd, (HMENU)6, hInst, nullptr);
-
-    // Создаем окно списка для панели "Console"
-    hConsolePane = CreateWindowEx(WS_EX_CLIENTEDGE, WC_LISTBOX, nullptr,
-        WS_CHILD | WS_VISIBLE | LBS_NOINTEGRALHEIGHT,
-        0, height - panelHeight, width, panelHeight,
-        hWnd, (HMENU)7, hInst, nullptr);
-
-    // Добавляем сообщения в консоль
-    SendMessage(hConsolePane, LB_ADDSTRING, 0, (LPARAM)L"Console initialized.");
+                if (style.textColor != 0) {
+                    // Устанавливаем цвет текста
+                    SetTextColor(GetDC(hControl), style.textColor);
+                }
+            }
+        }
+    }
 }
 
-// Остальная часть кода...
+// Функция парсинга цвета из строки
+COLORREF ParseColor(const std::string& colorStr) {
+    if (colorStr.find("RGB(") == 0 && colorStr.back() == ')') {
+        std::string values = colorStr.substr(4, colorStr.length() - 5);
+        int r = 0, g = 0, b = 0;
+        sscanf_s(values.c_str(), "%d, %d, %d", &r, &g, &b);
+        return RGB(r, g, b);
+    }
+    return 0;
+}

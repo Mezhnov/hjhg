@@ -2,16 +2,17 @@
 #include <windows.h>
 #include <gdiplus.h>
 #include <urlmon.h>
-#include <shlwapi.h> // For path manipulation functions
+#include <shlwapi.h> // Для функций работы с путями
 #include <string>
 #include <ctime>
 #include <vector>
 #include <windowsx.h>
-#include <cstdlib> // For rand()
+#include <cstdlib> // Для rand()
 #include <sstream>
 #include <map>
 #include <codecvt>
 #include <locale>
+#include <algorithm> // Добавлено для std::replace
 
 #pragma comment (lib,"Gdiplus.lib")
 #pragma comment (lib,"Urlmon.lib")
@@ -24,6 +25,7 @@ HWND hStylinEdit;
 HWND hRunButton;
 HWND hMainWnd;
 
+// Структуры для хранения элементов UI и стилей
 struct UIElement {
     std::string type;
     std::string id;
@@ -51,6 +53,9 @@ std::vector<UIElement> uiElements;
 std::map<std::string, Style> styles;
 std::map<std::string, EventHandler> eventHandlers;
 
+// Карта для сопоставления HWND контролов с их цветовыми параметрами
+std::map<HWND, Style> controlStyles;
+
 // Функции для парсинга
 void ParseMarky(const std::string& markyCode);
 void ParseStylin(const std::string& stylinCode);
@@ -62,7 +67,6 @@ void CreateUI(HWND parent);
 COLORREF ParseColor(const std::string& colorStr);
 void ApplyStyle(HWND hControl, const Style& style);
 Gdiplus::Bitmap* LoadImageFromURL(const std::wstring& url);
-LRESULT CALLBACK ButtonProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 // Прототипы оконных процедур
 LRESULT CALLBACK MainWndProc(HWND, UINT, WPARAM, LPARAM);
@@ -199,6 +203,19 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
             ShowWindow(hUIWindow, SW_SHOW);
         }
         break;
+    case WM_CTLCOLORSTATIC:
+    case WM_CTLCOLORBTN:
+    {
+        HDC hdcStatic = (HDC)wParam;
+        HWND hControl = (HWND)lParam;
+        auto it = controlStyles.find(hControl);
+        if (it != controlStyles.end()) {
+            SetTextColor(hdcStatic, it->second.textColor);
+            SetBkMode(hdcStatic, TRANSPARENT);
+            return (INT_PTR)GetStockObject(NULL_BRUSH);
+        }
+        break;
+    }
     case WM_DESTROY:
         PostQuitMessage(0);
         break;
@@ -228,8 +245,21 @@ LRESULT CALLBACK UIWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             }
             // Добавьте дополнительные действия здесь
         }
+        break;
     }
-    break;
+    case WM_CTLCOLORSTATIC:
+    case WM_CTLCOLORBTN:
+    {
+        HDC hdcStatic = (HDC)wParam;
+        HWND hControl = (HWND)lParam;
+        auto it = controlStyles.find(hControl);
+        if (it != controlStyles.end()) {
+            SetTextColor(hdcStatic, it->second.textColor);
+            SetBkMode(hdcStatic, TRANSPARENT);
+            return (INT_PTR)GetStockObject(NULL_BRUSH);
+        }
+        break;
+    }
     case WM_DESTROY:
         // Очищаем элементы и стили после закрытия окна
         uiElements.clear();
@@ -272,7 +302,7 @@ void ParseMarky(const std::string& markyCode) {
         else if (line.find("size:") == 0) {
             std::string sizeStr = line.substr(5);
             sizeStr.erase(0, sizeStr.find_first_not_of(" \t"));
-            int xPos = sizeStr.find('x');
+            size_t xPos = sizeStr.find('x');
             if (xPos != std::string::npos) {
                 currentWindow.size.cx = std::atoi(sizeStr.substr(0, xPos).c_str());
                 currentWindow.size.cy = std::atoi(sizeStr.substr(xPos + 1).c_str());
@@ -311,14 +341,14 @@ void ParseMarky(const std::string& markyCode) {
                     element.src = value;
                 }
                 else if (key == "position") {
-                    int xPos = value.find('x');
+                    size_t xPos = value.find('x');
                     if (xPos != std::string::npos) {
                         element.position.x = std::stoi(value.substr(0, xPos));
                         element.position.y = std::stoi(value.substr(xPos + 1));
                     }
                 }
                 else if (key == "size") {
-                    int xPos = value.find('x');
+                    size_t xPos = value.find('x');
                     if (xPos != std::string::npos) {
                         element.size.cx = std::stoi(value.substr(0, xPos));
                         element.size.cy = std::stoi(value.substr(xPos + 1));
@@ -431,7 +461,6 @@ void CreateUI(HWND parent) {
             if (!element.action.empty()) {
                 buttonActions[hControl] = element.action;
                 SetWindowLongPtr(hControl, GWLP_ID, (LONG_PTR)hControl);
-                SetWindowLongPtr(hControl, GWLP_USERDATA, (LONG_PTR)parent);
             }
         }
         else if (element.type == "image") {
@@ -452,7 +481,7 @@ void CreateUI(HWND parent) {
         }
 
         // Применяем стили с использованием идентификатора
-        if (!element.id.empty()) {
+        if (hControl && !element.id.empty()) {
             auto it = styles.find("#" + element.id);
             if (it != styles.end()) {
                 ApplyStyle(hControl, it->second);
@@ -465,8 +494,8 @@ void CreateUI(HWND parent) {
 COLORREF ParseColor(const std::string& colorStr) {
     if (colorStr.find("RGB(") == 0 && colorStr.back() == ')') {
         std::string values = colorStr.substr(4, colorStr.length() - 5);
-        int r = 0, g = 0, b = 0;
         std::replace(values.begin(), values.end(), ',', ' ');
+        int r = 0, g = 0, b = 0;
         std::istringstream iss(values);
         iss >> r >> g >> b;
         return RGB(r, g, b);
@@ -493,20 +522,8 @@ void ApplyStyle(HWND hControl, const Style& style) {
         InvalidateRect(hControl, NULL, TRUE);
     }
 
-    // Сохраняем цвет текста в пользовательских данных
-    SetWindowLongPtr(hControl, GWLP_USERDATA, (LONG_PTR)style.textColor);
-
-    // Перехватываем сообщение WM_CTLCOLORSTATIC
-    SetWindowLongPtr(hControl, GWLP_WNDPROC, (LONG_PTR)[] (HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) -> LRESULT {
-        if (msg == WM_CTLCOLORSTATIC || msg == WM_CTLCOLORBTN) {
-            HDC hdc = (HDC)wParam;
-            COLORREF textColor = (COLORREF)GetWindowLongPtr(hwnd, GWLP_USERDATA);
-            SetTextColor(hdc, textColor);
-            SetBkMode(hdc, TRANSPARENT);
-            return (LRESULT)GetStockObject(NULL_BRUSH);
-        }
-        return DefWindowProc(hwnd, msg, wParam, lParam);
-    });
+    // Сохраняем стиль в карте
+    controlStyles[hControl] = style;
 }
 
 // Функция загрузки изображения по URL
@@ -523,24 +540,3 @@ Gdiplus::Bitmap* LoadImageFromURL(const std::wstring& url) {
     }
     return nullptr;
 }
-Сборка начата в 11:25...
-1>------ Сборка начата: проект: тторор, Конфигурация: Debug x64 ------
-1>тторор.cpp
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(275,22): warning C4267: инициализация: преобразование из "size_t" в "int"; возможна потеря данных
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(314,30): warning C4267: инициализация: преобразование из "size_t" в "int"; возможна потеря данных
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(321,30): warning C4267: инициализация: преобразование из "size_t" в "int"; возможна потеря данных
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(469,14): error C2039: "replace": не является членом "std".
-1>    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\codecvt(20,1):
-1>     см. объявление "std"
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(469,14): error C3861: replace: идентификатор не найден
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(500,46): error C2440: приведение типов: невозможно преобразовать "ApplyStyle::<lambda_1>" в "LONG_PTR"
-1>    C:\Users\User\source\repos\тторор\тторор\тторор.cpp(500,46):
-1>    Для выполнения данного преобразования нет доступного оператора преобразования, определенного пользователем, или вызов оператора невозможен
-1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(500,5): error C2660: SetWindowLongPtrW: функция не принимает 2 аргументов
-1>    C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\um\winuser.h(9869,1):
-1>     см. объявление "SetWindowLongPtrW"
-1>    C:\Users\User\source\repos\тторор\тторор\тторор.cpp(500,5):
-1>    при попытке сопоставить список аргументов "(HWND, int)"
-1>Сборка проекта "тторор.vcxproj" завершена с ошибкой.
-========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
-========== Сборка завершено в 11:25 и заняло 01,330 с ==========

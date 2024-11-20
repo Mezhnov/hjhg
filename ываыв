@@ -1,3 +1,27 @@
+window:
+title: "Пример интерфейса"
+size: 500x400
+elements:
+- label:
+    id: "label1"
+    text: "Привет, Мир!"
+    position: 50x50
+    size: 200x30
+
+- button:
+    id: "button1"
+    text: "Нажми меня"
+    position: 50x100
+    size: 150x40
+    action: "message"
+
+- image:
+    id: "image1"
+    src: "https://via.placeholder.com/100"
+    position: 50x160
+    size: 100x100
+
+
 label:
     font-size: 18
     color: RGB(0, 0, 255) # Синий цвет текста

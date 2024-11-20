@@ -27,11 +27,11 @@ HWND hMainWnd;
 
 // Структуры для хранения элементов UI и стилей
 struct UIElement {
-    std::string type;
-    std::string id;
-    std::string text;
-    std::string src; // Для изображений
-    std::string action; // Для событий
+    std::wstring type;
+    std::wstring id;
+    std::wstring text;
+    std::wstring src; // Для изображений
+    std::wstring action; // Для событий
     POINT position{ 0, 0 };
     SIZE size{ 0, 0 };
 };
@@ -40,31 +40,31 @@ struct Style {
     int fontSize = 0;
     COLORREF textColor = RGB(0, 0, 0);
     COLORREF backgroundColor = RGB(255, 255, 255);
-    std::string fontFamily = "Arial";
+    std::wstring fontFamily = L"Arial";
 };
 
 struct EventHandler {
-    std::string id;
-    std::string action;
+    std::wstring id;
+    std::wstring action;
 };
 
 // Словари для хранения элементов и стилей
 std::vector<UIElement> uiElements;
-std::map<std::string, Style> styles;
-std::map<std::string, EventHandler> eventHandlers;
+std::map<std::wstring, Style> styles;
+std::map<std::wstring, EventHandler> eventHandlers;
 
 // Карта для сопоставления HWND контролов с их цветовыми параметрами
 std::map<HWND, Style> controlStyles;
 
 // Функции для парсинга
-void ParseMarky(const std::string& markyCode);
-void ParseStylin(const std::string& stylinCode);
+void ParseMarky(const std::wstring& markyCode);
+void ParseStylin(const std::wstring& stylinCode);
 
 // Функции для создания интерфейса
 void CreateUI(HWND parent);
 
 // Вспомогательные функции
-COLORREF ParseColor(const std::string& colorStr);
+COLORREF ParseColor(const std::wstring& colorStr);
 void ApplyStyle(HWND hControl, const Style& style);
 Gdiplus::Bitmap* LoadImageFromURL(const std::wstring& url);
 
@@ -76,7 +76,53 @@ LRESULT CALLBACK UIWndProc(HWND, UINT, WPARAM, LPARAM);
 ULONG_PTR gdiplusToken;
 
 // Карта для сопоставления HWND кнопки с ее действием
-std::map<HWND, std::string> buttonActions;
+std::map<HWND, std::wstring> buttonActions;
+
+// Предустановленный код Marky и Stylin
+const wchar_t* defaultMarkyCode = LR"(
+window:
+title: "Пример интерфейса"
+size: 500x400
+elements:
+- label:
+    id: "label1"
+    text: "Привет, Мир!"
+    position: 50x50
+    size: 200x30
+
+- button:
+    id: "button1"
+    text: "Нажми меня"
+    position: 50x100
+    size: 150x40
+    action: "message"
+
+- image:
+    id: "image1"
+    src: "https://via.placeholder.com/100"
+    position: 50x160
+    size: 100x100
+)";
+
+const wchar_t* defaultStylinCode = LR"(
+label:
+    font-size: 18
+    color: RGB(0, 0, 255) # Синий цвет текста
+    font-family: "Calibri"
+
+button:
+    font-size: 16
+    color: RGB(255, 255, 255) # Белый цвет текста
+    background-color: RGB(0, 128, 0) # Зеленый фон
+    font-family: "Arial"
+
+#label1:
+    font-size: 20
+    color: RGB(255, 0, 0) # Красный текст для конкретного элемента
+
+#button1:
+    background-color: RGB(0, 0, 128) # Синий фон для конкретной кнопки
+)";
 
 // Главная функция
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
@@ -93,7 +139,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     WNDCLASS wc = {};
     wc.lpfnWndProc = MainWndProc;
     wc.hInstance = hInstance;
-    wc.lpszClassName = TEXT("MarkyStylinIDE");
+    wc.lpszClassName = L"MarkyStylinIDE";
 
     RegisterClass(&wc);
 
@@ -101,7 +147,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     hMainWnd = CreateWindowEx(
         0,
         wc.lpszClassName,
-        TEXT("Marky & Stylin IDE"),
+        L"Marky & Stylin IDE",
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT, 800, 600,
         nullptr,
@@ -129,27 +175,33 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
 
 // Создание элементов управления в главном окне
 void CreateControls(HWND hwnd) {
-    CreateWindow(TEXT("STATIC"), TEXT("Marky Code:"),
+    CreateWindowW(L"STATIC", L"Marky Code:",
         WS_VISIBLE | WS_CHILD,
         10, 10, 100, 20,
         hwnd, nullptr, hInst, nullptr);
 
-    hMarkyEdit = CreateWindowEx(WS_EX_CLIENTEDGE, TEXT("EDIT"), TEXT(""),
+    hMarkyEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
         WS_VISIBLE | WS_CHILD | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL,
         10, 30, 360, 500,
         hwnd, (HMENU)101, hInst, nullptr);
 
-    CreateWindow(TEXT("STATIC"), TEXT("Stylin Code:"),
+    // Устанавливаем предустановленный код Marky
+    SetWindowTextW(hMarkyEdit, defaultMarkyCode);
+
+    CreateWindowW(L"STATIC", L"Stylin Code:",
         WS_VISIBLE | WS_CHILD,
         380, 10, 100, 20,
         hwnd, nullptr, hInst, nullptr);
 
-    hStylinEdit = CreateWindowEx(WS_EX_CLIENTEDGE, TEXT("EDIT"), TEXT(""),
+    hStylinEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
         WS_VISIBLE | WS_CHILD | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL,
         380, 30, 360, 500,
         hwnd, (HMENU)102, hInst, nullptr);
 
-    hRunButton = CreateWindow(TEXT("BUTTON"), TEXT("Запустить"),
+    // Устанавливаем предустановленный код Stylin
+    SetWindowTextW(hStylinEdit, defaultStylinCode);
+
+    hRunButton = CreateWindowW(L"BUTTON", L"Запустить",
         WS_VISIBLE | WS_CHILD,
         10, 540, 100, 30,
         hwnd, (HMENU)1, hInst, nullptr);
@@ -166,15 +218,13 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
         if (LOWORD(wParam) == 1) // Нажата кнопка "Запустить"
         {
             // Получаем код из контролов
-            TCHAR markyBuffer[10000];
-            GetWindowText(hMarkyEdit, markyBuffer, 10000);
-            std::wstring wMarkyCode = markyBuffer;
-            std::string markyCode(wMarkyCode.begin(), wMarkyCode.end());
+            WCHAR markyBuffer[10000];
+            GetWindowTextW(hMarkyEdit, markyBuffer, 10000);
+            std::wstring markyCode = markyBuffer;
 
-            TCHAR stylinBuffer[10000];
-            GetWindowText(hStylinEdit, stylinBuffer, 10000);
-            std::wstring wStylinCode = stylinBuffer;
-            std::string stylinCode(wStylinCode.begin(), wStylinCode.end());
+            WCHAR stylinBuffer[10000];
+            GetWindowTextW(hStylinEdit, stylinBuffer, 10000);
+            std::wstring stylinCode = stylinBuffer;
 
             // Парсим код
             ParseMarky(markyCode);
@@ -184,7 +234,7 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
             WNDCLASS wc = {};
             wc.lpfnWndProc = UIWndProc;
             wc.hInstance = hInst;
-            wc.lpszClassName = TEXT("UIWindowClass");
+            wc.lpszClassName = L"UIWindowClass";
 
             RegisterClass(&wc);
 
@@ -236,11 +286,11 @@ LRESULT CALLBACK UIWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     {
         HWND hControl = (HWND)lParam;
         if (buttonActions.find(hControl) != buttonActions.end()) {
-            std::string action = buttonActions[hControl];
-            if (action == "close") {
+            std::wstring action = buttonActions[hControl];
+            if (action == L"close") {
                 DestroyWindow(hwnd);
             }
-            else if (action == "message") {
+            else if (action == L"message") {
                 MessageBox(hwnd, L"Кнопка нажата!", L"Информация", MB_OK);
             }
             // Добавьте дополнительные действия здесь
@@ -273,88 +323,91 @@ LRESULT CALLBACK UIWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 }
 
 // Функция парсинга Marky
-void ParseMarky(const std::string& markyCode) {
+void ParseMarky(const std::wstring& markyCode) {
     uiElements.clear();
 
-    std::istringstream iss(markyCode);
-    std::string line;
+    std::wistringstream iss(markyCode);
+    std::wstring line;
     UIElement currentWindow;
     bool inElements = false;
     UIElement element;
 
     while (std::getline(iss, line)) {
         // Убираем начальные и конечные пробелы
-        line.erase(0, line.find_first_not_of(" \t"));
-        line.erase(line.find_last_not_of(" \t\r\n") + 1);
+        line.erase(0, line.find_first_not_of(L" \t"));
+        line.erase(line.find_last_not_of(L" \t\r\n") + 1);
 
-        if (line.empty() || line[0] == '#')
+        if (line.empty() || line[0] == L'#')
             continue; // Пропускаем пустые строки и комментарии
 
-        if (line.find("window:") == 0) {
+        if (line.find(L"window:") == 0) {
             // Начало описания окна
             inElements = false;
         }
-        else if (line.find("title:") == 0) {
+        else if (line.find(L"title:") == 0) {
             currentWindow.text = line.substr(6);
-            currentWindow.text.erase(0, currentWindow.text.find_first_not_of(" \""));
-            currentWindow.text.erase(currentWindow.text.find_last_not_of(" \"") + 1);
+            currentWindow.text.erase(0, currentWindow.text.find_first_not_of(L" \""));
+            currentWindow.text.erase(currentWindow.text.find_last_not_of(L" \"") + 1);
         }
-        else if (line.find("size:") == 0) {
-            std::string sizeStr = line.substr(5);
-            sizeStr.erase(0, sizeStr.find_first_not_of(" \t"));
-            size_t xPos = sizeStr.find('x');
-            if (xPos != std::string::npos) {
-                currentWindow.size.cx = std::atoi(sizeStr.substr(0, xPos).c_str());
-                currentWindow.size.cy = std::atoi(sizeStr.substr(xPos + 1).c_str());
+        else if (line.find(L"size:") == 0) {
+            std::wstring sizeStr = line.substr(5);
+            sizeStr.erase(0, sizeStr.find_first_not_of(L" \t"));
+            size_t xPos = sizeStr.find(L'x');
+            if (xPos != std::wstring::npos) {
+                currentWindow.size.cx = std::stoi(sizeStr.substr(0, xPos));
+                currentWindow.size.cy = std::stoi(sizeStr.substr(xPos + 1));
             }
         }
-        else if (line.find("elements:") == 0) {
+        else if (line.find(L"elements:") == 0) {
             inElements = true;
         }
-        else if (inElements && line[0] == '-') {
+        else if (inElements && line[0] == L'-') {
+            if (!element.type.empty()) {
+                uiElements.push_back(element);
+            }
             // Начало описания элемента
             element = UIElement();
-            size_t pos = line.find(':');
-            if (pos != std::string::npos) {
+            size_t pos = line.find(L':');
+            if (pos != std::wstring::npos) {
                 element.type = line.substr(1, pos - 1);
-                element.type.erase(0, element.type.find_first_not_of(" \t"));
-                element.type.erase(element.type.find_last_not_of(" \t") + 1);
+                element.type.erase(0, element.type.find_first_not_of(L" \t"));
+                element.type.erase(element.type.find_last_not_of(L" \t") + 1);
             }
         }
         else if (inElements) {
-            size_t colonPos = line.find(':');
-            if (colonPos != std::string::npos) {
-                std::string key = line.substr(0, colonPos);
-                std::string value = line.substr(colonPos + 1);
-                key.erase(0, key.find_first_not_of(" \t"));
-                key.erase(key.find_last_not_of(" \t") + 1);
-                value.erase(0, value.find_first_not_of(" \t\""));
-                value.erase(value.find_last_not_of(" \t\"") + 1);
+            size_t colonPos = line.find(L':');
+            if (colonPos != std::wstring::npos) {
+                std::wstring key = line.substr(0, colonPos);
+                std::wstring value = line.substr(colonPos + 1);
+                key.erase(0, key.find_first_not_of(L" \t"));
+                key.erase(key.find_last_not_of(L" \t") + 1);
+                value.erase(0, value.find_first_not_of(L" \t\""));
+                value.erase(value.find_last_not_of(L" \t\"") + 1);
 
-                if (key == "id") {
+                if (key == L"id") {
                     element.id = value;
                 }
-                else if (key == "text") {
+                else if (key == L"text") {
                     element.text = value;
                 }
-                else if (key == "src") {
+                else if (key == L"src") {
                     element.src = value;
                 }
-                else if (key == "position") {
-                    size_t xPos = value.find('x');
-                    if (xPos != std::string::npos) {
+                else if (key == L"position") {
+                    size_t xPos = value.find(L'x');
+                    if (xPos != std::wstring::npos) {
                         element.position.x = std::stoi(value.substr(0, xPos));
                         element.position.y = std::stoi(value.substr(xPos + 1));
                     }
                 }
-                else if (key == "size") {
-                    size_t xPos = value.find('x');
-                    if (xPos != std::string::npos) {
+                else if (key == L"size") {
+                    size_t xPos = value.find(L'x');
+                    if (xPos != std::wstring::npos) {
                         element.size.cx = std::stoi(value.substr(0, xPos));
                         element.size.cy = std::stoi(value.substr(xPos + 1));
                     }
                 }
-                else if (key == "action") {
+                else if (key == L"action") {
                     element.action = value;
                     // Сохраняем обработчик события
                     eventHandlers[element.id] = { element.id, element.action };
@@ -373,56 +426,61 @@ void ParseMarky(const std::string& markyCode) {
     }
 
     // Устанавливаем параметры окна на основе парсинга
-    if (!currentWindow.text.empty()) {
-        // Здесь можно сохранить параметры окна, если потребуется
-    }
+    // Здесь можно сохранить параметры окна, если потребуется
 }
 
 // Функция парсинга Stylin
-void ParseStylin(const std::string& stylinCode) {
+void ParseStylin(const std::wstring& stylinCode) {
     styles.clear();
 
-    std::istringstream iss(stylinCode);
-    std::string line;
-    std::string currentSelector;
+    std::wistringstream iss(stylinCode);
+    std::wstring line;
+    std::wstring currentSelector;
 
     while (std::getline(iss, line)) {
         // Убираем начальные и конечные пробелы
-        line.erase(0, line.find_first_not_of(" \t"));
-        line.erase(line.find_last_not_of(" \t\r\n") + 1);
+        line.erase(0, line.find_first_not_of(L" \t"));
+        line.erase(line.find_last_not_of(L" \t\r\n") + 1);
 
-        if (line.empty() || line[0] == '#')
+        if (line.empty() || line[0] == L'#')
             continue; // Пропускаем пустые строки и комментарии
 
-        if (line.back() == ':') {
+        if (line.back() == L':') {
             currentSelector = line.substr(0, line.length() - 1);
-            currentSelector.erase(0, currentSelector.find_first_not_of(" \t"));
-            currentSelector.erase(currentSelector.find_last_not_of(" \t") + 1);
+            currentSelector.erase(0, currentSelector.find_first_not_of(L" \t"));
+            currentSelector.erase(currentSelector.find_last_not_of(L" \t") + 1);
         }
         else {
-            size_t colonPos = line.find(':');
-            if (colonPos != std::string::npos) {
-                std::string property = line.substr(0, colonPos);
-                std::string value = line.substr(colonPos + 1);
+            size_t colonPos = line.find(L':');
+            if (colonPos != std::wstring::npos) {
+                std::wstring property = line.substr(0, colonPos);
+                std::wstring value = line.substr(colonPos + 1);
 
-                property.erase(0, property.find_first_not_of(" \t"));
-                property.erase(property.find_last_not_of(" \t") + 1);
-                value.erase(0, value.find_first_not_of(" \t"));
-                value.erase(value.find_last_not_of(" \t") + 1);
+                property.erase(0, property.find_first_not_of(L" \t"));
+                property.erase(property.find_last_not_of(L" \t") + 1);
+                value.erase(0, value.find_first_not_of(L" \t"));
+                value.erase(value.find_last_not_of(L" \t") + 1);
 
                 Style& style = styles[currentSelector];
 
-                if (property == "font-size") {
+                if (property == L"font-size") {
                     style.fontSize = std::stoi(value);
                 }
-                else if (property == "color" || property == "text-color") {
+                else if (property == L"color" || property == L"text-color") {
                     style.textColor = ParseColor(value);
                 }
-                else if (property == "background-color") {
+                else if (property == L"background-color") {
                     style.backgroundColor = ParseColor(value);
                 }
-                else if (property == "font-family") {
+                else if (property == L"font-family") {
                     style.fontFamily = value;
+                    // Убираем кавычки, если есть
+                    if (!style.fontFamily.empty() && style.fontFamily.front() == L'"') {
+                        style.fontFamily.erase(0, 1);
+                    }
+                    if (!style.fontFamily.empty() && style.fontFamily.back() == L'"') {
+                        style.fontFamily.erase(style.fontFamily.size() - 1, 1);
+                    }
                 }
             }
         }
@@ -433,26 +491,26 @@ void ParseStylin(const std::string& stylinCode) {
 void CreateUI(HWND parent) {
     for (const auto& element : uiElements) {
         HWND hControl = nullptr;
-        if (element.type == "label") {
-            hControl = CreateWindow(TEXT("STATIC"), std::wstring(element.text.begin(), element.text.end()).c_str(),
+        if (element.type == L"label") {
+            hControl = CreateWindowW(L"STATIC", element.text.c_str(),
                 WS_VISIBLE | WS_CHILD,
                 element.position.x, element.position.y, element.size.cx, element.size.cy,
                 parent, nullptr, hInst, nullptr);
 
             // Применяем стили
-            auto it = styles.find("label");
+            auto it = styles.find(L"label");
             if (it != styles.end()) {
                 ApplyStyle(hControl, it->second);
             }
         }
-        else if (element.type == "button") {
-            hControl = CreateWindow(TEXT("BUTTON"), std::wstring(element.text.begin(), element.text.end()).c_str(),
+        else if (element.type == L"button") {
+            hControl = CreateWindowW(L"BUTTON", element.text.c_str(),
                 WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
                 element.position.x, element.position.y, element.size.cx, element.size.cy,
                 parent, nullptr, hInst, nullptr);
 
             // Применяем стили
-            auto it = styles.find("button");
+            auto it = styles.find(L"button");
             if (it != styles.end()) {
                 ApplyStyle(hControl, it->second);
             }
@@ -463,11 +521,11 @@ void CreateUI(HWND parent) {
                 SetWindowLongPtr(hControl, GWLP_ID, (LONG_PTR)hControl);
             }
         }
-        else if (element.type == "image") {
+        else if (element.type == L"image") {
             // Загружаем изображение
-            Gdiplus::Bitmap* image = LoadImageFromURL(std::wstring(element.src.begin(), element.src.end()));
+            Gdiplus::Bitmap* image = LoadImageFromURL(element.src);
             if (image) {
-                HWND hImageControl = CreateWindow(TEXT("STATIC"), nullptr,
+                HWND hImageControl = CreateWindowW(L"STATIC", nullptr,
                     WS_VISIBLE | WS_CHILD | SS_BITMAP,
                     element.position.x, element.position.y, element.size.cx, element.size.cy,
                     parent, nullptr, hInst, nullptr);
@@ -482,7 +540,7 @@ void CreateUI(HWND parent) {
 
         // Применяем стили с использованием идентификатора
         if (hControl && !element.id.empty()) {
-            auto it = styles.find("#" + element.id);
+            auto it = styles.find(L"#" + element.id);
             if (it != styles.end()) {
                 ApplyStyle(hControl, it->second);
             }
@@ -491,12 +549,12 @@ void CreateUI(HWND parent) {
 }
 
 // Функция парсинга цвета из строки
-COLORREF ParseColor(const std::string& colorStr) {
-    if (colorStr.find("RGB(") == 0 && colorStr.back() == ')') {
-        std::string values = colorStr.substr(4, colorStr.length() - 5);
-        std::replace(values.begin(), values.end(), ',', ' ');
+COLORREF ParseColor(const std::wstring& colorStr) {
+    if (colorStr.find(L"RGB(") == 0 && colorStr.back() == L')') {
+        std::wstring values = colorStr.substr(4, colorStr.length() - 5);
+        std::replace(values.begin(), values.end(), L',', L' ');
         int r = 0, g = 0, b = 0;
-        std::istringstream iss(values);
+        std::wistringstream iss(values);
         iss >> r >> g >> b;
         return RGB(r, g, b);
     }
@@ -507,29 +565,23 @@ COLORREF ParseColor(const std::string& colorStr) {
 void ApplyStyle(HWND hControl, const Style& style) {
     if (style.fontSize > 0 || !style.fontFamily.empty()) {
         // Изменяем шрифт
-        HFONT hFont = CreateFont(
+        HFONT hFont = CreateFontW(
             -MulDiv(style.fontSize, GetDeviceCaps(GetDC(hControl), LOGPIXELSY), 72),
             0, 0, 0, FW_NORMAL,
             FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
-            CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, VARIABLE_PITCH, std::wstring(style.fontFamily.begin(), style.fontFamily.end()).c_str());
+            CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, VARIABLE_PITCH, style.fontFamily.c_str());
         SendMessage(hControl, WM_SETFONT, (WPARAM)hFont, TRUE);
     }
 
     // Устанавливаем цвета
-    if (style.backgroundColor != RGB(255, 255, 255)) {
-        HBRUSH hBrush = CreateSolidBrush(style.backgroundColor);
-        SetClassLongPtr(hControl, GCLP_HBRBACKGROUND, (LONG_PTR)hBrush);
-        InvalidateRect(hControl, NULL, TRUE);
-    }
-
-    // Сохраняем стиль в карте
     controlStyles[hControl] = style;
+    InvalidateRect(hControl, NULL, TRUE);
 }
 
 // Функция загрузки изображения по URL
 Gdiplus::Bitmap* LoadImageFromURL(const std::wstring& url) {
     IStream* pStream = NULL;
-    HRESULT hr = URLOpenBlockingStream(NULL, url.c_str(), &pStream, 0, NULL);
+    HRESULT hr = URLOpenBlockingStreamW(NULL, url.c_str(), &pStream, 0, NULL);
     if (SUCCEEDED(hr) && pStream) {
         Gdiplus::Bitmap* bitmap = new Gdiplus::Bitmap(pStream);
         pStream->Release();
@@ -540,45 +592,3 @@ Gdiplus::Bitmap* LoadImageFromURL(const std::wstring& url) {
     }
     return nullptr;
 }
-
-window:
-title: "Пример интерфейса"
-size: 500x400
-elements:
-- label:
-    id: "label1"
-    text: "Привет, Мир!"
-    position: 50x50
-    size: 200x30
-
-- button:
-    id: "button1"
-    text: "Нажми меня"
-    position: 50x100
-    size: 150x40
-    action: "message"
-
-- image:
-    id: "image1"
-    src: "https://via.placeholder.com/100"
-    position: 50x160
-    size: 100x100
-
-
-label:
-    font-size: 18
-    color: RGB(0, 0, 255) # Синий цвет текста
-    font-family: "Calibri"
-
-button:
-    font-size: 16
-    color: RGB(255, 255, 255) # Белый цвет текста
-    background-color: RGB(0, 128, 0) # Зеленый фон
-    font-family: "Arial"
-
-#label1:
-    font-size: 20
-    color: RGB(255, 0, 0) # Красный текст для конкретного элемента
-
-#button1:
-    background-color: RGB(0, 0, 128) # Синий фон для конкретной кнопки

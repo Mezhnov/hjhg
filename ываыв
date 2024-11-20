@@ -475,6 +475,18 @@ void ApplyStyle(HWND hControl, const Style& style) {
 void DownloadImage(const std::string& url, const std::string& filename) {
     URLDownloadToFileA(NULL, url.c_str(), filename.c_str(), 0, NULL);
 }
+Сборка начата в 11:02...
+1>------ Сборка начата: проект: тторор, Конфигурация: Debug x64 ------
+1>тторор.cpp
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(256,22): warning C4267: инициализация: преобразование из "size_t" в "int"; возможна потеря данных
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(295,30): warning C4267: инициализация: преобразование из "size_t" в "int"; возможна потеря данных
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(302,30): warning C4267: инициализация: преобразование из "size_t" в "int"; возможна потеря данных
+1>C:\Users\User\source\repos\тторор\тторор\тторор.cpp(424,20): error C2039: "GetHBITMAP": не является членом "Gdiplus::Image".
+1>    C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\um\GdiplusHeaders.h(384,7):
+1>     см. объявление "Gdiplus::Image"
+1>Сборка проекта "тторор.vcxproj" завершена с ошибкой.
+========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
+========== Сборка завершено в 11:02 и заняло 00,826 с ==========
 
 window:
 title: "Пример интерфейса"

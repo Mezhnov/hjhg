@@ -507,14 +507,3 @@ void ApplyStyle(HWND hWnd, const UIElement& element) {
     // включая обработку сообщений WM_CTLCOLOR*
 }
 
-Window(title="Добро пожаловать", size="800x600")
-  Label(text="Добро пожаловать!", id="welcomeLabel", x="100", y="50", width="600", height="50")
-  Button(text="Нажми меня", id="clickButton", x="350", y="150", width="100", height="30")
-@welcomeLabel:
-  font-size: 24
-  font-weight: bold
-  font-family: Arial
-
-.clickButton:
-  font-size: 18
-  font-family: Verdana

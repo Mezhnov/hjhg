@@ -17,6 +17,8 @@ struct UIElement {
     std::string type;
     std::map<std::string, std::string> attributes;
     std::vector<UIElement> children;
+    std::string id; // Добавлено для хранения идентификатора
+    HWND hWnd; // Добавлено для хранения дескриптора окна/контрола
 };
 
 struct Style {
@@ -37,6 +39,7 @@ void CreateUI(HWND parent, const std::vector<UIElement>& elements);
 COLORREF ParseColor(const std::string& colorStr);
 int ParseSize(const std::string& sizeStr);
 HFONT CreateFontFromStyle(const Style& style);
+void ApplyStyle(HWND hWnd, const UIElement& element);
 
 // Оконные процедуры
 LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -186,11 +189,10 @@ void ParseMarky(const std::string& markyCode) {
 
     std::istringstream iss(markyCode);
     std::string line;
-    std::vector<UIElement*> elementStack;
-    int currentIndent = 0;
+    std::vector<std::pair<int, UIElement*>> elementStack;
 
     while (std::getline(iss, line)) {
-        // Убираем перевод строки и пробелы в конце
+        // Убираем пробелы и переводы строк
         line.erase(line.find_last_not_of(" \t\r\n") + 1);
         // Пропускаем пустые строки
         if (line.empty()) continue;
@@ -218,9 +220,11 @@ void ParseMarky(const std::string& markyCode) {
                     if (eqPos != std::string::npos) {
                         std::string key = attrPair.substr(0, eqPos);
                         std::string value = attrPair.substr(eqPos + 1);
-                        // Убираем возможные кавычки
-                        if (!value.empty() && value.front() == '"') value.erase(0, 1);
-                        if (!value.empty() && value.back() == '"') value.pop_back();
+                        // Убираем возможные кавычки и пробелы
+                        key.erase(0, key.find_first_not_of(" \t"));
+                        key.erase(key.find_last_not_of(" \t") + 1);
+                        value.erase(0, value.find_first_not_of(" \t\""));
+                        value.erase(value.find_last_not_of(" \t\"") + 1);
                         element.attributes[key] = value;
                     }
                 }
@@ -233,43 +237,24 @@ void ParseMarky(const std::string& markyCode) {
             element.type = trimmedLine;
         }
 
-        // Определяем родительский элемент на основе отступа
-        if (indent == currentIndent) {
-            if (elementStack.empty()) {
-                uiElements.push_back(element);
-                elementStack.push_back(&uiElements.back());
-            }
-            else {
-                elementStack.back()->children.push_back(element);
-                elementStack.pop_back();
-                elementStack.push_back(&elementStack.back()->children.back());
-            }
+        // Получаем id элемента, если есть
+        auto itId = element.attributes.find("id");
+        if (itId != element.attributes.end()) {
+            element.id = itId->second;
         }
-        else if (indent > currentIndent) {
-            if (!elementStack.empty()) {
-                elementStack.back()->children.push_back(element);
-                elementStack.push_back(&elementStack.back()->children.back());
-            }
-            else {
-                uiElements.push_back(element);
-                elementStack.push_back(&uiElements.back());
-            }
-            currentIndent = indent;
+
+        // Обрабатываем иерархию на основе отступов
+        while (!elementStack.empty() && indent <= elementStack.back().first) {
+            elementStack.pop_back();
+        }
+
+        if (elementStack.empty()) {
+            uiElements.push_back(element);
+            elementStack.push_back({ indent, &uiElements.back() });
         }
         else {
-            while (currentIndent > indent && !elementStack.empty()) {
-                elementStack.pop_back();
-                currentIndent -= 2;
-            }
-            if (elementStack.empty()) {
-                uiElements.push_back(element);
-                elementStack.push_back(&uiElements.back());
-            }
-            else {
-                elementStack.back()->children.push_back(element);
-                elementStack.push_back(&elementStack.back()->children.back());
-            }
-            currentIndent = indent;
+            elementStack.back().second->children.push_back(element);
+            elementStack.push_back({ indent, &elementStack.back().second->children.back() });
         }
     }
 }
@@ -283,10 +268,10 @@ void ParseStylin(const std::string& stylinCode) {
     std::string currentSelector;
 
     while (std::getline(iss, line)) {
-        // Убираем перевод строки и пробелы
+        // Убираем пробелы и переводы строк
         line.erase(line.find_last_not_of(" \t\r\n") + 1);
         line.erase(0, line.find_first_not_of(" \t"));
-        
+
         if (line.empty()) continue;
 
         // Если строка заканчивается двоеточием, это селектор
@@ -302,6 +287,7 @@ void ParseStylin(const std::string& stylinCode) {
                 std::string value = line.substr(colonPos + 1);
                 // Убираем пробелы
                 property.erase(property.find_last_not_of(" \t") + 1);
+                property.erase(0, property.find_first_not_of(" \t"));
                 value.erase(0, value.find_first_not_of(" \t"));
                 value.erase(value.find_last_not_of(" \t") + 1);
                 styles[currentSelector].properties[property] = value;
@@ -313,11 +299,11 @@ void ParseStylin(const std::string& stylinCode) {
 // Функция создания интерфейса на основе парсинга
 void CreateUI(HWND parent, const std::vector<UIElement>& elements) {
     for (const auto& element : elements) {
+        HWND hControl = nullptr;
         if (element.type == "Window") {
-            // Настраиваем окно
+            // Создаем новое окно
             std::string title = "Window";
             int width = 800, height = 600;
-
             auto itTitle = element.attributes.find("title");
             if (itTitle != element.attributes.end()) {
                 title = itTitle->second;
@@ -332,73 +318,113 @@ void CreateUI(HWND parent, const std::vector<UIElement>& elements) {
                 }
             }
 
-            SetWindowText(parent, std::wstring(title.begin(), title.end()).c_str());
-            SetWindowPos(parent, nullptr, 0, 0, width, height, SWP_NOMOVE | SWP_NOZORDER);
+            // Регистрируем класс окна, если он не зарегистрирован
+            static bool isWindowClassRegistered = false;
+            if (!isWindowClassRegistered) {
+                WNDCLASS wc = {};
+                wc.lpfnWndProc = DefWindowProc;
+                wc.hInstance = hInst;
+                wc.lpszClassName = TEXT("UIWindow");
+
+                RegisterClass(&wc);
+                isWindowClassRegistered = true;
+            }
+
+            hControl = CreateWindowEx(
+                0,
+                TEXT("UIWindow"),
+                std::wstring(title.begin(), title.end()).c_str(),
+                WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+                CW_USEDEFAULT, CW_USEDEFAULT, width, height,
+                nullptr,
+                nullptr,
+                hInst,
+                nullptr
+            );
 
             // Создаем дочерние элементы
-            CreateUI(parent, element.children);
+            if (hControl != nullptr) {
+                // Сохраняем дескриптор окна
+                const_cast<UIElement&>(element).hWnd = hControl;
+                // Применяем стили
+                ApplyStyle(hControl, element);
+
+                CreateUI(hControl, element.children);
+            }
         }
         else {
             // Создаем контролы
-            HWND hControl = nullptr;
             std::string text = "";
             int x = 10, y = 10, width = 100, height = 30;
-            std::string id = "";
+            std::string id = element.id;
             std::string className = "";
 
             auto itText = element.attributes.find("text");
             if (itText != element.attributes.end()) {
                 text = itText->second;
             }
-            auto itId = element.attributes.find("id");
-            if (itId != element.attributes.end()) {
-                id = "@" + itId->second;
-            }
             auto itClass = element.attributes.find("class");
             if (itClass != element.attributes.end()) {
-                className = "." + itClass->second;
+                className = itClass->second;
+            }
+            auto itX = element.attributes.find("x");
+            if (itX != element.attributes.end()) {
+                x = atoi(itX->second.c_str());
+            }
+            auto itY = element.attributes.find("y");
+            if (itY != element.attributes.end()) {
+                y = atoi(itY->second.c_str());
+            }
+            auto itWidth = element.attributes.find("width");
+            if (itWidth != element.attributes.end()) {
+                width = atoi(itWidth->second.c_str());
+            }
+            auto itHeight = element.attributes.find("height");
+            if (itHeight != element.attributes.end()) {
+                height = atoi(itHeight->second.c_str());
             }
 
-            // Можно добавить обработку координат и размеров из атрибутов
+            DWORD style = WS_VISIBLE | WS_CHILD;
+            const wchar_t* wndClass = nullptr;
 
             if (element.type == "Label") {
-                hControl = CreateWindow(TEXT("STATIC"), std::wstring(text.begin(), text.end()).c_str(),
-                    WS_VISIBLE | WS_CHILD,
-                    x, y, width, height,
-                    parent, nullptr, hInst, nullptr);
+                wndClass = TEXT("STATIC");
+                style |= SS_CENTER;
             }
             else if (element.type == "Button") {
-                hControl = CreateWindow(TEXT("BUTTON"), std::wstring(text.begin(), text.end()).c_str(),
-                    WS_VISIBLE | WS_CHILD,
+                wndClass = TEXT("BUTTON");
+            }
+            else if (element.type == "Edit") {
+                wndClass = TEXT("EDIT");
+                style |= WS_BORDER;
+            }
+            // Добавьте другие типы контролов при необходимости
+
+            if (wndClass != nullptr) {
+                hControl = CreateWindowEx(
+                    0,
+                    wndClass,
+                    std::wstring(text.begin(), text.end()).c_str(),
+                    style,
                     x, y, width, height,
-                    parent, nullptr, hInst, nullptr);
+                    parent,
+                    nullptr,
+                    hInst,
+                    nullptr
+                );
             }
 
-            // Применяем стили
-            Style style;
-
-            if (!id.empty() && styles.find(id) != styles.end()) {
-                style = styles[id];
-            }
-            else if (!className.empty() && styles.find(className) != styles.end()) {
-                style = styles[className];
-            }
-            else if (styles.find(element.type) != styles.end()) {
-                style = styles[element.type];
-            }
-
-            // Применяем стиль к контролу
             if (hControl != nullptr) {
-                // Применяем шрифт
-                HFONT hFont = CreateFontFromStyle(style);
-                if (hFont != nullptr) {
-                    SendMessage(hControl, WM_SETFONT, (WPARAM)hFont, TRUE);
+                // Сохраняем дескриптор окна
+                const_cast<UIElement&>(element).hWnd = hControl;
+
+                // Применяем стили
+                ApplyStyle(hControl, element);
+
+                // Создаем дочерние элементы
+                if (!element.children.empty()) {
+                    CreateUI(hControl, element.children);
                 }
-
-                // Применяем цвет фона (для статических контролов нужно обрабатывать сообщение WM_CTLCOLORSTATIC)
-                // Это требует более сложной реализации и обработки сообщений дочерних окон
-
-                // Для упрощения можно пропустить этот шаг или ограничиться базовыми элементами
             }
         }
     }
@@ -426,27 +452,60 @@ int ParseSize(const std::string& sizeStr) {
 HFONT CreateFontFromStyle(const Style& style) {
     int fontSize = 16; // Размер по умолчанию
     std::string fontName = "Arial"; // Шрифт по умолчанию
+    bool bold = false;
+    bool italic = false;
 
     auto itFontSize = style.properties.find("font-size");
     if (itFontSize != style.properties.end()) {
         fontSize = ParseSize(itFontSize->second);
     }
+    auto itFontFamily = style.properties.find("font-family");
+    if (itFontFamily != style.properties.end()) {
+        fontName = itFontFamily->second;
+    }
+    auto itFontWeight = style.properties.find("font-weight");
+    if (itFontWeight != style.properties.end() && itFontWeight->second == "bold") {
+        bold = true;
+    }
+    auto itFontStyle = style.properties.find("font-style");
+    if (itFontStyle != style.properties.end() && itFontStyle->second == "italic") {
+        italic = true;
+    }
 
-    return CreateFont(fontSize, 0, 0, 0, FW_NORMAL,
-        FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
+    return CreateFont(-fontSize, 0, 0, 0, bold ? FW_BOLD : FW_NORMAL,
+        italic ? TRUE : FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
         CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, VARIABLE_PITCH, std::wstring(fontName.begin(), fontName.end()).c_str());
 }
-Window(title="Добро пожаловать", size="800x600")
-  Label(text="Добро пожаловать!", id="welcomeLabel")
-  Button(text="Нажми меня", id="clickButton")
 
+void ApplyStyle(HWND hWnd, const UIElement& element) {
+    // Определяем соответствующий стиль
+    Style style;
 
-@welcomeLabel:
-  font-size: 24
-  color: #FFFFFF
+    std::string idSelector = "@" + element.id;
+    std::string classSelector;
+    auto itClass = element.attributes.find("class");
+    if (itClass != element.attributes.end()) {
+        classSelector = "." + itClass->second;
+    }
 
-.clickButton:
-  background-color: #FF0000
-  font-size: 18
+    if (!element.id.empty() && styles.find(idSelector) != styles.end()) {
+        style = styles[idSelector];
+    }
+    else if (!classSelector.empty() && styles.find(classSelector) != styles.end()) {
+        style = styles[classSelector];
+    }
+    else if (styles.find(element.type) != styles.end()) {
+        style = styles[element.type];
+    }
 
-Необработанное исключение по адресу 0x00007FFF1BED829C (ucrtbased.dll) в тторор.exe: Недопустимый параметр был передан функции, для которой недопустимые параметры вызывают неустранимую ошибку.
+    // Применяем свойства стиля
+    // Пример: установка шрифта
+    HFONT hFont = CreateFontFromStyle(style);
+    if (hFont != nullptr) {
+        SendMessage(hWnd, WM_SETFONT, (WPARAM)hFont, TRUE);
+    }
+
+    // Для установки цвета текста и фона требуется дополнительная реализация
+    // включая обработку сообщений WM_CTLCOLOR*
+}
+

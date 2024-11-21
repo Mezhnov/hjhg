@@ -439,3 +439,7 @@ HFONT CreateFontFromStyle(const Style& style) {
 Window(title="Добро пожаловать", size="800x600")
   Label(text="Добро пожаловать!", id="welcomeLabel")
   Button(text="Нажми меня", id="clickButton")
+
+
+
+Необработанное исключение по адресу 0x00007FFF1BED829C (ucrtbased.dll) в тторор.exe: Недопустимый параметр был передан функции, для которой недопустимые параметры вызывают неустранимую ошибку.

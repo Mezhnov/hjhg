@@ -14,30 +14,30 @@ HWND hRunButton;
 HWND hMainWnd;
 
 struct UIElement {
-    std::string type;
-    std::map<std::string, std::string> attributes;
+    std::wstring type;
+    std::map<std::wstring, std::wstring> attributes;
     std::vector<UIElement> children;
-    std::string id; // Добавлено для хранения идентификатора
-    HWND hWnd; // Добавлено для хранения дескриптора окна/контрола
+    std::wstring id; // Изменено для хранения идентификатора в wstring
+    HWND hWnd; // Дескриптор окна/контрола
 };
 
 struct Style {
-    std::map<std::string, std::string> properties;
+    std::map<std::wstring, std::wstring> properties;
 };
 
 std::vector<UIElement> uiElements;
-std::map<std::string, Style> styles;
+std::map<std::wstring, Style> styles;
 
 // Функции парсинга
-void ParseMarky(const std::string& markyCode);
-void ParseStylin(const std::string& stylinCode);
+void ParseMarky(const std::wstring& markyCode);
+void ParseStylin(const std::wstring& stylinCode);
 
 // Функция создания интерфейса
 void CreateUI(HWND parent, const std::vector<UIElement>& elements);
 
 // Вспомогательные функции
-COLORREF ParseColor(const std::string& colorStr);
-int ParseSize(const std::string& sizeStr);
+COLORREF ParseColor(const std::wstring& colorStr);
+int ParseSize(const std::wstring& sizeStr);
 HFONT CreateFontFromStyle(const Style& style);
 void ApplyStyle(HWND hWnd, const UIElement& element);
 
@@ -121,13 +121,11 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
             // Получаем код из контролов
             TCHAR markyBuffer[10000];
             GetWindowText(hMarkyEdit, markyBuffer, 10000);
-            std::wstring wMarkyCode = markyBuffer;
-            std::string markyCode(wMarkyCode.begin(), wMarkyCode.end());
+            std::wstring markyCode = markyBuffer;
 
             TCHAR stylinBuffer[10000];
             GetWindowText(hStylinEdit, stylinBuffer, 10000);
-            std::wstring wStylinCode = stylinBuffer;
-            std::string stylinCode(wStylinCode.begin(), wStylinCode.end());
+            std::wstring stylinCode = stylinBuffer;
 
             // Парсим код
             ParseMarky(markyCode);
@@ -184,47 +182,47 @@ LRESULT CALLBACK UIWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 }
 
 // Функция парсинга Marky
-void ParseMarky(const std::string& markyCode) {
+void ParseMarky(const std::wstring& markyCode) {
     uiElements.clear();
 
-    std::istringstream iss(markyCode);
-    std::string line;
+    std::wistringstream iss(markyCode);
+    std::wstring line;
     std::vector<std::pair<int, UIElement*>> elementStack;
 
     while (std::getline(iss, line)) {
         // Убираем пробелы и переводы строк
-        line.erase(line.find_last_not_of(" \t\r\n") + 1);
+        line.erase(line.find_last_not_of(L" \t\r\n") + 1);
         // Пропускаем пустые строки
         if (line.empty()) continue;
 
         // Определяем уровень отступа
         size_t indent = 0;
-        while (indent < line.length() && (line[indent] == ' ' || line[indent] == '\t')) {
+        while (indent < line.length() && (line[indent] == L' ' || line[indent] == L'\t')) {
             indent++;
         }
 
-        std::string trimmedLine = line.substr(indent);
+        std::wstring trimmedLine = line.substr(indent);
         // Создаем новый элемент
         UIElement element;
-        size_t pos = trimmedLine.find('(');
-        if (pos != std::string::npos) {
+        size_t pos = trimmedLine.find(L'(');
+        if (pos != std::wstring::npos) {
             element.type = trimmedLine.substr(0, pos);
-            size_t endPos = trimmedLine.find(')', pos);
-            if (endPos != std::string::npos) {
-                std::string attrs = trimmedLine.substr(pos + 1, endPos - pos - 1);
+            size_t endPos = trimmedLine.find(L')', pos);
+            if (endPos != std::wstring::npos) {
+                std::wstring attrs = trimmedLine.substr(pos + 1, endPos - pos - 1);
                 // Разбиваем атрибуты
-                std::istringstream attrStream(attrs);
-                std::string attrPair;
-                while (std::getline(attrStream, attrPair, ',')) {
-                    size_t eqPos = attrPair.find('=');
-                    if (eqPos != std::string::npos) {
-                        std::string key = attrPair.substr(0, eqPos);
-                        std::string value = attrPair.substr(eqPos + 1);
+                std::wistringstream attrStream(attrs);
+                std::wstring attrPair;
+                while (std::getline(attrStream, attrPair, L',')) {
+                    size_t eqPos = attrPair.find(L'=');
+                    if (eqPos != std::wstring::npos) {
+                        std::wstring key = attrPair.substr(0, eqPos);
+                        std::wstring value = attrPair.substr(eqPos + 1);
                         // Убираем возможные кавычки и пробелы
-                        key.erase(0, key.find_first_not_of(" \t"));
-                        key.erase(key.find_last_not_of(" \t") + 1);
-                        value.erase(0, value.find_first_not_of(" \t\""));
-                        value.erase(value.find_last_not_of(" \t\"") + 1);
+                        key.erase(0, key.find_first_not_of(L" \t"));
+                        key.erase(key.find_last_not_of(L" \t") + 1);
+                        value.erase(0, value.find_first_not_of(L" \t\""));
+                        value.erase(value.find_last_not_of(L" \t\"") + 1);
                         element.attributes[key] = value;
                     }
                 }
@@ -238,7 +236,7 @@ void ParseMarky(const std::string& markyCode) {
         }
 
         // Получаем id элемента, если есть
-        auto itId = element.attributes.find("id");
+        auto itId = element.attributes.find(L"id");
         if (itId != element.attributes.end()) {
             element.id = itId->second;
         }
@@ -260,36 +258,36 @@ void ParseMarky(const std::string& markyCode) {
 }
 
 // Функция парсинга Stylin
-void ParseStylin(const std::string& stylinCode) {
+void ParseStylin(const std::wstring& stylinCode) {
     styles.clear();
 
-    std::istringstream iss(stylinCode);
-    std::string line;
-    std::string currentSelector;
+    std::wistringstream iss(stylinCode);
+    std::wstring line;
+    std::wstring currentSelector;
 
     while (std::getline(iss, line)) {
         // Убираем пробелы и переводы строк
-        line.erase(line.find_last_not_of(" \t\r\n") + 1);
-        line.erase(0, line.find_first_not_of(" \t"));
+        line.erase(line.find_last_not_of(L" \t\r\n") + 1);
+        line.erase(0, line.find_first_not_of(L" \t"));
 
         if (line.empty()) continue;
 
         // Если строка заканчивается двоеточием, это селектор
-        if (line.back() == ':') {
+        if (line.back() == L':') {
             currentSelector = line.substr(0, line.length() - 1);
             styles[currentSelector] = Style();
         }
         else {
             // Это свойство стиля
-            size_t colonPos = line.find(':');
-            if (colonPos != std::string::npos) {
-                std::string property = line.substr(0, colonPos);
-                std::string value = line.substr(colonPos + 1);
+            size_t colonPos = line.find(L':');
+            if (colonPos != std::wstring::npos) {
+                std::wstring property = line.substr(0, colonPos);
+                std::wstring value = line.substr(colonPos + 1);
                 // Убираем пробелы
-                property.erase(property.find_last_not_of(" \t") + 1);
-                property.erase(0, property.find_first_not_of(" \t"));
-                value.erase(0, value.find_first_not_of(" \t"));
-                value.erase(value.find_last_not_of(" \t") + 1);
+                property.erase(property.find_last_not_of(L" \t") + 1);
+                property.erase(0, property.find_first_not_of(L" \t"));
+                value.erase(0, value.find_first_not_of(L" \t"));
+                value.erase(value.find_last_not_of(L" \t") + 1);
                 styles[currentSelector].properties[property] = value;
             }
         }
@@ -300,21 +298,21 @@ void ParseStylin(const std::string& stylinCode) {
 void CreateUI(HWND parent, const std::vector<UIElement>& elements) {
     for (const auto& element : elements) {
         HWND hControl = nullptr;
-        if (element.type == "Window") {
+        if (element.type == L"Window") {
             // Создаем новое окно
-            std::string title = "Window";
+            std::wstring title = L"Window";
             int width = 800, height = 600;
-            auto itTitle = element.attributes.find("title");
+            auto itTitle = element.attributes.find(L"title");
             if (itTitle != element.attributes.end()) {
                 title = itTitle->second;
             }
-            auto itSize = element.attributes.find("size");
+            auto itSize = element.attributes.find(L"size");
             if (itSize != element.attributes.end()) {
-                std::string sizeStr = itSize->second;
-                size_t xPos = sizeStr.find('x');
-                if (xPos != std::string::npos) {
-                    width = atoi(sizeStr.substr(0, xPos).c_str());
-                    height = atoi(sizeStr.substr(xPos + 1).c_str());
+                std::wstring sizeStr = itSize->second;
+                size_t xPos = sizeStr.find(L'x');
+                if (xPos != std::wstring::npos) {
+                    width = _wtoi(sizeStr.substr(0, xPos).c_str());
+                    height = _wtoi(sizeStr.substr(xPos + 1).c_str());
                 }
             }
 
@@ -333,7 +331,7 @@ void CreateUI(HWND parent, const std::vector<UIElement>& elements) {
             hControl = CreateWindowEx(
                 0,
                 TEXT("UIWindow"),
-                std::wstring(title.begin(), title.end()).c_str(),
+                title.c_str(),
                 WS_OVERLAPPEDWINDOW | WS_VISIBLE,
                 CW_USEDEFAULT, CW_USEDEFAULT, width, height,
                 nullptr,
@@ -354,47 +352,47 @@ void CreateUI(HWND parent, const std::vector<UIElement>& elements) {
         }
         else {
             // Создаем контролы
-            std::string text = "";
+            std::wstring text = L"";
             int x = 10, y = 10, width = 100, height = 30;
-            std::string id = element.id;
-            std::string className = "";
+            std::wstring id = element.id;
+            std::wstring className = L"";
 
-            auto itText = element.attributes.find("text");
+            auto itText = element.attributes.find(L"text");
             if (itText != element.attributes.end()) {
                 text = itText->second;
             }
-            auto itClass = element.attributes.find("class");
+            auto itClass = element.attributes.find(L"class");
             if (itClass != element.attributes.end()) {
                 className = itClass->second;
             }
-            auto itX = element.attributes.find("x");
+            auto itX = element.attributes.find(L"x");
             if (itX != element.attributes.end()) {
-                x = atoi(itX->second.c_str());
+                x = _wtoi(itX->second.c_str());
             }
-            auto itY = element.attributes.find("y");
+            auto itY = element.attributes.find(L"y");
             if (itY != element.attributes.end()) {
-                y = atoi(itY->second.c_str());
+                y = _wtoi(itY->second.c_str());
             }
-            auto itWidth = element.attributes.find("width");
+            auto itWidth = element.attributes.find(L"width");
             if (itWidth != element.attributes.end()) {
-                width = atoi(itWidth->second.c_str());
+                width = _wtoi(itWidth->second.c_str());
             }
-            auto itHeight = element.attributes.find("height");
+            auto itHeight = element.attributes.find(L"height");
             if (itHeight != element.attributes.end()) {
-                height = atoi(itHeight->second.c_str());
+                height = _wtoi(itHeight->second.c_str());
             }
 
             DWORD style = WS_VISIBLE | WS_CHILD;
             const wchar_t* wndClass = nullptr;
 
-            if (element.type == "Label") {
+            if (element.type == L"Label") {
                 wndClass = TEXT("STATIC");
                 style |= SS_CENTER;
             }
-            else if (element.type == "Button") {
+            else if (element.type == L"Button") {
                 wndClass = TEXT("BUTTON");
             }
-            else if (element.type == "Edit") {
+            else if (element.type == L"Edit") {
                 wndClass = TEXT("EDIT");
                 style |= WS_BORDER;
             }
@@ -404,7 +402,7 @@ void CreateUI(HWND parent, const std::vector<UIElement>& elements) {
                 hControl = CreateWindowEx(
                     0,
                     wndClass,
-                    std::wstring(text.begin(), text.end()).c_str(),
+                    text.c_str(),
                     style,
                     x, y, width, height,
                     parent,
@@ -432,11 +430,11 @@ void CreateUI(HWND parent, const std::vector<UIElement>& elements) {
 
 // Вспомогательные функции
 
-COLORREF ParseColor(const std::string& colorStr) {
-    if (colorStr[0] == '#') {
+COLORREF ParseColor(const std::wstring& colorStr) {
+    if (colorStr[0] == L'#') {
         // Цвет в формате HEX
         unsigned int rgb = 0;
-        std::stringstream ss;
+        std::wstringstream ss;
         ss << std::hex << colorStr.substr(1);
         ss >> rgb;
         return RGB((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
@@ -444,48 +442,48 @@ COLORREF ParseColor(const std::string& colorStr) {
     return 0;
 }
 
-int ParseSize(const std::string& sizeStr) {
+int ParseSize(const std::wstring& sizeStr) {
     // Преобразуем строку в число
-    return atoi(sizeStr.c_str());
+    return _wtoi(sizeStr.c_str());
 }
 
 HFONT CreateFontFromStyle(const Style& style) {
     int fontSize = 16; // Размер по умолчанию
-    std::string fontName = "Arial"; // Шрифт по умолчанию
+    std::wstring fontName = L"Arial"; // Шрифт по умолчанию
     bool bold = false;
     bool italic = false;
 
-    auto itFontSize = style.properties.find("font-size");
+    auto itFontSize = style.properties.find(L"font-size");
     if (itFontSize != style.properties.end()) {
         fontSize = ParseSize(itFontSize->second);
     }
-    auto itFontFamily = style.properties.find("font-family");
+    auto itFontFamily = style.properties.find(L"font-family");
     if (itFontFamily != style.properties.end()) {
         fontName = itFontFamily->second;
     }
-    auto itFontWeight = style.properties.find("font-weight");
-    if (itFontWeight != style.properties.end() && itFontWeight->second == "bold") {
+    auto itFontWeight = style.properties.find(L"font-weight");
+    if (itFontWeight != style.properties.end() && itFontWeight->second == L"bold") {
         bold = true;
     }
-    auto itFontStyle = style.properties.find("font-style");
-    if (itFontStyle != style.properties.end() && itFontStyle->second == "italic") {
+    auto itFontStyle = style.properties.find(L"font-style");
+    if (itFontStyle != style.properties.end() && itFontStyle->second == L"italic") {
         italic = true;
     }
 
     return CreateFont(-fontSize, 0, 0, 0, bold ? FW_BOLD : FW_NORMAL,
         italic ? TRUE : FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
-        CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, VARIABLE_PITCH, std::wstring(fontName.begin(), fontName.end()).c_str());
+        CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, VARIABLE_PITCH, fontName.c_str());
 }
 
 void ApplyStyle(HWND hWnd, const UIElement& element) {
     // Определяем соответствующий стиль
     Style style;
 
-    std::string idSelector = "@" + element.id;
-    std::string classSelector;
-    auto itClass = element.attributes.find("class");
+    std::wstring idSelector = L"@" + element.id;
+    std::wstring classSelector;
+    auto itClass = element.attributes.find(L"class");
     if (itClass != element.attributes.end()) {
-        classSelector = "." + itClass->second;
+        classSelector = L"." + itClass->second;
     }
 
     if (!element.id.empty() && styles.find(idSelector) != styles.end()) {

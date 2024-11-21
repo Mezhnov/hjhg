@@ -441,5 +441,12 @@ Window(title="Добро пожаловать", size="800x600")
   Button(text="Нажми меня", id="clickButton")
 
 
+@welcomeLabel:
+  font-size: 24
+  color: #FFFFFF
+
+.clickButton:
+  background-color: #FF0000
+  font-size: 18
 
 Необработанное исключение по адресу 0x00007FFF1BED829C (ucrtbased.dll) в тторор.exe: Недопустимый параметр был передан функции, для которой недопустимые параметры вызывают неустранимую ошибку.

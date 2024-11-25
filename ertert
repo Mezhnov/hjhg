@@ -1,5 +1,3 @@
-// NovaScriptIDE.cpp
-//#define UNICODE // Удалено, так как уже определено в настройках проекта
 #include <windows.h>
 #include <gdiplus.h>
 #include <wininet.h>
@@ -25,729 +23,175 @@
 
 using namespace Gdiplus;
 
-// Resource Identifiers
-#define ID_MENU_FILE_NEW        1
-#define ID_MENU_FILE_OPEN       2
-#define ID_MENU_FILE_SAVE       3
-#define ID_MENU_FILE_SAVEAS     4
-#define ID_MENU_FILE_EXIT       5
-#define ID_MENU_EDIT_UNDO       6
-#define ID_MENU_EDIT_REDO       7
-#define ID_MENU_EDIT_CUT        8
-#define ID_MENU_EDIT_COPY       9
-#define ID_MENU_EDIT_PASTE      10
-#define ID_MENU_HELP_ABOUT      11
-#define ID_FILE_RENAME          12
-#define ID_FILE_DELETE          13
-#define ID_EDIT_FIND            14
-#define ID_EDIT_REPLACE         15
-#define ID_BUILD_COMPILE        16
-#define ID_BUILD_RUN            17
-
-// Global Variables
+// Глобальные переменные
 HINSTANCE hInst;
-HWND hMainWnd;
-HWND hTab;
-HWND hExplorer;
-std::map<int, HWND> tabEditors; // Номер вкладки -> HWND Rich Edit
-int currentTab = -1;
 ULONG_PTR gdiplusToken;
-std::wstring currentFilePath = L"";
+HWND hWndMain;
+Image* pBackgroundImage = nullptr;
 
-// Function Declarations
-LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
-bool InitGDIPlus();
-void ShutdownGDIPlus();
-bool InitCommonControlsExWrapper();
-bool LoadRichEdit();
-bool CreateMainWindow();
-bool InitializeResources();
-bool CreateMenus(HWND);
-void HandleFileNew();
-void HandleFileOpen();
-void HandleFileSave();
-void HandleFileSaveAs();
-void HandleEditUndo();
-void HandleEditRedo();
-void HandleEditCut();
-void HandleEditCopy();
-void HandleEditPaste();
-void HandleHelpAbout();
-void HandleBuildCompile();
-void HandleBuildRun();
-std::wstring GetOpenFilePath(HWND hwnd);
-std::wstring GetSaveFilePath(HWND hwnd);
-std::wstring GetWindowTitle(const std::wstring& filename);
-bool ExecuteNovaScript(const std::wstring& scriptPath);
-void HighlightSyntax(HWND hEditWnd, const std::vector<std::wstring>& keywords);
-HTREEITEM AddFileToProject(const std::wstring& fileName);
-void AddNewTab(const std::wstring& fileName, const std::wstring& filePath);
-
-// Entry Point
-int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
+// Функция для загрузки изображения из URL
+Image* LoadImageFromURL(const std::wstring& url)
 {
-    // Initialize GDI+
-    if (!InitGDIPlus()) {
-        MessageBox(NULL, L"Не удалось инициализировать GDI+.", L"Ошибка", MB_ICONERROR);
-        return 0;
+    HINTERNET hInternet = InternetOpen(L"MyApp", INTERNET_OPEN_TYPE_PRECONFIG, nullptr, nullptr, 0);
+    if (!hInternet)
+        return nullptr;
+
+    HINTERNET hFile = InternetOpenUrl(hInternet, url.c_str(), nullptr, 0, 0, 0);
+    if (!hFile)
+    {
+        InternetCloseHandle(hInternet);
+        return nullptr;
     }
 
-    // Initialize Common Controls
-    if (!InitCommonControlsExWrapper()) {
-        MessageBox(NULL, L"Не удалось инициализировать общие контролы.", L"Ошибка", MB_ICONERROR);
-        ShutdownGDIPlus();
-        return 0;
+    std::vector<BYTE> buffer;
+    BYTE tempBuffer[4096];
+    DWORD bytesRead = 0;
+
+    while (InternetReadFile(hFile, tempBuffer, sizeof(tempBuffer), &bytesRead) && bytesRead != 0)
+    {
+        buffer.insert(buffer.end(), tempBuffer, tempBuffer + bytesRead);
     }
 
-    // Load Rich Edit library
-    if (!LoadRichEdit()) {
-        MessageBox(NULL, L"Не удалось загрузить Rich Edit контрол.", L"Ошибка", MB_ICONERROR);
-        ShutdownGDIPlus();
-        return 0;
+    InternetCloseHandle(hFile);
+    InternetCloseHandle(hInternet);
+
+    // Создаем IStream из буфера
+    HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, buffer.size());
+    if (!hMem)
+        return nullptr;
+
+    void* pData = GlobalLock(hMem);
+    memcpy(pData, buffer.data(), buffer.size());
+    GlobalUnlock(hMem);
+
+    IStream* pStream = nullptr;
+    if (CreateStreamOnHGlobal(hMem, TRUE, &pStream) != S_OK)
+    {
+        GlobalFree(hMem);
+        return nullptr;
     }
 
-    // Store instance handle in global variable
+    // Загружаем изображение из потока
+    Image* pImage = new Image(pStream);
+
+    pStream->Release();
+    // hMem освобождается автоматически
+
+    if (pImage->GetLastStatus() != Ok)
+    {
+        delete pImage;
+        pImage = nullptr;
+    }
+
+    return pImage;
+}
+
+// Функция окна
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
+    case WM_PAINT:
+        if (pBackgroundImage)
+        {
+            PAINTSTRUCT ps;
+            HDC hdc = BeginPaint(hWnd, &ps);
+            Graphics graphics(hdc);
+
+            // Получаем размеры окна
+            RECT rect;
+            GetClientRect(hWnd, &rect);
+
+            // Рисуем изображение, растягивая на весь экран
+            graphics.DrawImage(pBackgroundImage, 0, 0, rect.right, rect.bottom);
+
+            EndPaint(hWnd, &ps);
+        }
+        break;
+    case WM_KEYDOWN:
+        if (wParam == VK_ESCAPE) // Если нажата клавиша Esc
+        {
+            PostMessage(hWnd, WM_CLOSE, 0, 0);
+        }
+        break;
+    case WM_DESTROY:
+        if (pBackgroundImage)
+        {
+            delete pBackgroundImage;
+            pBackgroundImage = nullptr;
+        }
+        GdiplusShutdown(gdiplusToken);
+        PostQuitMessage(0);
+        break;
+    default:
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+    return 0;
+}
+
+// Точка входа
+int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
+                      _In_opt_ HINSTANCE hPrevInstance,
+                      _In_ LPWSTR    lpCmdLine,
+                      _In_ int       nCmdShow)
+{
     hInst = hInstance;
 
-    // Create Main Window
-    if (!CreateMainWindow()) {
-        MessageBox(NULL, L"Не удалось создать главное окно.", L"Ошибка", MB_ICONERROR);
-        ShutdownGDIPlus();
-        return 0;
+    // Инициализируем GDI+
+    GdiplusStartupInput gdiplusStartupInput;
+    if (GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, nullptr) != Ok)
+        return -1;
+
+    // Регистрируем класс окна
+    WNDCLASS wc = {};
+    wc.lpfnWndProc = WndProc;
+    wc.hInstance = hInst;
+    wc.lpszClassName = L"FullScreenWindowClass";
+    if (!RegisterClass(&wc))
+        return -1;
+
+    // Получаем размеры экрана
+    int nScreenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int nScreenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+    // Создаем окно
+    hWndMain = CreateWindowEx(
+        WS_EX_TOPMOST,
+        wc.lpszClassName,
+        L"Полноэкранное окно",
+        WS_POPUP,
+        0, 0, nScreenWidth, nScreenHeight,
+        nullptr, nullptr, hInst, nullptr);
+
+    if (!hWndMain)
+        return -1;
+
+    // Загружаем фоновое изображение из URL
+    std::wstring imageUrl = L"https://example.com/your_image.jpg"; // Замените на ваш URL изображения
+    pBackgroundImage = LoadImageFromURL(imageUrl);
+
+    if (!pBackgroundImage)
+    {
+        MessageBox(hWndMain, L"Не удалось загрузить фоновое изображение.", L"Ошибка", MB_OK | MB_ICONERROR);
+        return -1;
     }
 
-    // Show the window
-    ShowWindow(hMainWnd, nCmdShow);
-    UpdateWindow(hMainWnd);
+    ShowWindow(hWndMain, SW_SHOWDEFAULT);
+    UpdateWindow(hWndMain);
 
-    // Message Loop
-    MSG msg = { };
-    while (GetMessage(&msg, NULL, 0, 0))
+    // Скрываем курсор
+    ShowCursor(FALSE);
+
+    // Цикл сообщений
+    MSG msg = {};
+    while (GetMessage(&msg, nullptr, 0, 0))
     {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
-    // Shutdown GDI+
-    ShutdownGDIPlus();
+    // Показываем курсор
+    ShowCursor(TRUE);
 
-    return 0;
-}
-
-// Initialize GDI+
-bool InitGDIPlus()
-{
-    GdiplusStartupInput gdiPlusStartupInput;
-    return GdiplusStartup(&gdiplusToken, &gdiPlusStartupInput, NULL) == Ok;
-}
-
-// Shutdown GDI+
-void ShutdownGDIPlus()
-{
-    GdiplusShutdown(gdiplusToken);
-}
-
-// Initialize Common Controls
-bool InitCommonControlsExWrapper()
-{
-    INITCOMMONCONTROLSEX icex;
-    icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
-    icex.dwICC = ICC_WIN95_CLASSES | ICC_TAB_CLASSES | ICC_TREEVIEW_CLASSES;
-    return InitCommonControlsEx(&icex);
-}
-
-// Load Rich Edit Control
-bool LoadRichEdit()
-{
-    HMODULE hMod = LoadLibrary(L"Msftedit.dll");
-    return hMod != NULL;
-}
-
-// Create Main Window
-bool CreateMainWindow()
-{
-    // Register Window Class
-    const wchar_t CLASS_NAME[]  = L"NovaScript IDE Window Class";
-
-    WNDCLASS wc = { };
-    wc.lpfnWndProc   = WndProc;
-    wc.hInstance     = hInst;
-    wc.lpszClassName = CLASS_NAME;
-    wc.hCursor       = LoadCursor(NULL, IDC_ARROW);
-    wc.hIcon         = LoadIcon(NULL, IDI_APPLICATION);
-    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
-
-    if (!RegisterClass(&wc)) {
-        return false;
-    }
-
-    // Create Window
-    hMainWnd = CreateWindowEx(
-        0,                              // Optional window styles.
-        CLASS_NAME,                     // Window class
-        L"NovaScript IDE",             // Window text
-        WS_OVERLAPPEDWINDOW,            // Window style
-
-        // Size and position
-        CW_USEDEFAULT, CW_USEDEFAULT, 1600, 900,
-
-        NULL,       // Parent window    
-        NULL,       // Menu
-        hInst,  // Instance handle
-        NULL        // Additional application data
-        );
-
-    if (hMainWnd == NULL) {
-        return false;
-    }
-
-    // Создать панель обозревателя проекта (TreeView)
-    hExplorer = CreateWindowEx(
-        0,
-        WC_TREEVIEW,
-        NULL,
-        WS_CHILD | WS_VISIBLE | WS_BORDER | TVS_HASLINES | TVS_LINESATROOT | TVS_HASBUTTONS,
-        0, 0, 200, 900,
-        hMainWnd,
-        (HMENU)NULL,
-        hInst,
-        NULL
-        );
-
-    if (hExplorer == NULL) {
-        return false;
-    }
-
-    // Создать Tab Control
-    hTab = CreateWindowEx(
-        0,
-        WC_TABCONTROL,
-        NULL,
-        WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_BORDER,
-        200, 0, 1400, 30,
-        hMainWnd,
-        (HMENU)NULL,
-        hInst,
-        NULL
-        );
-
-    if (hTab == NULL) {
-        return false;
-    }
-
-    // Создать Menus
-    if (!CreateMenus(hMainWnd)) {
-        return false;
-    }
-
-    // Добавить первую вкладку
-    AddNewTab(L"Без имени.novascript", L"");
-
-    // Заполнить дерево проекта
-    HTREEITEM hRoot = TreeView_InsertItem(hExplorer, &(TVINSERTSTRUCT){
-        .hParent = NULL,
-        .hInsertAfter = TVI_ROOT,
-        .item = {
-            .mask = TVIF_TEXT,
-            .pszText = const_cast<LPWSTR>(L"Проект NovaScript")
-        }
-    });
-
-    return true;
-}
-
-// Add New Tab
-void AddNewTab(const std::wstring& fileName, const std::wstring& filePath)
-{
-    // Добавить вкладку в Tab Control
-    TCITEM tie;
-    tie.mask = TCIF_TEXT;
-    tie.pszText = const_cast<LPWSTR>(fileName.c_str());
-    int newTab = TabCtrl_GetItemCount(hTab);
-    TabCtrl_InsertItem(hTab, newTab, &tie);
-
-    // Создать Rich Edit контрол для новой вкладки
-    HWND hNewEdit = CreateWindowEx(
-        0,
-        L"RICHEDIT50W", // Rich Edit Control
-        NULL, 
-        WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL,
-        200, 30, 1400, 870, // Позиция и размер внутри окна
-        hMainWnd, 
-        (HMENU)NULL, 
-        hInst, 
-        NULL
-        );
-
-    if (hNewEdit == NULL) {
-        MessageBox(hMainWnd, L"Не удалось создать Rich Edit контрол.", L"Ошибка", MB_OK | MB_ICONERROR);
-        return;
-    }
-
-    // Установить шрифт для редактирования
-    CHARFORMAT2 cf;
-    ZeroMemory(&cf, sizeof(CHARFORMAT2));
-    cf.cbSize = sizeof(CHARFORMAT2);
-    cf.dwMask = CFM_FACE | CFM_SIZE;
-    cf.yHeight = 200; // 10 points
-    wcscpy_s(cf.szFaceName, L"Consolas");
-    SendMessage(hNewEdit, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cf);
-
-    // Включить Undo
-    SendMessage(hNewEdit, EM_SETUNDOLIMIT, (WPARAM)1000, 0);
-
-    // Сохранить HWND в карте
-    tabEditors[newTab] = hNewEdit;
-
-    // Переключить на новую вкладку
-    TabCtrl_SetCurSel(hTab, newTab);
-    ShowWindow(hExplorer, SW_SHOW);
-    ShowWindow(hNewEdit, SW_SHOW);
-    currentTab = newTab;
-}
-
-// Handle File Open with вкладок
-void HandleFileOpen()
-{
-    std::wstring filePath = GetOpenFilePath(hMainWnd);
-    if (!filePath.empty()) {
-        // Загрузить файл в текущую вкладку или создать новую
-        std::wstring fileName = filePath.substr(filePath.find_last_of(L"\\/") + 1);
-        AddNewTab(fileName, filePath);
-
-        // Загрузить содержимое файла
-        LoadFileIntoEditor(filePath);
-        
-        // Добавить файл в дерево проекта
-        AddFileToProject(fileName);
-    }
-}
-
-// Handle File Save
-void HandleFileSave()
-{
-    if (currentTab == -1) return;
-    auto it = tabEditors.find(currentTab);
-    if (it == tabEditors.end()) return;
-    HWND hCurrentEdit = it->second;
-
-    if (currentFilePath.empty()) {
-        HandleFileSaveAs();
-        return;
-    }
-
-    // Сохранить содержимое
-    if (SaveEditorContentToFile(currentFilePath)) {
-        MessageBox(hMainWnd, L"Файл успешно сохранён.", L"Сохранение", MB_OK | MB_ICONINFORMATION);
-    }
-}
-
-// Handle File Save As
-void HandleFileSaveAs()
-{
-    if (currentTab == -1) return;
-    auto it = tabEditors.find(currentTab);
-    if (it == tabEditors.end()) return;
-    HWND hCurrentEdit = it->second;
-
-    std::wstring filePath = GetSaveFilePath(hMainWnd);
-    if (!filePath.empty()) {
-        // Сохранить содержимое
-        if (SaveEditorContentToFile(filePath)) {
-            // Обновить название вкладки
-            std::wstring fileName = filePath.substr(filePath.find_last_of(L"\\/") + 1);
-            TCITEM tie;
-            tie.mask = TCIF_TEXT;
-            tie.pszText = const_cast<LPWSTR>(fileName.c_str());
-            TabCtrl_SetItem(hTab, currentTab, &tie);
-
-            // Обновить путь к файлу
-            currentFilePath = filePath;
-
-            // Добавить файл в дерево проекта
-            AddFileToProject(fileName);
-
-            MessageBox(hMainWnd, L"Файл успешно сохранён.", L"Сохранение", MB_OK | MB_ICONINFORMATION);
-        }
-    }
-}
-
-// Handle Build Compile
-void HandleBuildCompile()
-{
-    if (currentTab == -1) {
-        MessageBox(hMainWnd, L"Нет открытого файла для компиляции.", L"Компиляция", MB_OK | MB_ICONWARNING);
-        return;
-    }
-
-    if (currentFilePath.empty()) {
-        HandleFileSaveAs();
-    }
-
-    if (!currentFilePath.empty()) {
-        // Сохранить текущий файл перед компиляцией
-        if (SaveEditorContentToFile(currentFilePath)) {
-            // Выполнить компиляцию
-            std::wstring compilerPath = L"NovaScriptCompiler.exe"; // Путь к компилятору
-            std::wstring command = L"\"" + compilerPath + L"\" \"" + currentFilePath + L"\"";
-
-            STARTUPINFOW si = { sizeof(si) };
-            PROCESS_INFORMATION pi;
-
-            if (CreateProcessW(NULL, &command[0], NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
-            {
-                CloseHandle(pi.hThread);
-                CloseHandle(pi.hProcess);
-                MessageBox(hMainWnd, L"Компиляция запущена.", L"Компиляция", MB_OK | MB_ICONINFORMATION);
-            }
-            else
-            {
-                MessageBox(hMainWnd, L"Не удалось запустить компилятор.", L"Ошибка", MB_OK | MB_ICONERROR);
-            }
-        }
-    }
-}
-
-// Handle Build Run
-void HandleBuildRun()
-{
-    if (currentTab == -1) {
-        MessageBox(hMainWnd, L"Нет открытого файла для выполнения.", L"Выполнение", MB_OK | MB_ICONWARNING);
-        return;
-    }
-
-    if (currentFilePath.empty()) {
-        HandleFileSaveAs();
-    }
-
-    if (!currentFilePath.empty()) {
-        // Сохранить текущий файл перед выполнением
-        if (SaveEditorContentToFile(currentFilePath)) {
-            // Выполнить скрипт
-            ExecuteNovaScript(currentFilePath);
-        }
-    }
-}
-
-// Execute NovaScript (Placeholder)
-bool ExecuteNovaScript(const std::wstring& scriptPath)
-{
-    // Реализуйте выполнение скрипта NovaScript
-    // Это может включать вызов внешнего интерпретатора или внедрение скриптового движка
-
-    // Например, запуск внешнего процесса
-    STARTUPINFOW si = { sizeof(si) };
-    PROCESS_INFORMATION pi;
-    std::wstring command = L"MyNovaScriptInterpreter.exe \"" + scriptPath + L"\"";
-
-    if (CreateProcessW(NULL, &command[0], NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
-    {
-        CloseHandle(pi.hThread);
-        CloseHandle(pi.hProcess);
-        MessageBox(hMainWnd, L"Скрипт запущен.", L"Выполнение", MB_OK | MB_ICONINFORMATION);
-        return true;
-    }
-    else
-    {
-        MessageBox(hMainWnd, L"Не удалось запустить интерпретатор.", L"Ошибка", MB_OK | MB_ICONERROR);
-        return false;
-    }
-}
-
-// Highlight Syntax for specific Edit Control
-void HighlightSyntax(HWND hEditWnd, const std::vector<std::wstring>& keywords)
-{
-    // Очистка предыдущего форматирования
-    CHARFORMAT2 cfDefault;
-    ZeroMemory(&cfDefault, sizeof(CHARFORMAT2));
-    cfDefault.cbSize = sizeof(CHARFORMAT2);
-    cfDefault.dwMask = CFM_COLOR | CFM_BOLD;
-    cfDefault.crTextColor = RGB(0, 0, 0); // Черный цвет
-    cfDefault.dwEffects = 0;
-    SendMessage(hEditWnd, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cfDefault);
-
-    // Формат для ключевых слов
-    CHARFORMAT2 cfKeyword;
-    ZeroMemory(&cfKeyword, sizeof(CHARFORMAT2));
-    cfKeyword.cbSize = sizeof(CHARFORMAT2);
-    cfKeyword.dwMask = CFM_COLOR | CFM_BOLD;
-    cfKeyword.crTextColor = RGB(0, 0, 255); // Синий цвет
-    cfKeyword.dwEffects = CFE_BOLD;
-
-    // Получение всего текста
-    int textLength = GetWindowTextLength(hEditWnd);
-    std::wstring text;
-    text.resize(textLength + 1);
-    GetWindowText(hEditWnd, &text[0], textLength + 1);
-
-    for (const auto& keyword : keywords) {
-        size_t pos = 0;
-        while ((pos = text.find(keyword, pos)) != std::wstring::npos) {
-            // Проверка, что найденное слово является отдельным
-            bool isValid = true;
-            if (pos > 0 && iswalnum(text[pos - 1])) isValid = false;
-            if (pos + keyword.length() < text.length() && iswalnum(text[pos + keyword.length()])) isValid = false;
-
-            if (isValid) {
-                // Установка выделения
-                CHARRANGE cr;
-                cr.cpMin = static_cast<LONG>(pos);
-                cr.cpMax = static_cast<LONG>(pos + keyword.length());
-                SendMessage(hEditWnd, EM_EXSETSEL, 0, (LPARAM)&cr);
-                // Установка формата
-                SendMessage(hEditWnd, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cfKeyword);
-            }
-            pos += keyword.length();
-        }
-    }
-
-    // Сбросить выделение
-    CHARRANGE crReset = { 0, 0 };
-    SendMessage(hEditWnd, EM_EXSETSEL, 0, (LPARAM)&crReset);
-}
-
-// Handle Window Resize
-void ResizeControls()
-{
-    RECT rcClient;
-    GetClientRect(hMainWnd, &rcClient);
-    int explorerWidth = 200;
-    int tabHeight = 30;
-
-    // Resize Explorer
-    MoveWindow(hExplorer, 0, 0, explorerWidth, rcClient.bottom, TRUE);
-
-    // Resize Tab Control
-    MoveWindow(hTab, explorerWidth, 0, rcClient.right - explorerWidth, tabHeight, TRUE);
-
-    // Resize Editors
-    for (auto& pair : tabEditors) {
-        MoveWindow(pair.second, explorerWidth, tabHeight, rcClient.right - explorerWidth, rcClient.bottom - tabHeight, TRUE);
-    }
-}
-
-// Add File to Project TreeView
-HTREEITEM AddFileToProject(const std::wstring& fileName)
-{
-    // Найти корневой элемент
-    HTREEITEM hRoot = TreeView_GetRoot(hExplorer);
-    if (hRoot == NULL) {
-        hRoot = TreeView_InsertItem(hExplorer, &(TVINSERTSTRUCT){
-            .hParent = NULL,
-            .hInsertAfter = TVI_ROOT,
-            .item = {
-                .mask = TVIF_TEXT,
-                .pszText = const_cast<LPWSTR>(L"Проект NovaScript")
-            }
-        });
-    }
-
-    // Добавить файл как дочерний элемент
-    TVINSERTSTRUCT tvis = { };
-    tvis.hParent = hRoot;
-    tvis.hInsertAfter = TVI_LAST;
-    tvis.item.mask = TVIF_TEXT;
-    tvis.item.pszText = const_cast<LPWSTR>(fileName.c_str());
-
-    return TreeView_InsertItem(hExplorer, &tvis);
-}
-
-// Handle Build and Run commands
-void HandleBuildCompile()
-{
-    if (currentTab == -1) {
-        MessageBox(hMainWnd, L"Нет открытого файла для компиляции.", L"Компиляция", MB_OK | MB_ICONWARNING);
-        return;
-    }
-
-    if (currentFilePath.empty()) {
-        HandleFileSaveAs();
-    }
-
-    if (!currentFilePath.empty()) {
-        // Сохранить текущий файл перед компиляцией
-        if (SaveEditorContentToFile(currentFilePath)) {
-            // Выполнить компиляцию
-            std::wstring compilerPath = L"NovaScriptCompiler.exe"; // Путь к компилятору
-            std::wstring command = L"\"" + compilerPath + L"\" \"" + currentFilePath + L"\"";
-
-            STARTUPINFOW si = { sizeof(si) };
-            PROCESS_INFORMATION pi;
-
-            if (CreateProcessW(NULL, &command[0], NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
-            {
-                CloseHandle(pi.hThread);
-                CloseHandle(pi.hProcess);
-                MessageBox(hMainWnd, L"Компиляция запущена.", L"Компиляция", MB_OK | MB_ICONINFORMATION);
-            }
-            else
-            {
-                MessageBox(hMainWnd, L"Не удалось запустить компилятор.", L"Ошибка", MB_OK | MB_ICONERROR);
-            }
-        }
-    }
-}
-
-void HandleBuildRun()
-{
-    if (currentTab == -1) {
-        MessageBox(hMainWnd, L"Нет открытого файла для выполнения.", L"Выполнение", MB_OK | MB_ICONWARNING);
-        return;
-    }
-
-    if (currentFilePath.empty()) {
-        HandleFileSaveAs();
-    }
-
-    if (!currentFilePath.empty()) {
-        // Сохранить текущий файл перед выполнением
-        if (SaveEditorContentToFile(currentFilePath)) {
-            // Выполнить скрипт
-            ExecuteNovaScript(currentFilePath);
-        }
-    }
-}
-
-// Window Procedure
-LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
-{
-    switch (uMsg)
-    {
-    case WM_CREATE:
-        {
-            // Создать корневой элемент в TreeView, если нужно
-        }
-        break;
-    case WM_COMMAND:
-        switch (LOWORD(wParam))
-        {
-        case ID_MENU_FILE_NEW:
-            AddNewTab(L"Без имени.novascript", L"");
-            break;
-        case ID_MENU_FILE_OPEN:
-            HandleFileOpen();
-            break;
-        case ID_MENU_FILE_SAVE:
-            HandleFileSave();
-            break;
-        case ID_MENU_FILE_SAVEAS:
-            HandleFileSaveAs();
-            break;
-        case ID_MENU_FILE_EXIT:
-            PostMessage(hwnd, WM_CLOSE, 0, 0);
-            break;
-        case ID_MENU_EDIT_UNDO:
-            if (currentTab != -1 && tabEditors.find(currentTab) != tabEditors.end()) {
-                SendMessage(tabEditors[currentTab], EM_UNDO, 0, 0);
-            }
-            break;
-        case ID_MENU_EDIT_REDO:
-            HandleEditRedo();
-            break;
-        case ID_MENU_EDIT_CUT:
-            if (currentTab != -1 && tabEditors.find(currentTab) != tabEditors.end()) {
-                SendMessage(tabEditors[currentTab], EM_CUT, 0, 0);
-            }
-            break;
-        case ID_MENU_EDIT_COPY:
-            if (currentTab != -1 && tabEditors.find(currentTab) != tabEditors.end()) {
-                SendMessage(tabEditors[currentTab], EM_COPY, 0, 0);
-            }
-            break;
-        case ID_MENU_EDIT_PASTE:
-            if (currentTab != -1 && tabEditors.find(currentTab) != tabEditors.end()) {
-                SendMessage(tabEditors[currentTab], EM_PASTE, 0, 0);
-            }
-            break;
-        case ID_MENU_HELP_ABOUT:
-            HandleHelpAbout();
-            break;
-        case ID_BUILD_COMPILE:
-            HandleBuildCompile();
-            break;
-        case ID_BUILD_RUN:
-            HandleBuildRun();
-            break;
-        default:
-            break;
-        }
-        break;
-    case WM_NOTIFY:
-        {
-            LPNMHDR pnmh = (LPNMHDR)lParam;
-            if (pnmh->hwndFrom == hTab && pnmh->code == TCN_SELCHANGE) {
-                // Получить выбранную вкладку
-                int selected = TabCtrl_GetCurSel(hTab);
-                if (selected != currentTab) {
-                    // Скрыть предыдущий редактор
-                    if (currentTab != -1 && tabEditors.find(currentTab) != tabEditors.end()) {
-                        ShowWindow(tabEditors[currentTab], SW_HIDE);
-                    }
-                    // Показать новый редактор
-                    if (tabEditors.find(selected) != tabEditors.end()) {
-                        ShowWindow(tabEditors[selected], SW_SHOW);
-                        currentTab = selected;
-                    }
-                }
-            }
-        }
-        break;
-    case WM_SIZE:
-        {
-            ResizeControls();
-        }
-        break;
-    case WM_PAINT:
-        {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hwnd, &ps);
-
-            // Реализуйте синтаксическое выделение при необходимости
-
-            EndPaint(hwnd, &ps);
-        }
-        break;
-    case WM_KEYDOWN:
-        {
-            // Горячие клавиши
-            if ((GetKeyState(VK_CONTROL) & 0x8000))
-            {
-                switch (wParam)
-                {
-                case 'N':
-                    AddNewTab(L"Без имени.novascript", L"");
-                    break;
-                case 'O':
-                    HandleFileOpen();
-                    break;
-                case 'S':
-                    HandleFileSave();
-                    break;
-                case 'Z':
-                    if (currentTab != -1 && tabEditors.find(currentTab) != tabEditors.end()) {
-                        SendMessage(tabEditors[currentTab], EM_UNDO, 0, 0);
-                    }
-                    break;
-                case 'Y':
-                    HandleEditRedo();
-                    break;
-                default:
-                    break;
-                }
-            }
-        }
-        break;
-    case WM_CLOSE:
-        if (MessageBox(hwnd, L"Вы уверены, что хотите выйти?", L"Выход", MB_YESNO | MB_ICONQUESTION) == IDYES)
-        {
-            DestroyWindow(hwnd);
-        }
-        break;
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        break;
-    default:
-        return DefWindowProc(hwnd, uMsg, wParam, lParam);
-    }
-    return 0;
+    return (int)msg.wParam;
 }

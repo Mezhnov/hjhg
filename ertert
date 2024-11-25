@@ -9,17 +9,17 @@
 #include <locale>
 #include <codecvt>
 #include <windowsx.h>
-#include <mmsystem.h> // For PlaySound
-#include <CommCtrl.h> // For common controls
-#include <richedit.h> // For Rich Edit controls
+#include <mmsystem.h>   // For PlaySound
+#include <CommCtrl.h>   // For common controls
+#include <richedit.h>   // For Rich Edit controls
 #include <map>
 #include <algorithm>
 
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "wininet.lib")
-#pragma comment(lib, "winmm.lib") // Link with winmm.lib for PlaySound
-#pragma comment(lib, "comctl32.lib") // Link with comctl32.lib for common controls
-#pragma comment(lib, "Msftedit.lib") // Link with Msftedit.lib for newer Rich Edit controls
+#pragma comment(lib, "winmm.lib")     // Link with winmm.lib for PlaySound
+#pragma comment(lib, "comctl32.lib")  // Link with comctl32.lib for common controls
+#pragma comment(lib, "Msftedit.lib")  // Link with Msftedit.lib for newer Rich Edit controls
 
 using namespace Gdiplus;
 
@@ -104,6 +104,44 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             // Рисуем изображение, растягивая на весь экран
             graphics.DrawImage(pBackgroundImage, 0, 0, rect.right, rect.bottom);
+
+            // Добавляем код для рисования прямоугольников
+            // Параметры прямоугольников
+            int rectWidth = 100;    // Ширина прямоугольника
+            int rectHeight = 300;   // Высота прямоугольника
+            int rectSpacing = 20;   // Расстояние между прямоугольниками
+
+            // Координаты первого прямоугольника
+            int rect1X = (rect.right - 2 * rectWidth - rectSpacing) / 2;
+            int rect1Y = (rect.bottom - rectHeight) / 2;
+
+            // Координаты второго прямоугольника
+            int rect2X = rect1X + rectWidth + rectSpacing;
+            int rect2Y = rect1Y;
+
+            // Цвет светло-серый
+            SolidBrush brush(Color(255, 211, 211, 211)); // ARGB
+
+            // Рисуем первый прямоугольник
+            graphics.FillRectangle(&brush, rect1X, rect1Y, rectWidth, rectHeight);
+
+            // Рисуем второй прямоугольник
+            graphics.FillRectangle(&brush, rect2X, rect2Y, rectWidth, rectHeight);
+
+            // Добавляем текст на прямоугольники
+            FontFamily fontFamily(L"Arial");
+            Font font(&fontFamily, 16, FontStyleRegular, UnitPixel);
+            SolidBrush textBrush(Color(255, 0, 0, 0)); // Черный цвет
+
+            StringFormat format;
+            format.SetAlignment(StringAlignmentCenter);
+            format.SetLineAlignment(StringAlignmentCenter);
+
+            RectF rectF1((REAL)rect1X, (REAL)rect1Y, (REAL)rectWidth, (REAL)rectHeight);
+            RectF rectF2((REAL)rect2X, (REAL)rect2Y, (REAL)rectWidth, (REAL)rectHeight);
+
+            graphics.DrawString(L"Текст 1", -1, &font, rectF1, &format, &textBrush);
+            graphics.DrawString(L"Текст 2", -1, &font, rectF2, &format, &textBrush);
 
             EndPaint(hWnd, &ps);
         }

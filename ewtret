@@ -88,6 +88,8 @@ Image* LoadImageFromURL(const std::wstring& url)
 // Функция окна
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+    static HCURSOR hCursorHand = LoadCursor(nullptr, IDC_HAND);
+
     switch (message)
     {
     case WM_PAINT:
@@ -104,11 +106,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             // Рисуем изображение, растягивая на весь экран
             graphics.DrawImage(pBackgroundImage, 0, 0, rect.right, rect.bottom);
 
-            // Добавляем код для рисования прямоугольников
             // Параметры прямоугольников
             int rectWidth = 400;    // Ширина прямоугольника
             int rectHeight = 700;   // Высота прямоугольника
             int rectSpacing = 20;   // Расстояние между прямоугольниками
+            int cornerRadius = 30;  // Радиус закругления углов
 
             // Координаты первого прямоугольника
             int rect1X = (rect.right - 2 * rectWidth - rectSpacing) / 2;
@@ -118,39 +120,135 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             int rect2X = rect1X + rectWidth + rectSpacing;
             int rect2Y = rect1Y;
 
-            // Цвет светло-серый
-            SolidBrush brush(Color(200, 200, 200)); // ARGB
+            // Цвет светло-серый с прозрачностью
+            SolidBrush brush(Color(200, 220, 220, 220)); // ARGB
 
-            // Рисуем первый прямоугольник
-            graphics.FillRectangle(&brush, rect1X, rect1Y, rectWidth, rectHeight);
+            // Рисуем первый прямоугольник с закругленными углами
+            GraphicsPath path1;
+            path1.AddArc(rect1X, rect1Y, cornerRadius, cornerRadius, 180, 90);
+            path1.AddArc(rect1X + rectWidth - cornerRadius, rect1Y, cornerRadius, cornerRadius, 270, 90);
+            path1.AddArc(rect1X + rectWidth - cornerRadius, rect1Y + rectHeight - cornerRadius, cornerRadius, cornerRadius, 0, 90);
+            path1.AddArc(rect1X, rect1Y + rectHeight - cornerRadius, cornerRadius, cornerRadius, 90, 90);
+            path1.CloseFigure();
+            graphics.FillPath(&brush, &path1);
 
-            // Рисуем второй прямоугольник
-            graphics.FillRectangle(&brush, rect2X, rect2Y, rectWidth, rectHeight);
+            // Рисуем второй прямоугольник с закругленными углами
+            GraphicsPath path2;
+            path2.AddArc(rect2X, rect2Y, cornerRadius, cornerRadius, 180, 90);
+            path2.AddArc(rect2X + rectWidth - cornerRadius, rect2Y, cornerRadius, cornerRadius, 270, 90);
+            path2.AddArc(rect2X + rectWidth - cornerRadius, rect2Y + rectHeight - cornerRadius, cornerRadius, cornerRadius, 0, 90);
+            path2.AddArc(rect2X, rect2Y + rectHeight - cornerRadius, cornerRadius, cornerRadius, 90, 90);
+            path2.CloseFigure();
+            graphics.FillPath(&brush, &path2);
 
             // Добавляем текст на прямоугольники
             FontFamily fontFamily(L"Arial");
-            Font font(&fontFamily, 16, FontStyleRegular, UnitPixel);
+            Font fontTitle(&fontFamily, 36, FontStyleBold, UnitPixel);
+            Font fontDesc(&fontFamily, 24, FontStyleRegular, UnitPixel);
             SolidBrush textBrush(Color(255, 0, 0, 0)); // Черный цвет
 
             StringFormat format;
             format.SetAlignment(StringAlignmentCenter);
-            format.SetLineAlignment(StringAlignmentCenter);
 
-            RectF rectF1((REAL)rect1X, (REAL)rect1Y, (REAL)rectWidth, (REAL)rectHeight);
-            RectF rectF2((REAL)rect2X, (REAL)rect2Y, (REAL)rectWidth, (REAL)rectHeight);
+            // Первый прямоугольник - "Выбрать существующий клуб"
+            RectF rectF1((REAL)rect1X, (REAL)rect1Y + 50, (REAL)rectWidth, 50);
+            graphics.DrawString(L"Выбрать существующий клуб", -1, &fontTitle, rectF1, &format, &textBrush);
 
-            graphics.DrawString(L"Текст 1", -1, &font, rectF1, &format, &textBrush);
-            graphics.DrawString(L"Текст 2", -1, &font, rectF2, &format, &textBrush);
+            // Описание для первого прямоугольника
+            RectF descRectF1((REAL)rect1X + 20, (REAL)rect1Y + 120, (REAL)rectWidth - 40, (REAL)rectHeight - 150);
+            format.SetAlignment(StringAlignmentNear);
+            graphics.DrawString(L"Здесь вы можете выбрать уже существующий клуб из списка и присоединиться к нему.", -1, &fontDesc, descRectF1, &format, &textBrush);
+
+            // Второй прямоугольник - "Создать клуб"
+            format.SetAlignment(StringAlignmentCenter);
+            RectF rectF2((REAL)rect2X, (REAL)rect2Y + 50, (REAL)rectWidth, 50);
+            graphics.DrawString(L"Создать клуб", -1, &fontTitle, rectF2, &format, &textBrush);
+
+            // Описание для второго прямоугольника
+            RectF descRectF2((REAL)rect2X + 20, (REAL)rect2Y + 120, (REAL)rectWidth - 40, (REAL)rectHeight - 150);
+            format.SetAlignment(StringAlignmentNear);
+            graphics.DrawString(L"Здесь вы можете создать новый клуб и пригласить в него участников.", -1, &fontDesc, descRectF2, &format, &textBrush);
 
             EndPaint(hWnd, &ps);
         }
         break;
+
+    case WM_LBUTTONDOWN:
+    {
+        // Определяем, где был клик
+        int xPos = GET_X_LPARAM(lParam);
+        int yPos = GET_Y_LPARAM(lParam);
+
+        // Размеры и координаты прямоугольников должны совпадать с теми, что в WM_PAINT
+        int rectWidth = 400;    // Ширина прямоугольника
+        int rectHeight = 700;   // Высота прямоугольника
+        int rectSpacing = 20;   // Расстояние между прямоугольниками
+
+        RECT rect;
+        GetClientRect(hWnd, &rect);
+
+        int rect1X = (rect.right - 2 * rectWidth - rectSpacing) / 2;
+        int rect1Y = (rect.bottom - rectHeight) / 2;
+
+        int rect2X = rect1X + rectWidth + rectSpacing;
+        int rect2Y = rect1Y;
+
+        RECT rect1 = { rect1X, rect1Y, rect1X + rectWidth, rect1Y + rectHeight };
+        RECT rect2 = { rect2X, rect2Y, rect2X + rectWidth, rect2Y + rectHeight };
+
+        if (PtInRect(&rect1, { xPos, yPos }))
+        {
+            MessageBox(hWnd, L"Вы выбрали существующий клуб.", L"Информация", MB_OK | MB_ICONINFORMATION);
+            // Здесь можно добавить переход на соответствующий раздел
+        }
+        else if (PtInRect(&rect2, { xPos, yPos }))
+        {
+            MessageBox(hWnd, L"Вы решили создать новый клуб.", L"Информация", MB_OK | MB_ICONINFORMATION);
+            // Здесь можно добавить переход на соответствующий раздел
+        }
+    }
+    break;
+
+    case WM_MOUSEMOVE:
+    {
+        // Изменяем курсор при наведении на прямоугольники
+        int xPos = GET_X_LPARAM(lParam);
+        int yPos = GET_Y_LPARAM(lParam);
+
+        int rectWidth = 400;    // Ширина прямоугольника
+        int rectHeight = 700;   // Высота прямоугольника
+        int rectSpacing = 20;   // Расстояние между прямоугольниками
+
+        RECT rect;
+        GetClientRect(hWnd, &rect);
+
+        int rect1X = (rect.right - 2 * rectWidth - rectSpacing) / 2;
+        int rect1Y = (rect.bottom - rectHeight) / 2;
+
+        int rect2X = rect1X + rectWidth + rectSpacing;
+        int rect2Y = rect1Y;
+
+        RECT rect1 = { rect1X, rect1Y, rect1X + rectWidth, rect1Y + rectHeight };
+        RECT rect2 = { rect2X, rect2Y, rect2X + rectWidth, rect2Y + rectHeight };
+
+        if (PtInRect(&rect1, { xPos, yPos }) || PtInRect(&rect2, { xPos, yPos }))
+        {
+            SetCursor(hCursorHand);
+        }
+        else
+        {
+            SetCursor(LoadCursor(nullptr, IDC_ARROW));
+        }
+    }
+    break;
+
     case WM_KEYDOWN:
         if (wParam == VK_ESCAPE) // Если нажата клавиша Esc
         {
             PostMessage(hWnd, WM_CLOSE, 0, 0);
         }
         break;
+
     case WM_DESTROY:
         if (pBackgroundImage)
         {
@@ -160,6 +258,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         GdiplusShutdown(gdiplusToken);
         PostQuitMessage(0);
         break;
+
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }

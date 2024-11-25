@@ -1,1 +1,234 @@
-https://wallpaperbat.com/img/53062-abstract-black-geometric-line-pattern.jpg
+#include <windows.h>
+#include <gdiplus.h>
+#include <wininet.h>
+#include <string>
+#include <vector>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
+#include <locale>
+#include <codecvt>
+#include <windowsx.h>
+#include <mmsystem.h>   // For PlaySound
+#include <CommCtrl.h>   // For common controls
+#include <richedit.h>   // For Rich Edit controls
+#include <map>
+#include <algorithm>
+
+#pragma comment(lib, "gdiplus.lib")
+#pragma comment(lib, "wininet.lib")
+#pragma comment(lib, "winmm.lib")     // Link with winmm.lib for PlaySound
+#pragma comment(lib, "comctl32.lib")  // Link with comctl32.lib for common controls
+
+using namespace Gdiplus;
+
+// Глобальные переменные
+HINSTANCE hInst;
+ULONG_PTR gdiplusToken;
+HWND hWndMain;
+Image* pBackgroundImage = nullptr;
+
+// Функция для загрузки изображения из URL
+Image* LoadImageFromURL(const std::wstring& url)
+{
+    HINTERNET hInternet = InternetOpen(L"MyApp", INTERNET_OPEN_TYPE_PRECONFIG, nullptr, nullptr, 0);
+    if (!hInternet)
+        return nullptr;
+
+    HINTERNET hFile = InternetOpenUrl(hInternet, url.c_str(), nullptr, 0, 0, 0);
+    if (!hFile)
+    {
+        InternetCloseHandle(hInternet);
+        return nullptr;
+    }
+
+    std::vector<BYTE> buffer;
+    BYTE tempBuffer[4096];
+    DWORD bytesRead = 0;
+
+    while (InternetReadFile(hFile, tempBuffer, sizeof(tempBuffer), &bytesRead) && bytesRead != 0)
+    {
+        buffer.insert(buffer.end(), tempBuffer, tempBuffer + bytesRead);
+    }
+
+    InternetCloseHandle(hFile);
+    InternetCloseHandle(hInternet);
+
+    // Создаем IStream из буфера
+    HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, buffer.size());
+    if (!hMem)
+        return nullptr;
+
+    void* pData = GlobalLock(hMem);
+    memcpy(pData, buffer.data(), buffer.size());
+    GlobalUnlock(hMem);
+
+    IStream* pStream = nullptr;
+    if (CreateStreamOnHGlobal(hMem, TRUE, &pStream) != S_OK)
+    {
+        GlobalFree(hMem);
+        return nullptr;
+    }
+
+    // Загружаем изображение из потока
+    Image* pImage = new Image(pStream);
+
+    pStream->Release();
+    // hMem освобождается автоматически
+
+    if (pImage->GetLastStatus() != Ok)
+    {
+        delete pImage;
+        pImage = nullptr;
+    }
+
+    return pImage;
+}
+
+// Функция окна
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
+    case WM_PAINT:
+        if (pBackgroundImage)
+        {
+            PAINTSTRUCT ps;
+            HDC hdc = BeginPaint(hWnd, &ps);
+            Graphics graphics(hdc);
+
+            // Получаем размеры окна
+            RECT rect;
+            GetClientRect(hWnd, &rect);
+
+            // Рисуем изображение, растягивая на весь экран
+            graphics.DrawImage(pBackgroundImage, 0, 0, rect.right, rect.bottom);
+
+            // Добавляем код для рисования прямоугольников
+            // Параметры прямоугольников
+            int rectWidth = 400;    // Ширина прямоугольника
+            int rectHeight = 700;   // Высота прямоугольника
+            int rectSpacing = 20;   // Расстояние между прямоугольниками
+
+            // Координаты первого прямоугольника
+            int rect1X = (rect.right - 2 * rectWidth - rectSpacing) / 2;
+            int rect1Y = (rect.bottom - rectHeight) / 2;
+
+            // Координаты второго прямоугольника
+            int rect2X = rect1X + rectWidth + rectSpacing;
+            int rect2Y = rect1Y;
+
+            // Цвет светло-серый
+            SolidBrush brush(Color(200, 200, 200)); // ARGB
+
+            // Рисуем первый прямоугольник
+            graphics.FillRectangle(&brush, rect1X, rect1Y, rectWidth, rectHeight);
+
+            // Рисуем второй прямоугольник
+            graphics.FillRectangle(&brush, rect2X, rect2Y, rectWidth, rectHeight);
+
+            // Добавляем текст на прямоугольники
+            FontFamily fontFamily(L"Arial");
+            Font font(&fontFamily, 16, FontStyleRegular, UnitPixel);
+            SolidBrush textBrush(Color(255, 0, 0, 0)); // Черный цвет
+
+            StringFormat format;
+            format.SetAlignment(StringAlignmentCenter);
+            format.SetLineAlignment(StringAlignmentCenter);
+
+            RectF rectF1((REAL)rect1X, (REAL)rect1Y, (REAL)rectWidth, (REAL)rectHeight);
+            RectF rectF2((REAL)rect2X, (REAL)rect2Y, (REAL)rectWidth, (REAL)rectHeight);
+
+            graphics.DrawString(L"Текст 1", -1, &font, rectF1, &format, &textBrush);
+            graphics.DrawString(L"Текст 2", -1, &font, rectF2, &format, &textBrush);
+
+            EndPaint(hWnd, &ps);
+        }
+        break;
+    case WM_KEYDOWN:
+        if (wParam == VK_ESCAPE) // Если нажата клавиша Esc
+        {
+            PostMessage(hWnd, WM_CLOSE, 0, 0);
+        }
+        break;
+    case WM_DESTROY:
+        if (pBackgroundImage)
+        {
+            delete pBackgroundImage;
+            pBackgroundImage = nullptr;
+        }
+        GdiplusShutdown(gdiplusToken);
+        PostQuitMessage(0);
+        break;
+    default:
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+    return 0;
+}
+
+// Точка входа
+int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
+    _In_opt_ HINSTANCE hPrevInstance,
+    _In_ LPWSTR    lpCmdLine,
+    _In_ int       nCmdShow)
+{
+    hInst = hInstance;
+
+    // Инициализируем GDI+
+    GdiplusStartupInput gdiplusStartupInput;
+    if (GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, nullptr) != Ok)
+        return -1;
+
+    // Регистрируем класс окна
+    WNDCLASS wc = {};
+    wc.lpfnWndProc = WndProc;
+    wc.hInstance = hInst;
+    wc.lpszClassName = L"FullScreenWindowClass";
+    if (!RegisterClass(&wc))
+        return -1;
+
+    // Получаем размеры экрана
+    int nScreenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int nScreenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+    // Создаем окно
+    hWndMain = CreateWindowEx(
+        WS_EX_TOPMOST,
+        wc.lpszClassName,
+        L"Полноэкранное окно",
+        WS_POPUP,
+        0, 0, nScreenWidth, nScreenHeight,
+        nullptr, nullptr, hInst, nullptr);
+
+    if (!hWndMain)
+        return -1;
+
+    // Загружаем фоновое изображение из URL
+    std::wstring imageUrl = L"https://wallpaperbat.com/img/53062-abstract-black-geometric-line-pattern.jpg"; // Замените на ваш URL изображения
+    pBackgroundImage = LoadImageFromURL(imageUrl);
+
+    if (!pBackgroundImage)
+    {
+        MessageBox(hWndMain, L"Не удалось загрузить фоновое изображение.", L"Ошибка", MB_OK | MB_ICONERROR);
+        return -1;
+    }
+
+    ShowWindow(hWndMain, SW_SHOWDEFAULT);
+    UpdateWindow(hWndMain);
+
+    // Скрываем курсор
+    ShowCursor(FALSE);
+
+    // Цикл сообщений
+    MSG msg = {};
+    while (GetMessage(&msg, nullptr, 0, 0))
+    {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    // Показываем курсор
+    ShowCursor(TRUE);
+
+    return (int)msg.wParam;
+}

@@ -1,8 +1,9 @@
 package com.example.messengerapp
-import com.example.myapplication.R
+
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 
@@ -11,6 +12,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var usernameEditText: EditText
     private lateinit var passwordEditText: EditText
     private lateinit var loginButton: Button
+    private lateinit var logoImageView: ImageView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -20,6 +22,7 @@ class MainActivity : AppCompatActivity() {
         usernameEditText = findViewById(R.id.usernameEditText)
         passwordEditText = findViewById(R.id.passwordEditText)
         loginButton = findViewById(R.id.loginButton)
+        logoImageView = findViewById(R.id.logoImageView)
 
         // Обработчик для кнопки "Войти"
         loginButton.setOnClickListener {
@@ -46,16 +49,19 @@ class MainActivity : AppCompatActivity() {
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
+    <!-- Логотип -->
     <ImageView
         android:id="@+id/logoImageView"
         android:layout_width="150dp"
         android:layout_height="150dp"
         android:layout_marginTop="100dp"
+        android:src="@drawable/ic_launcher_foreground"  <!-- Тут можно поставить ваше изображение -->
         app:layout_constraintBottom_toTopOf="@id/usernameEditText"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <!-- Поле для ввода имени пользователя -->
     <EditText
         android:id="@+id/usernameEditText"
         android:layout_width="0dp"
@@ -67,6 +73,7 @@ class MainActivity : AppCompatActivity() {
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/logoImageView" />
 
+    <!-- Поле для ввода пароля -->
     <EditText
         android:id="@+id/passwordEditText"
         android:layout_width="0dp"
@@ -78,6 +85,7 @@ class MainActivity : AppCompatActivity() {
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/usernameEditText" />
 
+    <!-- Кнопка "Войти" -->
     <Button
         android:id="@+id/loginButton"
         android:layout_width="0dp"
@@ -89,23 +97,3 @@ class MainActivity : AppCompatActivity() {
         app:layout_constraintTop_toBottomOf="@id/passwordEditText" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
---------------------------- PROCESS STARTED (8439) for package com.example.myapplication ----------------------------
-2024-11-29 21:22:13.911  8439-8439  ApplicationLoaders      com.example.myapplication            D  Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
-2024-11-29 21:22:13.911  8439-8439  ApplicationLoaders      com.example.myapplication            D  Returning zygote-cached class loader: /system_ext/framework/androidx.window.sidecar.jar
-2024-11-29 21:22:13.917  8439-8439  ziparchive              com.example.myapplication            W  Unable to open '/data/app/~~wHI6PjlIRLcrnu1tqjzC9w==/com.example.myapplication-vN-AfR9MI5l0GF4nNBZRFg==/base.dm': No such file or directory
-2024-11-29 21:22:13.917  8439-8439  ziparchive              com.example.myapplication            W  Unable to open '/data/app/~~wHI6PjlIRLcrnu1tqjzC9w==/com.example.myapplication-vN-AfR9MI5l0GF4nNBZRFg==/base.dm': No such file or directory
-2024-11-29 21:22:14.005  8439-8439  nativeloader            com.example.myapplication            D  Configuring clns-7 for other apk /data/app/~~wHI6PjlIRLcrnu1tqjzC9w==/com.example.myapplication-vN-AfR9MI5l0GF4nNBZRFg==/base.apk. target_sdk_version=34, uses_libraries=, library_path=/data/app/~~wHI6PjlIRLcrnu1tqjzC9w==/com.example.myapplication-vN-AfR9MI5l0GF4nNBZRFg==/lib/x86_64, permitted_path=/data:/mnt/expand:/data/user/0/com.example.myapplication
-2024-11-29 21:22:14.024  8439-8439  GraphicsEnvironment     com.example.myapplication            V  Currently set values for:
-2024-11-29 21:22:14.024  8439-8439  GraphicsEnvironment     com.example.myapplication            V    angle_gl_driver_selection_pkgs=[]
-2024-11-29 21:22:14.024  8439-8439  GraphicsEnvironment     com.example.myapplication            V    angle_gl_driver_selection_values=[]
-2024-11-29 21:22:14.024  8439-8439  GraphicsEnvironment     com.example.myapplication            V  Global.Settings values are invalid: number of packages: 0, number of values: 0
-2024-11-29 21:22:14.024  8439-8439  GraphicsEnvironment     com.example.myapplication            V  Neither updatable production driver nor prerelease driver is supported.
-2024-11-29 21:22:14.109  8439-8439  HWUI                    com.example.myapplication            W  Unknown dataspace 0
-2024-11-29 21:22:14.125  8439-8454  EGL_emulation           com.example.myapplication            I  Opening libGLESv1_CM_emulation.so
-2024-11-29 21:22:14.126  8439-8454  EGL_emulation           com.example.myapplication            I  Opening libGLESv2_emulation.so
-2024-11-29 21:22:14.132  8439-8454  HWUI                    com.example.myapplication            W  Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
-2024-11-29 21:22:14.133  8439-8454  HWUI                    com.example.myapplication            W  Failed to initialize 101010-2 format, error = EGL_SUCCESS
-2024-11-29 21:22:14.184  8439-8454  Gralloc4                com.example.myapplication            I  mapper 4.x is not supported
-2024-11-29 21:22:14.399  8439-8443  e.myapplication         com.example.myapplication            I  Compiler allocated 5174KB to compile void android.view.ViewRootImpl.performTraversals()
-2024-11-29 21:22:19.287  8439-8463  ProfileInstaller        com.example.myapplication            D  Installing profile for com.example.myapplication
----------------------------- PROCESS ENDED (8439) for package com.example.myapplication ----------------------------

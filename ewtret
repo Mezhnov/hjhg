@@ -8,8 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -23,7 +22,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
-                LoginScreen()
+                LoginScreen() // По умолчанию показываем экран входа
             }
         }
     }
@@ -31,8 +30,19 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun LoginScreen() {
-    val username = remember { androidx.compose.runtime.mutableStateOf("") }
-    val password = remember { androidx.compose.runtime.mutableStateOf("") }
+    var showLogin by remember { mutableStateOf(true) }
+
+    if (showLogin) {
+        LoginContent(onRegisterClick = { showLogin = false })
+    } else {
+        RegisterContent(onLoginClick = { showLogin = true })
+    }
+}
+
+@Composable
+fun LoginContent(onRegisterClick: () -> Unit) {
+    val username = remember { mutableStateOf("") }
+    val password = remember { mutableStateOf("") }
 
     Box(
         modifier = Modifier
@@ -45,14 +55,12 @@ fun LoginScreen() {
                 .padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // App Name or Logo
             Text(
                 text = "Messenger App",
-                style = MaterialTheme.typography.titleLarge, // Changed from h4 to titleLarge
+                style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(bottom = 32.dp)
             )
 
-            // Username input field
             OutlinedTextField(
                 value = username.value,
                 onValueChange = { username.value = it },
@@ -62,7 +70,6 @@ fun LoginScreen() {
                     .padding(bottom = 16.dp)
             )
 
-            // Password input field
             OutlinedTextField(
                 value = password.value,
                 onValueChange = { password.value = it },
@@ -73,7 +80,6 @@ fun LoginScreen() {
                     .padding(bottom = 24.dp)
             )
 
-            // Login Button
             Button(
                 onClick = { /* Handle login logic */ },
                 modifier = Modifier.fillMaxWidth()
@@ -81,12 +87,82 @@ fun LoginScreen() {
                 Text("Login")
             }
 
-            // Register text link
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "Don't have an account? Sign Up",
                 color = Color.Blue,
-                style = MaterialTheme.typography.bodySmall // Optional, to style the link
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.clickable { onRegisterClick() } // Перехоод на экран регистрации
+            )
+        }
+    }
+}
+
+@Composable
+fun RegisterContent(onLoginClick: () -> Unit) {
+    val username = remember { mutableStateOf("") }
+    val password = remember { mutableStateOf("") }
+    val confirmPassword = remember { mutableStateOf("") }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFE0E0E0))
+    ) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Create Account",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(bottom = 32.dp)
+            )
+
+            OutlinedTextField(
+                value = username.value,
+                onValueChange = { username.value = it },
+                label = { Text("Username") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            )
+
+            OutlinedTextField(
+                value = password.value,
+                onValueChange = { password.value = it },
+                label = { Text("Password") },
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            )
+
+            OutlinedTextField(
+                value = confirmPassword.value,
+                onValueChange = { confirmPassword.value = it },
+                label = { Text("Confirm Password") },
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp)
+            )
+
+            Button(
+                onClick = { /* Handle register logic */ },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Register")
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Already have an account? Login",
+                color = Color.Blue,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.clickable { onLoginClick() } // Перехоод на экран входа
             )
         }
     }
@@ -96,6 +172,6 @@ fun LoginScreen() {
 @Composable
 fun DefaultPreview() {
     MyApplicationTheme {
-        LoginScreen()
+        LoginScreen() // Начальный экран входа
     }
 }

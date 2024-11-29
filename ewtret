@@ -1,1 +1,33 @@
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:11:47 Unresolved reference 'Logout'.
+@Composable
+fun DrawerContent(onMenuClick: (String) -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxHeight()
+            .background(Color(0xFFBBDEFB))
+            .padding(16.dp)
+    ) {
+        Text(
+            text = "Messenger Menu",
+            style = MaterialTheme.typography.titleLarge,
+            color = Color.White,
+            modifier = Modifier.padding(bottom = 32.dp)
+        )
+
+        DrawerItem(
+            icon = Icons.Default.Home,
+            label = "Home",
+            onClick = { onMenuClick("Home") }
+        )
+        DrawerItem(
+            icon = Icons.Default.Settings,
+            label = "Settings",
+            onClick = { onMenuClick("Settings") }
+        )
+        Spacer(modifier = Modifier.weight(1f))
+        DrawerItem(
+            icon = Icons.Default.ExitToApp, // Заменено с Logout
+            label = "Logout",
+            onClick = { onMenuClick("Login") }
+        )
+    }
+}

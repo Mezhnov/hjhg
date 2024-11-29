@@ -6,10 +6,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -53,12 +49,12 @@ fun MessengerApp() {
                 TopAppBar(
                     title = { Text(text = "Messenger") },
                     navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(
-                                imageVector = Icons.Default.Home,
-                                contentDescription = "Menu"
-                            )
-                        }
+                        Text(
+                            text = "Menu",
+                            modifier = Modifier
+                                .clickable { scope.launch { drawerState.open() } }
+                                .padding(16.dp)
+                        )
                     }
                 )
             }
@@ -92,18 +88,15 @@ fun DrawerContent(onMenuClick: (String) -> Unit) {
         )
 
         DrawerItem(
-            icon = Icons.Default.Home,
             label = "Home",
             onClick = { onMenuClick("Home") }
         )
         DrawerItem(
-            icon = Icons.Default.Settings,
             label = "Settings",
             onClick = { onMenuClick("Settings") }
         )
         Spacer(modifier = Modifier.weight(1f))
         DrawerItem(
-            icon = Icons.Default.Logout,
             label = "Logout",
             onClick = { onMenuClick("Login") }
         )
@@ -111,7 +104,7 @@ fun DrawerContent(onMenuClick: (String) -> Unit) {
 }
 
 @Composable
-fun DrawerItem(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+fun DrawerItem(label: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -119,13 +112,6 @@ fun DrawerItem(icon: androidx.compose.ui.graphics.vector.ImageVector, label: Str
             .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = Color.White,
-            modifier = Modifier.size(24.dp)
-        )
-        Spacer(modifier = Modifier.width(16.dp))
         Text(
             text = label,
             color = Color.White,

@@ -1,4 +1,1 @@
-Android resource linking failed
-com.example.myapplication.app-mergeDebugResources-47:/layout/activity_login.xml:18: error: resource drawable/ic_logo (aka com.example.myapplication:drawable/ic_logo) not found.
-com.example.myapplication.app-mergeDebugResources-47:/layout/activity_login.xml:51: error: resource color/colorPrimary (aka com.example.myapplication:color/colorPrimary) not found.
-error: failed linking file resources.
+e: file:///C:/Users/User/AndroidStudioProjects/MyApplication/app/src/main/java/com/example/myapplication/MainActivity.kt:17:24 Unresolved reference: R

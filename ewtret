@@ -3,10 +3,14 @@ package com.example.myapplication
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,161 +23,92 @@ import com.example.myapplication.ui.theme.MyApplicationTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
-                LoginScreen()
+                MessengerApp()
             }
         }
     }
 }
 
 @Composable
-fun LoginScreen() {
-    var showLogin by remember { mutableStateOf(true) }
-    var isLoggedIn by remember { mutableStateOf(false) }
+fun MessengerApp() {
+    var drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    var currentScreen by remember { mutableStateOf("Home") }
 
-    when {
-        isLoggedIn -> MessengerHome(onLogoutClick = {
-            isLoggedIn = false
-            showLogin = true
-        })
-        showLogin -> LoginContent(
-            onLoginClick = { isLoggedIn = true },
-            onRegisterClick = { showLogin = false }
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            DrawerContent(
+                onMenuClick = { screen ->
+                    currentScreen = screen
+                }
+            )
+        }
+    ) {
+        when (currentScreen) {
+            "Home" -> MessengerHome { /* Handle logout */ }
+            "Settings" -> SettingsScreen()
+        }
+    }
+}
+
+@Composable
+fun DrawerContent(onMenuClick: (String) -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxHeight()
+            .background(Color(0xFFBBDEFB))
+            .padding(16.dp)
+    ) {
+        Text(
+            text = "Messenger",
+            style = MaterialTheme.typography.titleLarge,
+            color = Color.White,
+            modifier = Modifier.padding(bottom = 32.dp)
         )
-        else -> RegisterContent(onLoginClick = { showLogin = true })
+
+        DrawerItem(
+            icon = Icons.Default.Home,
+            label = "Home",
+            onClick = { onMenuClick("Home") }
+        )
+        DrawerItem(
+            icon = Icons.Default.Settings,
+            label = "Settings",
+            onClick = { onMenuClick("Settings") }
+        )
+        Spacer(modifier = Modifier.weight(1f))
+        DrawerItem(
+            icon = Icons.Default.Logout,
+            label = "Logout",
+            onClick = { onMenuClick("Logout") }
+        )
     }
 }
 
 @Composable
-fun LoginContent(onLoginClick: () -> Unit, onRegisterClick: () -> Unit) {
-    val username = remember { mutableStateOf("") }
-    val password = remember { mutableStateOf("") }
-
-    Box(
+fun DrawerItem(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+    Row(
         modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFE0E0E0))
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Messenger App",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 32.dp)
-            )
-
-            OutlinedTextField(
-                value = username.value,
-                onValueChange = { username.value = it },
-                label = { Text("Username") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            )
-
-            OutlinedTextField(
-                value = password.value,
-                onValueChange = { password.value = it },
-                label = { Text("Password") },
-                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp)
-            )
-
-            Button(
-                onClick = {
-                    onLoginClick()
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Login")
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Don't have an account? Sign Up",
-                color = Color.Blue,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.clickable { onRegisterClick() }
-            )
-        }
-    }
-}
-
-@Composable
-fun RegisterContent(onLoginClick: () -> Unit) {
-    val username = remember { mutableStateOf("") }
-    val password = remember { mutableStateOf("") }
-    val confirmPassword = remember { mutableStateOf("") }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFE0E0E0))
-    ) {
-        Column(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Create Account",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 32.dp)
-            )
-
-            OutlinedTextField(
-                value = username.value,
-                onValueChange = { username.value = it },
-                label = { Text("Username") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            )
-
-            OutlinedTextField(
-                value = password.value,
-                onValueChange = { password.value = it },
-                label = { Text("Password") },
-                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            )
-
-            OutlinedTextField(
-                value = confirmPassword.value,
-                onValueChange = { confirmPassword.value = it },
-                label = { Text("Confirm Password") },
-                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp)
-            )
-
-            Button(
-                onClick = { /* Handle register logic */ },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Register")
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Already have an account? Login",
-                color = Color.Blue,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.clickable { onLoginClick() }
-            )
-        }
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = Color.White,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = label,
+            color = Color.White,
+            style = MaterialTheme.typography.bodyLarge
+        )
     }
 }
 
@@ -182,7 +117,7 @@ fun MessengerHome(onLogoutClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFBBDEFB))
+            .background(Color(0xFFE0E0E0))
     ) {
         Column(
             modifier = Modifier.align(Alignment.Center),
@@ -204,10 +139,30 @@ fun MessengerHome(onLogoutClick: () -> Unit) {
     }
 }
 
+@Composable
+fun SettingsScreen() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF1F1F1))
+    ) {
+        Column(
+            modifier = Modifier.align(Alignment.Center),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Settings",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+        }
+    }
+}
+
 @Preview(showBackground = true)
 @Composable
 fun DefaultPreview() {
     MyApplicationTheme {
-        LoginScreen()
+        MessengerApp()
     }
 }

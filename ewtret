@@ -1,4 +1,1 @@
-Android resource linking failed
-com.example.myapplication.app-mergeDebugResources-47:/layout/activity_main.xml:21: error: attribute layout_constraintTop_margin (aka com.example.myapplication:layout_constraintTop_margin) not found.
-error: failed linking file resources.
-
+Hardcoded string "Messenger", should use `@string` resource

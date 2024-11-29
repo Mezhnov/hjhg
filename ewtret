@@ -1,1 +1,1 @@
-Redundant label can be removed
+android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar"

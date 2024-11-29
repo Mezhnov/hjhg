@@ -6,11 +6,10 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.ui.theme.MyApplicationTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,7 +33,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MessengerApp() {
-    var drawerState = rememberDrawerState(DrawerValue.Closed)
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var currentScreen by remember { mutableStateOf("Home") }
 
@@ -43,13 +43,35 @@ fun MessengerApp() {
             DrawerContent(
                 onMenuClick = { screen ->
                     currentScreen = screen
+                    scope.launch { drawerState.close() }
                 }
             )
         }
     ) {
-        when (currentScreen) {
-            "Home" -> MessengerHome { /* Handle logout */ }
-            "Settings" -> SettingsScreen()
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(text = "Messenger") },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(
+                                imageVector = Icons.Default.Home,
+                                contentDescription = "Menu"
+                            )
+                        }
+                    }
+                )
+            }
+        ) { paddingValues ->
+            Box(modifier = Modifier.padding(paddingValues)) {
+                when (currentScreen) {
+                    "Home" -> MessengerHome(onLogoutClick = {
+                        currentScreen = "Login"
+                    })
+                    "Settings" -> SettingsScreen()
+                    "Login" -> LoginScreen(onLoginSuccess = { currentScreen = "Home" })
+                }
+            }
         }
     }
 }
@@ -63,7 +85,7 @@ fun DrawerContent(onMenuClick: (String) -> Unit) {
             .padding(16.dp)
     ) {
         Text(
-            text = "Messenger",
+            text = "Messenger Menu",
             style = MaterialTheme.typography.titleLarge,
             color = Color.White,
             modifier = Modifier.padding(bottom = 32.dp)
@@ -83,7 +105,7 @@ fun DrawerContent(onMenuClick: (String) -> Unit) {
         DrawerItem(
             icon = Icons.Default.Logout,
             label = "Logout",
-            onClick = { onMenuClick("Logout") }
+            onClick = { onMenuClick("Login") }
         )
     }
 }
@@ -155,6 +177,57 @@ fun SettingsScreen() {
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
+        }
+    }
+}
+
+@Composable
+fun LoginScreen(onLoginSuccess: () -> Unit) {
+    val username = remember { mutableStateOf("") }
+    val password = remember { mutableStateOf("") }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFE0E0E0))
+    ) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Login to Messenger",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(bottom = 32.dp)
+            )
+
+            OutlinedTextField(
+                value = username.value,
+                onValueChange = { username.value = it },
+                label = { Text("Username") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            )
+
+            OutlinedTextField(
+                value = password.value,
+                onValueChange = { password.value = it },
+                label = { Text("Password") },
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp)
+            )
+
+            Button(
+                onClick = { onLoginSuccess() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Login")
+            }
         }
     }
 }

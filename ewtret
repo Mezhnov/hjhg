@@ -5,9 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable // Добавлен импорт
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,7 +22,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
-                LoginScreen() // По умолчанию показываем экран входа
+                LoginScreen()
             }
         }
     }
@@ -32,23 +31,30 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun LoginScreen() {
     var showLogin by remember { mutableStateOf(true) }
+    var isLoggedIn by remember { mutableStateOf(false) }
 
-    if (showLogin) {
-        LoginContent(onRegisterClick = { showLogin = false })
-    } else {
-        RegisterContent(onLoginClick = { showLogin = true })
+    when {
+        isLoggedIn -> MessengerHome(onLogoutClick = {
+            isLoggedIn = false
+            showLogin = true
+        })
+        showLogin -> LoginContent(
+            onLoginClick = { isLoggedIn = true },
+            onRegisterClick = { showLogin = false }
+        )
+        else -> RegisterContent(onLoginClick = { showLogin = true })
     }
 }
 
 @Composable
-fun LoginContent(onRegisterClick: () -> Unit) {
+fun LoginContent(onLoginClick: () -> Unit, onRegisterClick: () -> Unit) {
     val username = remember { mutableStateOf("") }
     val password = remember { mutableStateOf("") }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFE0E0E0)) // Background color
+            .background(Color(0xFFE0E0E0))
     ) {
         Column(
             modifier = Modifier
@@ -82,7 +88,9 @@ fun LoginContent(onRegisterClick: () -> Unit) {
             )
 
             Button(
-                onClick = { /* Handle login logic */ },
+                onClick = {
+                    onLoginClick()
+                },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Login")
@@ -93,7 +101,7 @@ fun LoginContent(onRegisterClick: () -> Unit) {
                 text = "Don't have an account? Sign Up",
                 color = Color.Blue,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.clickable { onRegisterClick() } // Перехоод на экран регистрации
+                modifier = Modifier.clickable { onRegisterClick() }
             )
         }
     }
@@ -163,8 +171,35 @@ fun RegisterContent(onLoginClick: () -> Unit) {
                 text = "Already have an account? Login",
                 color = Color.Blue,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.clickable { onLoginClick() } // Перехоод на экран входа
+                modifier = Modifier.clickable { onLoginClick() }
             )
+        }
+    }
+}
+
+@Composable
+fun MessengerHome(onLogoutClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFBBDEFB))
+    ) {
+        Column(
+            modifier = Modifier.align(Alignment.Center),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Welcome to Messenger!",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            Button(
+                onClick = { onLogoutClick() },
+                modifier = Modifier.padding(top = 16.dp)
+            ) {
+                Text("Logout")
+            }
         }
     }
 }
@@ -173,6 +208,6 @@ fun RegisterContent(onLoginClick: () -> Unit) {
 @Composable
 fun DefaultPreview() {
     MyApplicationTheme {
-        LoginScreen() // Начальный экран входа
+        LoginScreen()
     }
 }

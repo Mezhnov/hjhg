@@ -1,21 +1,51 @@
----------------------------- PROCESS ENDED (7770) for package com.example.myapplication ----------------------------
----------------------------- PROCESS STARTED (7825) for package com.example.myapplication ----------------------------
-2024-11-29 21:17:00.241  7825-7825  ApplicationLoaders      com.example.myapplication            D  Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
-2024-11-29 21:17:00.241  7825-7825  ApplicationLoaders      com.example.myapplication            D  Returning zygote-cached class loader: /system_ext/framework/androidx.window.sidecar.jar
-2024-11-29 21:17:00.244  7825-7825  ziparchive              com.example.myapplication            W  Unable to open '/data/data/com.example.myapplication/code_cache/.overlay/base.apk/classes7.dm': No such file or directory
-2024-11-29 21:17:00.245  7825-7825  ziparchive              com.example.myapplication            W  Unable to open '/data/app/~~99WxqpfgHyo0gpfgBp20JA==/com.example.myapplication-wuV7fuMnpMJLGQKl08H0ug==/base.dm': No such file or directory
-2024-11-29 21:17:00.245  7825-7825  ziparchive              com.example.myapplication            W  Unable to open '/data/app/~~99WxqpfgHyo0gpfgBp20JA==/com.example.myapplication-wuV7fuMnpMJLGQKl08H0ug==/base.dm': No such file or directory
-2024-11-29 21:17:00.323  7825-7825  nativeloader            com.example.myapplication            D  Configuring clns-7 for other apk /data/app/~~99WxqpfgHyo0gpfgBp20JA==/com.example.myapplication-wuV7fuMnpMJLGQKl08H0ug==/base.apk. target_sdk_version=34, uses_libraries=, library_path=/data/app/~~99WxqpfgHyo0gpfgBp20JA==/com.example.myapplication-wuV7fuMnpMJLGQKl08H0ug==/lib/x86_64, permitted_path=/data:/mnt/expand:/data/user/0/com.example.myapplication
-2024-11-29 21:17:00.342  7825-7825  GraphicsEnvironment     com.example.myapplication            V  Currently set values for:
-2024-11-29 21:17:00.342  7825-7825  GraphicsEnvironment     com.example.myapplication            V    angle_gl_driver_selection_pkgs=[]
-2024-11-29 21:17:00.342  7825-7825  GraphicsEnvironment     com.example.myapplication            V    angle_gl_driver_selection_values=[]
-2024-11-29 21:17:00.342  7825-7825  GraphicsEnvironment     com.example.myapplication            V  Global.Settings values are invalid: number of packages: 0, number of values: 0
-2024-11-29 21:17:00.342  7825-7825  GraphicsEnvironment     com.example.myapplication            V  Neither updatable production driver nor prerelease driver is supported.
-2024-11-29 21:17:00.447  7825-7825  HWUI                    com.example.myapplication            W  Unknown dataspace 0
-2024-11-29 21:17:00.470  7825-7840  EGL_emulation           com.example.myapplication            I  Opening libGLESv1_CM_emulation.so
-2024-11-29 21:17:00.470  7825-7840  EGL_emulation           com.example.myapplication            I  Opening libGLESv2_emulation.so
-2024-11-29 21:17:00.476  7825-7840  HWUI                    com.example.myapplication            W  Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
-2024-11-29 21:17:00.476  7825-7840  HWUI                    com.example.myapplication            W  Failed to initialize 101010-2 format, error = EGL_SUCCESS
-2024-11-29 21:17:00.524  7825-7840  Gralloc4                com.example.myapplication            I  mapper 4.x is not supported
-2024-11-29 21:17:00.797  7825-7829  e.myapplication         com.example.myapplication            I  Compiler allocated 5174KB to compile void android.view.ViewRootImpl.performTraversals()
-2024-11-29 21:17:05.943  7825-7857  ProfileInstaller        com.example.myapplication            D  Installing profile for com.example.myapplication
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
+
+    <ImageView
+        android:id="@+id/logoImageView"
+        android:layout_width="150dp"
+        android:layout_height="150dp"
+        android:layout_marginTop="100dp"
+        app:layout_constraintBottom_toTopOf="@id/usernameEditText"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <EditText
+        android:id="@+id/usernameEditText"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:hint="Username"
+        android:inputType="text"
+        android:padding="16dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/logoImageView" />
+
+    <EditText
+        android:id="@+id/passwordEditText"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:hint="Password"
+        android:inputType="textPassword"
+        android:padding="16dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/usernameEditText" />
+
+    <Button
+        android:id="@+id/loginButton"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="Login"
+        android:textColor="#FFFFFF"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/passwordEditText" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

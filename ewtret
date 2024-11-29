@@ -1,37 +1,21 @@
-024-11-29 21:35:37.626  9353-9353  CompatChangeReporter    com.example.myapplication            D  Compat change id reported: 242716250; UID 10208; state: ENABLED
-2024-11-29 21:35:37.635  9353-9353  ApplicationLoaders      com.example.myapplication            D  Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
-2024-11-29 21:35:37.635  9353-9353  ApplicationLoaders      com.example.myapplication            D  Returning zygote-cached class loader: /system_ext/framework/androidx.window.sidecar.jar
-2024-11-29 21:35:37.636  9353-9353  ziparchive              com.example.myapplication            W  Unable to open '/data/app/~~yaJbrkfkBzLr3MC8uRy4OA==/com.example.myapplication-ZQe-pwUqRV5NIBKZJ0nJWA==/base.dm': No such file or directory
-2024-11-29 21:35:37.636  9353-9353  ziparchive              com.example.myapplication            W  Unable to open '/data/app/~~yaJbrkfkBzLr3MC8uRy4OA==/com.example.myapplication-ZQe-pwUqRV5NIBKZJ0nJWA==/base.dm': No such file or directory
-2024-11-29 21:35:37.750  9353-9353  nativeloader            com.example.myapplication            D  Configuring clns-7 for other apk /data/app/~~yaJbrkfkBzLr3MC8uRy4OA==/com.example.myapplication-ZQe-pwUqRV5NIBKZJ0nJWA==/base.apk. target_sdk_version=34, uses_libraries=, library_path=/data/app/~~yaJbrkfkBzLr3MC8uRy4OA==/com.example.myapplication-ZQe-pwUqRV5NIBKZJ0nJWA==/lib/x86_64, permitted_path=/data:/mnt/expand:/data/user/0/com.example.myapplication
-2024-11-29 21:35:37.761  9353-9353  GraphicsEnvironment     com.example.myapplication            V  Currently set values for:
-2024-11-29 21:35:37.764  9353-9353  GraphicsEnvironment     com.example.myapplication            V    angle_gl_driver_selection_pkgs=[]
-2024-11-29 21:35:37.764  9353-9353  GraphicsEnvironment     com.example.myapplication            V    angle_gl_driver_selection_values=[]
-2024-11-29 21:35:37.764  9353-9353  GraphicsEnvironment     com.example.myapplication            V  Global.Settings values are invalid: number of packages: 0, number of values: 0
-2024-11-29 21:35:37.765  9353-9353  GraphicsEnvironment     com.example.myapplication            V  Neither updatable production driver nor prerelease driver is supported.
-2024-11-29 21:35:37.947  9353-9353  HWUI                    com.example.myapplication            W  Unknown dataspace 0
-2024-11-29 21:35:37.973  9353-9417  EGL_emulation           com.example.myapplication            I  Opening libGLESv1_CM_emulation.so
-2024-11-29 21:35:37.974  9353-9417  EGL_emulation           com.example.myapplication            I  Opening libGLESv2_emulation.so
-2024-11-29 21:35:37.982  9353-9417  HWUI                    com.example.myapplication            W  Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
-2024-11-29 21:35:37.983  9353-9417  HWUI                    com.example.myapplication            W  Failed to initialize 101010-2 format, error = EGL_SUCCESS
-2024-11-29 21:35:38.030  9353-9417  Gralloc4                com.example.myapplication            I  mapper 4.x is not supported
-2024-11-29 21:35:38.552  9353-9360  e.myapplication         com.example.myapplication            I  Compiler allocated 5174KB to compile void android.view.ViewRootImpl.performTraversals()
-2024-11-29 21:35:43.890  9353-9427  ProfileInstaller        com.example.myapplication            D  Installing profile for com.example.myapplication
-2024-11-29 21:36:53.133  9497-9497  ApplicationLoaders      com.example.myapplication            D  Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
-2024-11-29 21:36:53.137  9497-9497  ApplicationLoaders      com.example.myapplication            D  Returning zygote-cached class loader: /system_ext/framework/androidx.window.sidecar.jar
-2024-11-29 21:36:53.138  9497-9497  ziparchive              com.example.myapplication            W  Unable to open '/data/app/~~gCX2kpaIXbE8LMzrmqHSLg==/com.example.myapplication-8DomnHJcxcjkhyW0NtpX0w==/base.dm': No such file or directory
-2024-11-29 21:36:53.139  9497-9497  ziparchive              com.example.myapplication            W  Unable to open '/data/app/~~gCX2kpaIXbE8LMzrmqHSLg==/com.example.myapplication-8DomnHJcxcjkhyW0NtpX0w==/base.dm': No such file or directory
-2024-11-29 21:36:53.268  9497-9497  nativeloader            com.example.myapplication            D  Configuring clns-7 for other apk /data/app/~~gCX2kpaIXbE8LMzrmqHSLg==/com.example.myapplication-8DomnHJcxcjkhyW0NtpX0w==/base.apk. target_sdk_version=34, uses_libraries=, library_path=/data/app/~~gCX2kpaIXbE8LMzrmqHSLg==/com.example.myapplication-8DomnHJcxcjkhyW0NtpX0w==/lib/x86_64, permitted_path=/data:/mnt/expand:/data/user/0/com.example.myapplication
-2024-11-29 21:36:53.301  9497-9497  GraphicsEnvironment     com.example.myapplication            V  Currently set values for:
-2024-11-29 21:36:53.301  9497-9497  GraphicsEnvironment     com.example.myapplication            V    angle_gl_driver_selection_pkgs=[]
-2024-11-29 21:36:53.301  9497-9497  GraphicsEnvironment     com.example.myapplication            V    angle_gl_driver_selection_values=[]
-2024-11-29 21:36:53.301  9497-9497  GraphicsEnvironment     com.example.myapplication            V  Global.Settings values are invalid: number of packages: 0, number of values: 0
-2024-11-29 21:36:53.301  9497-9497  GraphicsEnvironment     com.example.myapplication            V  Neither updatable production driver nor prerelease driver is supported.
-2024-11-29 21:36:53.567  9497-9497  HWUI                    com.example.myapplication            W  Unknown dataspace 0
-2024-11-29 21:36:53.589  9497-9553  EGL_emulation           com.example.myapplication            I  Opening libGLESv1_CM_emulation.so
-2024-11-29 21:36:53.590  9497-9553  EGL_emulation           com.example.myapplication            I  Opening libGLESv2_emulation.so
-2024-11-29 21:36:53.605  9497-9553  HWUI                    com.example.myapplication            W  Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
-2024-11-29 21:36:53.606  9497-9553  HWUI                    com.example.myapplication            W  Failed to initialize 101010-2 format, error = EGL_SUCCESS
-2024-11-29 21:36:53.658  9497-9553  Gralloc4                com.example.myapplication            I  mapper 4.x is not supported
-2024-11-29 21:36:54.034  9497-9501  e.myapplication         com.example.myapplication            I  Compiler allocated 5174KB to compile void android.view.ViewRootImpl.performTraversals()
-2024-11-29 21:36:58.823  9497-9576  ProfileInstaller        com.example.myapplication            D  Installing profile for com.example.myapplication
+package com.example.myapp
+
+import android.os.Bundle
+import androidx.appcompat.app.AppCompatActivity
+
+class MainActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+    }
+}
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#00FF00"  <!-- Зеленый фон -->
+    android:gravity="center">
+
+    <!-- Здесь можно добавить другие элементы интерфейса -->
+</LinearLayout>

@@ -1,84 +1,12 @@
-<?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout 
-    xmlns:android="http://schemas.android.com/apk/res/android"   
-    xmlns:app="http://schemas.android.com/apk/res-auto"   
-    xmlns:tools="http://schemas.android.com/tools"   
-    android:layout_width="match_parent"   
-    android:layout_height="match_parent"   
-    tools:context=".MainActivity">
+package com.example.messengerlogin
 
-    <!-- Заголовок приложения -->
-    <TextView
-        android:id="@+id/tvAppTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Messenger"
-        android:textSize="36sp"
-        android:textStyle="bold"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintTop_margin="80dp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
+import androidx.appcompat.app.AppCompatActivity
+import android.os.Bundle
 
-    <!-- Поле ввода Email -->
-    <EditText
-        android:id="@+id/etEmail"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:hint="Email"
-        android:inputType="textEmailAddress"
-        app:layout_constraintTop_toBottomOf="@id/tvAppTitle"
-        app:layout_constraintTop_margin="40dp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintStart_margin="32dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintEnd_margin="32dp"/>
-
-    <!-- Поле ввода Пароля -->
-    <EditText
-        android:id="@+id/etPassword"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:hint="Пароль"
-        android:inputType="textPassword"
-        app:layout_constraintTop_toBottomOf="@id/etEmail"
-        app:layout_constraintTop_margin="16dp"
-        app:layout_constraintStart_toStartOf="@id/etEmail"
-        app:layout_constraintEnd_toEndOf="@id/etEmail"/>
-
-    <!-- Кнопка "Войти" -->
-    <Button
-        android:id="@+id/btnLogin"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:text="Войти"
-        app:layout_constraintTop_toBottomOf="@id/etPassword"
-        app:layout_constraintTop_margin="24dp"
-        app:layout_constraintStart_toStartOf="@id/etPassword"
-        app:layout_constraintEnd_toEndOf="@id/etPassword"/>
-
-    <!-- Текст "Забыли пароль?" -->
-    <TextView
-        android:id="@+id/tvForgotPassword"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Забыли пароль?"
-        android:textColor="@color/purple_500"
-        app:layout_constraintTop_toBottomOf="@id/btnLogin"
-        app:layout_constraintTop_margin="16dp"
-        app:layout_constraintStart_toStartOf="@id/btnLogin"
-        app:layout_constraintEnd_toEndOf="@id/btnLogin"/>
-
-    <!-- Текст "Нет аккаунта? Регистрация" -->
-    <TextView
-        android:id="@+id/tvRegister"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Нет аккаунта? Регистрация"
-        android:textColor="@color/purple_500"
-        app:layout_constraintTop_toBottomOf="@id/tvForgotPassword"
-        app:layout_constraintTop_margin="16dp"
-        app:layout_constraintStart_toStartOf="@id/tvForgotPassword"
-        app:layout_constraintEnd_toEndOf="@id/tvForgotPassword"/>
-
-</androidx.constraintlayout.widget.ConstraintLayout>
+class MainActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // Устанавливаем макет для активности
+        setContentView(R.layout.activity_main)
+    }
+}

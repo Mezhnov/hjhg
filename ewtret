@@ -15,6 +15,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import com.example.myapplication.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
@@ -37,7 +39,7 @@ fun LoginScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFE0E0E0)) // Background color
+            .background(Color(0xFFF0F0F0)) // Light gray background
     ) {
         Column(
             modifier = Modifier
@@ -45,14 +47,17 @@ fun LoginScreen() {
                 .padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // App Name or Logo
+            // App Name or Logo (you can replace this with an image if needed)
             Text(
                 text = "Messenger App",
-                style = MaterialTheme.typography.titleLarge, // Changed from h4 to titleLarge
-                modifier = Modifier.padding(bottom = 32.dp)
+                style = MaterialTheme.typography.titleLarge,
+                color = Color.Black,
+                modifier = Modifier
+                    .padding(bottom = 40.dp)
+                    .align(Alignment.CenterHorizontally)
             )
 
-            // Username input field
+            // Username input field with custom styles
             OutlinedTextField(
                 value = username.value,
                 onValueChange = { username.value = it },
@@ -60,33 +65,49 @@ fun LoginScreen() {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp)
+                    .background(Color.White, shape = MaterialTheme.shapes.small),
+                shape = MaterialTheme.shapes.small,
+                colors = TextFieldDefaults.outlinedTextFieldColors(
+                    focusedBorderColor = Color(0xFF0088CC), // Blue for focused state
+                    unfocusedBorderColor = Color(0xFFBBBBBB) // Gray for unfocused state
+                )
             )
 
-            // Password input field
+            // Password input field with custom styles
             OutlinedTextField(
                 value = password.value,
                 onValueChange = { password.value = it },
                 label = { Text("Password") },
-                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 24.dp)
+                    .background(Color.White, shape = MaterialTheme.shapes.small),
+                shape = MaterialTheme.shapes.small,
+                colors = TextFieldDefaults.outlinedTextFieldColors(
+                    focusedBorderColor = Color(0xFF0088CC),
+                    unfocusedBorderColor = Color(0xFFBBBBBB)
+                )
             )
 
-            // Login Button
+            // Login Button with custom styling
             Button(
                 onClick = { /* Handle login logic */ },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0088CC)) // Telegram-like blue
             ) {
-                Text("Login")
+                Text("Log in", color = Color.White)
             }
 
             // Register text link
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "Don't have an account? Sign Up",
-                color = Color.Blue,
-                style = MaterialTheme.typography.bodySmall // Optional, to style the link
+                color = Color(0xFF0088CC), // Blue color for the link
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.clickable { /* Handle sign up logic */ }
             )
         }
     }

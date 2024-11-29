@@ -1,1 +1,78 @@
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:10:17 Unresolved reference 'appcompat'.
+package com.example.myapplication
+
+import android.os.Bundle
+import android.widget.Button
+import android.widget.EditText
+import android.widget.TextView
+import android.widget.Toast
+import android.widget.LinearLayout
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import com.google.android.material.textfield.TextInputLayout
+import com.google.android.material.textfield.TextInputEditText
+
+class MainActivity : ComponentActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        // Создание линейного контейнера для UI
+        val linearLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(16, 16, 16, 16)
+        }
+
+        // Поле для ввода имени пользователя
+        val usernameInputLayout = TextInputLayout(this).apply {
+            hint = "Username"
+            val usernameEditText = TextInputEditText(this@MainActivity)
+            usernameEditText.id = R.id.username
+            addView(usernameEditText)
+        }
+
+        // Поле для ввода пароля
+        val passwordInputLayout = TextInputLayout(this).apply {
+            hint = "Password"
+            val passwordEditText = TextInputEditText(this@MainActivity)
+            passwordEditText.id = R.id.password
+            passwordEditText.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            addView(passwordEditText)
+        }
+
+        // Кнопка для входа
+        val loginButton = Button(this).apply {
+            text = "Log In"
+            setOnClickListener {
+                val username = findViewById<EditText>(R.id.username).text.toString()
+                val password = findViewById<EditText>(R.id.password).text.toString()
+                if (username.isNotEmpty() && password.isNotEmpty()) {
+                    // Логика для авторизации
+                    Toast.makeText(this@MainActivity, "Welcome $username!", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this@MainActivity, "Please fill in both fields.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        // Текст для перехода на страницу регистрации
+        val registerText = TextView(this).apply {
+            text = "Don't have an account? Sign up"
+            setTextColor(resources.getColor(android.R.color.holo_blue_dark))
+            setOnClickListener {
+                // Логика перехода на страницу регистрации
+                Toast.makeText(this@MainActivity, "Redirect to registration", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        // Добавляем все элементы в LinearLayout
+        linearLayout.apply {
+            addView(usernameInputLayout)
+            addView(passwordInputLayout)
+            addView(loginButton)
+            addView(registerText)
+        }
+
+        // Устанавливаем наш линейный макет как контент
+        setContentView(linearLayout)
+    }
+}

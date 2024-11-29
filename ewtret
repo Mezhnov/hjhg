@@ -1,1 +1,3 @@
-Hardcoded string "Messenger", should use `@string` resource
+<resources>
+    <string name="app_name">Messenger</string>
+</resources>

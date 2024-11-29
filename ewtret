@@ -1,47 +1,80 @@
 package com.example.myapplication
 
 import android.os.Bundle
+import android.widget.Button
+import android.widget.EditText
+import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import com.example.myapplication.ui.theme.MyApplicationTheme
+import androidx.appcompat.app.AppCompatActivity
+import android.widget.LinearLayout
+import androidx.core.widget.doAfterTextChanged
+import com.google.android.material.textfield.TextInputLayout
+import com.google.android.material.textfield.TextInputEditText
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent {
-            MyApplicationTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
+
+        // Создание линейного контейнера для UI
+        val linearLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(16, 16, 16, 16)
+        }
+
+        // Поле для ввода имени пользователя
+        val usernameInputLayout = TextInputLayout(this).apply {
+            hint = "Username"
+            val usernameEditText = TextInputEditText(this@MainActivity)
+            usernameEditText.id = R.id.username
+            addView(usernameEditText)
+        }
+
+        // Поле для ввода пароля
+        val passwordInputLayout = TextInputLayout(this).apply {
+            hint = "Password"
+            val passwordEditText = TextInputEditText(this@MainActivity)
+            passwordEditText.id = R.id.password
+            passwordEditText.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            addView(passwordEditText)
+        }
+
+        // Кнопка для входа
+        val loginButton = Button(this).apply {
+            text = "Log In"
+            setOnClickListener {
+                val username = findViewById<EditText>(R.id.username).text.toString()
+                val password = findViewById<EditText>(R.id.password).text.toString()
+                if (username.isNotEmpty() && password.isNotEmpty()) {
+                    // Логика для авторизации
+                    Toast.makeText(this@MainActivity, "Welcome $username!", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this@MainActivity, "Please fill in both fields.", Toast.LENGTH_SHORT).show()
                 }
             }
         }
-    }
-}
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
+        // Текст для перехода на страницу регистрации
+        val registerText = TextView(this).apply {
+            text = "Don't have an account? Sign up"
+            setTextColor(resources.getColor(android.R.color.holo_blue_dark))
+            setOnClickListener {
+                // Логика перехода на страницу регистрации
+                Toast.makeText(this@MainActivity, "Redirect to registration", Toast.LENGTH_SHORT).show()
+            }
+        }
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    MyApplicationTheme {
-        Greeting("Android")
+        // Добавляем все элементы в LinearLayout
+        linearLayout.apply {
+            addView(usernameInputLayout)
+            addView(passwordInputLayout)
+            addView(loginButton)
+            addView(registerText)
+        }
+
+        // Устанавливаем наш линейный макет как контент
+        setContentView(linearLayout)
     }
 }

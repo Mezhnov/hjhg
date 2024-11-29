@@ -1,1 +1,1 @@
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication/app/src/main/java/com/example/myapplication/MainActivity.kt:17:24 Unresolved reference: R
+import com.example.myapplication.R

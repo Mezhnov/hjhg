@@ -1,19 +1,4 @@
-package com.example.myapp
-
-import android.os.Bundle
-import androidx.appcompat.app.AppCompatActivity
-import com.bumptech.glide.Glide
-import kotlinx.android.synthetic.main.activity_main.*
-
-class MainActivity : AppCompatActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-
-        // Загрузка изображения через URL с помощью библиотеки Glide
-        val imageUrl = "https://example.com/your-image.jpg"  // Укажите вашу ссылку на картинку
-        Glide.with(this)
-            .load(imageUrl)
-            .into(imageView)  // imageView — это ваш элемент ImageView в XML
-    }
+dependencies {
+    implementation 'com.github.bumptech.glide:glide:4.14.2'  // Для Glide
+    annotationProcessor 'com.github.bumptech.glide:compiler:4.14.2'  // Для Glide
 }

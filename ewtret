@@ -281,4 +281,5 @@ fun DefaultPreview() {
 
 e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:50:40 Unresolved reference 'it'.
 e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:183:44 Unresolved reference 'it'.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:241:37 Class '<anonymous>' is not abstract and does not implement abstract member 'onFailure'.
+
+

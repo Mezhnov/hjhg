@@ -42,7 +42,10 @@ fun LoginScreen() {
             onLoginClick = { isLoggedIn = true },
             onRegisterClick = { showLogin = false }
         )
-        else -> RegisterContent(onLoginClick = { showLogin = true })
+        else -> RegisterContent(
+            onLoginClick = { showLogin = true },
+            onRegisterSuccess = { isLoggedIn = true }
+        )
     }
 }
 
@@ -108,7 +111,7 @@ fun LoginContent(onLoginClick: () -> Unit, onRegisterClick: () -> Unit) {
 }
 
 @Composable
-fun RegisterContent(onLoginClick: () -> Unit) {
+fun RegisterContent(onLoginClick: () -> Unit, onRegisterSuccess: () -> Unit) {
     val username = remember { mutableStateOf("") }
     val password = remember { mutableStateOf("") }
     val confirmPassword = remember { mutableStateOf("") }
@@ -160,7 +163,10 @@ fun RegisterContent(onLoginClick: () -> Unit) {
             )
 
             Button(
-                onClick = { /* Handle register logic */ },
+                onClick = {
+                    // Здесь можно добавить логику для проверки данных регистрации
+                    onRegisterSuccess() // Вызываем onRegisterSuccess при успешной регистрации
+                },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Register")
@@ -211,6 +217,7 @@ fun DefaultPreview() {
         LoginScreen()
     }
 }
+
 Connect and retrieve data from databases﻿
 Edit pageLast modified: 25 September 2024
 Kotlin Notebook offers capabilities for connecting to and retrieving data from various types of SQL databases, such as MariaDB, PostgreSQL, MySQL, and SQLite. Utilizing the Kotlin DataFrame library, Kotlin Notebook can establish connections to databases, execute SQL queries, and import the results for further operations.

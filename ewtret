@@ -1,30 +1,18 @@
-private fun registerUser(username: String, password: String, confirmPassword: String, callback: (Boolean) -> Unit) {
-    val client = OkHttpClient()
-    val json = """
-        {
-          "username": "$username",
-          "password": "$password",
-          "confirm_password": "$confirmPassword"
+Button(
+    onClick = {
+        if (password.value != confirmPassword.value) {
+            Toast.makeText(context, "Passwords do not match", Toast.LENGTH_SHORT).show()
+        } else {
+            registerUser(username.value, password.value, confirmPassword.value) { success ->
+                if (success) {
+                    onRegisterSuccess()
+                } else {
+                    Toast.makeText(context, "Registration Failed", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
-    """.trimIndent()
-
-    val requestBody = RequestBody.create(
-        MediaType.parse("application/json; charset=utf-8"),
-        json
-    )
-
-    val request = Request.Builder()
-        .url("http://YOUR_SERVER_IP:5000/register")
-        .post(requestBody)
-        .build()
-
-    client.newCall(request).enqueue(object : Callback {
-        override fun onFailure(call: Call, e: IOException) {
-            callback(false)
-        }
-
-        override fun onResponse(call: Call, response: Response) {
-            callback(response.isSuccessful)
-        }
-    })
+    },
+    modifier = Modifier.fillMaxWidth()
+) {
+    Text("Register")
 }

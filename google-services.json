@@ -1,15 +1,24 @@
-package com.example.myapplication.ui.theme
+package com.example.myapplication
 
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.lightColorScheme
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import com.example.myapplication.ui.theme.MyApplicationTheme // Если вы хотите оставить отдельный файл для темы
 
+// Создаем кастомную тему прямо в MainActivity.kt
 private val LightColorPalette = lightColorScheme(
-    primary = Color(0xFF6200EE),
-    onPrimary = Color.White,
-    surface = Color(0xFF121212),
-    onSurface = Color.White
+    primary = Color(0xFF6200EE),  // Основной цвет
+    onPrimary = Color.White,      // Цвет текста на основном фоне
+    surface = Color(0xFF121212),  // Цвет фона
+    onSurface = Color.White       // Цвет текста на фоне
 )
 
 @Composable
@@ -17,8 +26,201 @@ fun MyApplicationTheme(
     content: @Composable () -> Unit
 ) {
     MaterialTheme(
-        colorScheme = LightColorPalette,
-        content = content
+        colorScheme = LightColorPalette, // Применяем цветовую палитру
+        content = content                // Контент, который будет использовать эту тему
     )
 }
-Theme.kt
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            MyApplicationTheme {
+                LoginScreen()
+            }
+        }
+    }
+}
+
+// Оставьте остальную логику для экрана входа и регистрации
+@Composable
+fun LoginScreen() {
+    var showLogin by remember { mutableStateOf(true) }
+    var isLoggedIn by remember { mutableStateOf(false) }
+
+    when {
+        isLoggedIn -> MessengerHome(onLogoutClick = {
+            isLoggedIn = false
+            showLogin = true
+        })
+        showLogin -> LoginContent(
+            onLoginClick = { isLoggedIn = true },
+            onRegisterClick = { showLogin = false }
+        )
+        else -> RegisterContent(onLoginClick = { showLogin = true })
+    }
+}
+
+@Composable
+fun LoginContent(onLoginClick: () -> Unit, onRegisterClick: () -> Unit) {
+    val username = remember { mutableStateOf("") }
+    val password = remember { mutableStateOf("") }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFE0E0E0))
+    ) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Messenger App",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(bottom = 32.dp)
+            )
+
+            OutlinedTextField(
+                value = username.value,
+                onValueChange = { username.value = it },
+                label = { Text("Username") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            )
+
+            OutlinedTextField(
+                value = password.value,
+                onValueChange = { password.value = it },
+                label = { Text("Password") },
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp)
+            )
+
+            Button(
+                onClick = { onLoginClick() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Login")
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Don't have an account? Sign Up",
+                color = Color.Blue,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.clickable { onRegisterClick() }
+            )
+        }
+    }
+}
+
+@Composable
+fun RegisterContent(onLoginClick: () -> Unit) {
+    val username = remember { mutableStateOf("") }
+    val password = remember { mutableStateOf("") }
+    val confirmPassword = remember { mutableStateOf("") }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFE0E0E0))
+    ) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Create Account",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(bottom = 32.dp)
+            )
+
+            OutlinedTextField(
+                value = username.value,
+                onValueChange = { username.value = it },
+                label = { Text("Username") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            )
+
+            OutlinedTextField(
+                value = password.value,
+                onValueChange = { password.value = it },
+                label = { Text("Password") },
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            )
+
+            OutlinedTextField(
+                value = confirmPassword.value,
+                onValueChange = { confirmPassword.value = it },
+                label = { Text("Confirm Password") },
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp)
+            )
+
+            Button(
+                onClick = { /* Handle register logic */ },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Register")
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Already have an account? Login",
+                color = Color.Blue,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.clickable { onLoginClick() }
+            )
+        }
+    }
+}
+
+@Composable
+fun MessengerHome(onLogoutClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFBBDEFB))
+    ) {
+        Column(
+            modifier = Modifier.align(Alignment.Center),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Welcome to Messenger!",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            Button(
+                onClick = { onLogoutClick() },
+                modifier = Modifier.padding(top = 16.dp)
+            ) {
+                Text("Logout")
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun DefaultPreview() {
+    MyApplicationTheme {
+        LoginScreen()
+    }
+}

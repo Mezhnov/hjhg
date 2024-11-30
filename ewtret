@@ -282,4 +282,65 @@ fun DefaultPreview() {
 e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:50:40 Unresolved reference 'it'.
 e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:183:44 Unresolved reference 'it'.
 
+from flask import Flask, request, jsonify
+from werkzeug.security import generate_password_hash, check_password_hash
+import sqlite3
+
+app = Flask(__name__)
+
+# Подключение к базе данных
+def init_db():
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, password TEXT)''')
+    conn.commit()
+    conn.close()
+
+@app.route('/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    confirm_password = data.get('confirm_password')
+
+    if password != confirm_password:
+        return jsonify({"message": "Passwords do not match"}), 400
+
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE username = ?", (username,))
+    user = c.fetchone()
+
+    if user:
+        return jsonify({"message": "User already exists"}), 400
+
+    hashed_password = generate_password_hash(password)
+    c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_password))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "Registration successful"}), 201
+
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE username = ?", (username,))
+    user = c.fetchone()
+    conn.close()
+
+    if not user or not check_password_hash(user[2], password):
+        return jsonify({"message": "Invalid username or password"}), 401
+
+    return jsonify({"message": "Login successful"}), 200
+
+
+if __name__ == '__main__':
+    init_db()
+    app.run(debug=True)
 

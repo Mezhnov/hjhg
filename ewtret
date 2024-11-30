@@ -1,6 +1,7 @@
 package com.example.myapplication
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -15,6 +16,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.ui.theme.MyApplicationTheme
+import kotlinx.coroutines.*
+import okhttp3.*
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -39,7 +42,15 @@ fun LoginScreen() {
             showLogin = true
         })
         showLogin -> LoginContent(
-            onLoginClick = { isLoggedIn = true },
+            onLoginClick = { username, password ->
+                loginUser(username, password) { success ->
+                    if (success) {
+                        isLoggedIn = true
+                    } else {
+                        Toast.makeText(it.context, "Login Failed", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
             onRegisterClick = { showLogin = false }
         )
         else -> RegisterContent(
@@ -50,7 +61,7 @@ fun LoginScreen() {
 }
 
 @Composable
-fun LoginContent(onLoginClick: () -> Unit, onRegisterClick: () -> Unit) {
+fun LoginContent(onLoginClick: (String, String) -> Unit, onRegisterClick: () -> Unit) {
     val username = remember { mutableStateOf("") }
     val password = remember { mutableStateOf("") }
 
@@ -92,7 +103,7 @@ fun LoginContent(onLoginClick: () -> Unit, onRegisterClick: () -> Unit) {
 
             Button(
                 onClick = {
-                    onLoginClick()
+                    onLoginClick(username.value, password.value)
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -164,8 +175,13 @@ fun RegisterContent(onLoginClick: () -> Unit, onRegisterSuccess: () -> Unit) {
 
             Button(
                 onClick = {
-                    // Здесь можно добавить логику для проверки данных регистрации
-                    onRegisterSuccess() // Вызываем onRegisterSuccess при успешной регистрации
+                    registerUser(username.value, password.value) { success ->
+                        if (success) {
+                            onRegisterSuccess()
+                        } else {
+                            Toast.makeText(it.context, "Registration Failed", Toast.LENGTH_SHORT).show()
+                        }
+                    }
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -210,6 +226,50 @@ fun MessengerHome(onLogoutClick: () -> Unit) {
     }
 }
 
+private fun loginUser(username: String, password: String, callback: (Boolean) -> Unit) {
+    val client = OkHttpClient()
+    val formBody = FormBody.Builder()
+        .add("username", username)
+        .add("password", password)
+        .build()
+    val request = Request.Builder()
+        .url("http://127.0.0.1:5000/login")
+        .post(formBody)
+        .build()
+
+    client.newCall(request).enqueue(object : Callback {
+        override fun onFailure(call: Call, e: IOException) {
+            callback(false)
+        }
+
+        override fun onResponse(call: Call, response: Response) {
+            callback(response.isSuccessful)
+        }
+    })
+}
+
+private fun registerUser(username: String, password: String, callback: (Boolean) -> Unit) {
+    val client = OkHttpClient()
+    val formBody = FormBody.Builder()
+        .add("username", username)
+        .add("password", password)
+        .build()
+    val request = Request.Builder()
+        .url("http://127.0.0.1:5000/register")
+        .post(formBody)
+        .build()
+
+    client.newCall(request).enqueue(object : Callback {
+        override fun onFailure(call: Call, e: IOException) {
+            callback(false)
+        }
+
+        override fun onResponse(call: Call, response: Response) {
+            callback(response.isSuccessful)
+        }
+    })
+}
+
 @Preview(showBackground = true)
 @Composable
 fun DefaultPreview() {
@@ -217,3 +277,4 @@ fun DefaultPreview() {
         LoginScreen()
     }
 }
+IP-адрес вашего ПК: 192.168.146.1

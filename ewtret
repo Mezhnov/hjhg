@@ -6,12 +6,22 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.drawer.DrawerValue
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.*
+import androidx.compose.material.DrawerValue.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.rememberDrawerState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.ui.theme.MyApplicationTheme
@@ -64,7 +74,7 @@ fun LoginContent(onLoginClick: () -> Unit, onRegisterClick: () -> Unit) {
         ) {
             Text(
                 text = "Messenger App",
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.h5,
                 modifier = Modifier.padding(bottom = 32.dp)
             )
 
@@ -81,7 +91,7 @@ fun LoginContent(onLoginClick: () -> Unit, onRegisterClick: () -> Unit) {
                 value = password.value,
                 onValueChange = { password.value = it },
                 label = { Text("Password") },
-                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 24.dp)
@@ -100,7 +110,7 @@ fun LoginContent(onLoginClick: () -> Unit, onRegisterClick: () -> Unit) {
             Text(
                 text = "Don't have an account? Sign Up",
                 color = Color.Blue,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.body2,
                 modifier = Modifier.clickable { onRegisterClick() }
             )
         }
@@ -126,7 +136,7 @@ fun RegisterContent(onLoginClick: () -> Unit) {
         ) {
             Text(
                 text = "Create Account",
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.h5,
                 modifier = Modifier.padding(bottom = 32.dp)
             )
 
@@ -143,7 +153,7 @@ fun RegisterContent(onLoginClick: () -> Unit) {
                 value = password.value,
                 onValueChange = { password.value = it },
                 label = { Text("Password") },
-                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp)
@@ -153,7 +163,7 @@ fun RegisterContent(onLoginClick: () -> Unit) {
                 value = confirmPassword.value,
                 onValueChange = { confirmPassword.value = it },
                 label = { Text("Confirm Password") },
-                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 24.dp)
@@ -170,7 +180,7 @@ fun RegisterContent(onLoginClick: () -> Unit) {
             Text(
                 text = "Already have an account? Login",
                 color = Color.Blue,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.body2,
                 modifier = Modifier.clickable { onLoginClick() }
             )
         }
@@ -179,26 +189,109 @@ fun RegisterContent(onLoginClick: () -> Unit) {
 
 @Composable
 fun MessengerHome(onLogoutClick: () -> Unit) {
-    Box(
+    val scaffoldState = rememberScaffoldState()
+    val drawerState = scaffoldState.drawerState
+    val scope = rememberCoroutineScope()
+
+    val messages = remember {
+        mutableStateListOf(
+            "Hello! How are you?",
+            "Don't forget the meeting tomorrow.",
+            "Happy Birthday!",
+            "Let's catch up soon.",
+            "Check out this cool link!"
+        )
+    }
+
+    Scaffold(
+        scaffoldState = scaffoldState,
+        drawerContent = {
+            DrawerContent()
+        },
+        topBar = {
+            TopAppBar(
+                title = { Text("Messenger") },
+                navigationIcon = {
+                    IconButton(onClick = {
+                        scope.launch {
+                            if (drawerState.isClosed) drawerState.open()
+                            else drawerState.close()
+                        }
+                    }) {
+                        Icon(Icons.Filled.Menu, contentDescription = "Menu")
+                    }
+                }
+            )
+        },
+        content = { paddingValues ->
+            MessagesList(messages = messages, modifier = Modifier.padding(paddingValues))
+        }
+    )
+}
+
+@Composable
+fun DrawerContent() {
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFBBDEFB))
     ) {
-        Column(
-            modifier = Modifier.align(Alignment.Center),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Welcome to Messenger!",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
+        // Заголовок бокового меню
+        Text(
+            text = "Menu",
+            style = MaterialTheme.typography.h6,
+            modifier = Modifier.padding(16.dp)
+        )
+        Divider()
 
-            Button(
-                onClick = { onLogoutClick() },
-                modifier = Modifier.padding(top = 16.dp)
+        // Пункты меню
+        DrawerItem(icon = Icons.Filled.Settings, label = "Settings", onClick = { /* Handle click */ })
+        DrawerItem(icon = Icons.Filled.Settings, label = "Profile", onClick = { /* Handle click */ })
+        DrawerItem(icon = Icons.Filled.Settings, label = "Logout", onClick = { /* Handle click */ })
+    }
+}
+
+@Composable
+fun DrawerItem(icon: ImageVector, label: String, onClick: () -> Unit) {
+    ListItem(
+        icon = { Icon(icon, contentDescription = label) },
+        text = { Text(label) },
+        modifier = Modifier.clickable(onClick = onClick)
+    )
+}
+
+@Composable
+fun MessagesList(messages: List<String>, modifier: Modifier = Modifier) {
+    LazyColumn(modifier = modifier.fillMaxSize()) {
+        items(messages.size) { index ->
+            MessageItem(message = messages[index])
+        }
+    }
+}
+
+@Composable
+fun MessageItem(message: String) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp),
+        elevation = 2.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            // Здесь можно добавить изображение профиля пользователя
+            Column(
+                modifier = Modifier.weight(1f)
             ) {
-                Text("Logout")
+                Text(
+                    text = "User Name",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.subtitle1
+                )
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.body1
+                )
             }
         }
     }

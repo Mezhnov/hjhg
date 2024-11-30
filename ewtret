@@ -44,8 +44,8 @@ fun LoginScreen() {
             showLogin = true
         })
         showLogin -> LoginContent(
-            onLoginClick = { username, password ->
-                loginUser(username, password) { success ->
+            onLoginClick = { username, password -> 
+                loginUser(username, password) { success -> 
                     if (success) {
                         isLoggedIn = true
                     } else {
@@ -277,14 +277,3 @@ private fun registerUser(username: String, password: String, callback: (Boolean)
         }
     })
 }
-
-@Composable
-fun DefaultPreview() {
-    MyApplicationTheme {
-        LoginScreen()
-    }
-}
-
-
-Function "DefaultPreview" is never used
-Variable 'context' is never used

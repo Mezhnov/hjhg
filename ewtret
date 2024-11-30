@@ -44,8 +44,8 @@ fun LoginScreen() {
             showLogin = true
         })
         showLogin -> LoginContent(
-            onLoginClick = { username, password -> 
-                loginUser(username, password) { success -> 
+            onLoginClick = { username, password ->
+                loginUser(username, password) { success ->
                     if (success) {
                         isLoggedIn = true
                     } else {
@@ -66,7 +66,7 @@ fun LoginScreen() {
 fun LoginContent(onLoginClick: (String, String) -> Unit, onRegisterClick: () -> Unit) {
     val username = remember { mutableStateOf("") }
     val password = remember { mutableStateOf("") }
-    val context = LocalContext.current // Get the context
+    LocalContext.current // Get the context
 
     Box(
         modifier = Modifier

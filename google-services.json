@@ -1,25 +1,25 @@
-package com.example.myapplication
-
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.myapplication.ui.theme.MyApplicationTheme
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import java.sql.Connection
+import java.sql.DriverManager
+import java.sql.ResultSet
+import java.sql.SQLException
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
                 LoginScreen()
@@ -54,27 +54,19 @@ fun LoginContent(onLoginClick: () -> Unit, onRegisterClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFE0E0E0))
+            .padding(32.dp)
     ) {
         Column(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .padding(32.dp),
+            modifier = Modifier.align(Alignment.Center),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "Messenger App",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 32.dp)
-            )
+            Text("Messenger App", modifier = Modifier.padding(bottom = 32.dp))
 
             OutlinedTextField(
                 value = username.value,
                 onValueChange = { username.value = it },
                 label = { Text("Username") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
             )
 
             OutlinedTextField(
@@ -82,17 +74,10 @@ fun LoginContent(onLoginClick: () -> Unit, onRegisterClick: () -> Unit) {
                 onValueChange = { password.value = it },
                 label = { Text("Password") },
                 visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp)
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
             )
 
-            Button(
-                onClick = {
-                    onLoginClick()
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            Button(onClick = { onLoginClick() }, modifier = Modifier.fillMaxWidth()) {
                 Text("Login")
             }
 
@@ -100,7 +85,6 @@ fun LoginContent(onLoginClick: () -> Unit, onRegisterClick: () -> Unit) {
             Text(
                 text = "Don't have an account? Sign Up",
                 color = Color.Blue,
-                style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.clickable { onRegisterClick() }
             )
         }
@@ -116,27 +100,19 @@ fun RegisterContent(onLoginClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFE0E0E0))
+            .padding(32.dp)
     ) {
         Column(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .padding(32.dp),
+            modifier = Modifier.align(Alignment.Center),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "Create Account",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 32.dp)
-            )
+            Text("Create Account", modifier = Modifier.padding(bottom = 32.dp))
 
             OutlinedTextField(
                 value = username.value,
                 onValueChange = { username.value = it },
                 label = { Text("Username") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
             )
 
             OutlinedTextField(
@@ -144,9 +120,7 @@ fun RegisterContent(onLoginClick: () -> Unit) {
                 onValueChange = { password.value = it },
                 label = { Text("Password") },
                 visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
             )
 
             OutlinedTextField(
@@ -154,15 +128,10 @@ fun RegisterContent(onLoginClick: () -> Unit) {
                 onValueChange = { confirmPassword.value = it },
                 label = { Text("Confirm Password") },
                 visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp)
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
             )
 
-            Button(
-                onClick = { /* Handle register logic */ },
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            Button(onClick = { /* Handle register logic */ }, modifier = Modifier.fillMaxWidth()) {
                 Text("Register")
             }
 
@@ -170,7 +139,6 @@ fun RegisterContent(onLoginClick: () -> Unit) {
             Text(
                 text = "Already have an account? Login",
                 color = Color.Blue,
-                style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.clickable { onLoginClick() }
             )
         }
@@ -188,18 +156,39 @@ fun MessengerHome(onLogoutClick: () -> Unit) {
             modifier = Modifier.align(Alignment.Center),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "Welcome to Messenger!",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
+            Text("Welcome to Messenger!", modifier = Modifier.padding(bottom = 16.dp))
 
-            Button(
-                onClick = { onLogoutClick() },
-                modifier = Modifier.padding(top = 16.dp)
-            ) {
+            Button(onClick = { onLogoutClick() }, modifier = Modifier.padding(top = 16.dp)) {
                 Text("Logout")
             }
+        }
+    }
+}
+
+fun connectToMySQL() {
+    val url = "jdbc:mysql://your-database-url:3306/your-database"
+    val user = "your-username"
+    val password = "your-password"
+
+    // Используем корутины для асинхронного подключения
+    lifecycleScope.launch(Dispatchers.IO) {
+        try {
+            val connection: Connection = DriverManager.getConnection(url, user, password)
+            val statement = connection.createStatement()
+            val resultSet: ResultSet = statement.executeQuery("SELECT * FROM your_table")
+
+            while (resultSet.next()) {
+                // Вы можете получить данные из resultSet и обновить UI
+                // Например, отобразить их в интерфейсе (в UI поток).
+                val data = resultSet.getString("your_column_name")
+                println("Data: $data")
+            }
+            resultSet.close()
+            statement.close()
+            connection.close()
+        } catch (e: SQLException) {
+            // Обработка ошибок
+            e.printStackTrace()
         }
     }
 }

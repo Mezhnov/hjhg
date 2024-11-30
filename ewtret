@@ -1,4 +1,5 @@
 package com.example.myapplication
+
 import androidx.compose.ui.platform.LocalContext
 import android.os.Bundle
 import android.widget.Toast
@@ -13,11 +14,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.ui.theme.MyApplicationTheme
-import kotlinx.coroutines.*
 import okhttp3.*
+import java.io.IOException
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,6 +36,7 @@ class MainActivity : ComponentActivity() {
 fun LoginScreen() {
     var showLogin by remember { mutableStateOf(true) }
     var isLoggedIn by remember { mutableStateOf(false) }
+    val context = LocalContext.current // Get the context
 
     when {
         isLoggedIn -> MessengerHome(onLogoutClick = {
@@ -47,7 +49,7 @@ fun LoginScreen() {
                     if (success) {
                         isLoggedIn = true
                     } else {
-                        Toast.makeText(it.context, "Login Failed", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Login Failed", Toast.LENGTH_SHORT).show()
                     }
                 }
             },
@@ -64,7 +66,7 @@ fun LoginScreen() {
 fun LoginContent(onLoginClick: (String, String) -> Unit, onRegisterClick: () -> Unit) {
     val username = remember { mutableStateOf("") }
     val password = remember { mutableStateOf("") }
-    val context = LocalContext.current // Получаем контекст активности
+    val context = LocalContext.current // Get the context
 
     Box(
         modifier = Modifier
@@ -96,7 +98,7 @@ fun LoginContent(onLoginClick: (String, String) -> Unit, onRegisterClick: () -> 
                 value = password.value,
                 onValueChange = { password.value = it },
                 label = { Text("Password") },
-                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 24.dp)
@@ -127,6 +129,7 @@ fun RegisterContent(onLoginClick: () -> Unit, onRegisterSuccess: () -> Unit) {
     val username = remember { mutableStateOf("") }
     val password = remember { mutableStateOf("") }
     val confirmPassword = remember { mutableStateOf("") }
+    val context = LocalContext.current // Get the context
 
     Box(
         modifier = Modifier
@@ -158,7 +161,7 @@ fun RegisterContent(onLoginClick: () -> Unit, onRegisterSuccess: () -> Unit) {
                 value = password.value,
                 onValueChange = { password.value = it },
                 label = { Text("Password") },
-                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp)
@@ -168,7 +171,7 @@ fun RegisterContent(onLoginClick: () -> Unit, onRegisterSuccess: () -> Unit) {
                 value = confirmPassword.value,
                 onValueChange = { confirmPassword.value = it },
                 label = { Text("Confirm Password") },
-                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 24.dp)
@@ -176,11 +179,15 @@ fun RegisterContent(onLoginClick: () -> Unit, onRegisterSuccess: () -> Unit) {
 
             Button(
                 onClick = {
-                    registerUser(username.value, password.value) { success ->
-                        if (success) {
-                            onRegisterSuccess()
-                        } else {
-                            Toast.makeText(it.context, "Registration Failed", Toast.LENGTH_SHORT).show()
+                    if (password.value != confirmPassword.value) {
+                        Toast.makeText(context, "Passwords do not match", Toast.LENGTH_SHORT).show()
+                    } else {
+                        registerUser(username.value, password.value) { success ->
+                            if (success) {
+                                onRegisterSuccess()
+                            } else {
+                                Toast.makeText(context, "Registration Failed", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     }
                 },
@@ -271,141 +278,9 @@ private fun registerUser(username: String, password: String, callback: (Boolean)
     })
 }
 
-@Preview(showBackground = true)
 @Composable
 fun DefaultPreview() {
     MyApplicationTheme {
         LoginScreen()
     }
 }
-
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:50:40 Unresolved reference 'it'.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:183:44 Unresolved reference 'it'.
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
-plugins {
-    alias(libs.plugins.android.application) apply false
-    alias(libs.plugins.kotlin.android) apply false
-    alias(libs.plugins.kotlin.compose) apply false
-}
-
-plugins {
-    alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.compose)
-}
-
-android {
-    namespace = "com.example.myapplication"
-    compileSdk = 35
-
-    defaultConfig {
-        applicationId = "com.example.myapplication"
-        minSdk = 26
-        targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
-
-    buildTypes {
-        release {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-    kotlinOptions {
-        jvmTarget = "11"
-    }
-    buildFeatures {
-        compose = true
-    }
-}
-
-dependencies {
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.activity.compose)
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.ui)
-    implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.ui.test.junit4)
-    debugImplementation(libs.androidx.ui.tooling)
-    debugImplementation(libs.androidx.ui.test.manifest)
-    implementation("com.squareup.okhttp3:okhttp:4.9.3") // Заменили на Kotlin DSL синтаксис
-}
-from flask import Flask, request, jsonify
-from werkzeug.security import generate_password_hash, check_password_hash
-import sqlite3
-
-app = Flask(__name__)
-
-# Подключение к базе данных
-def init_db():
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, password TEXT)''')
-    conn.commit()
-    conn.close()
-
-@app.route('/register', methods=['POST'])
-def register():
-    data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
-    confirm_password = data.get('confirm_password')
-
-    if password != confirm_password:
-        return jsonify({"message": "Passwords do not match"}), 400
-
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE username = ?", (username,))
-    user = c.fetchone()
-
-    if user:
-        return jsonify({"message": "User already exists"}), 400
-
-    hashed_password = generate_password_hash(password)
-    c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_password))
-    conn.commit()
-    conn.close()
-
-    return jsonify({"message": "Registration successful"}), 201
-
-
-@app.route('/login', methods=['POST'])
-def login():
-    data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
-
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE username = ?", (username,))
-    user = c.fetchone()
-    conn.close()
-
-    if not user or not check_password_hash(user[2], password):
-        return jsonify({"message": "Invalid username or password"}), 401
-
-    return jsonify({"message": "Login successful"}), 200
-
-
-if __name__ == '__main__':
-    init_db()
-    app.run(debug=True)
-

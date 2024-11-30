@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "com.example.myapplication"
-    compileSdk = 35
+    compileSdk = 35 // Оставьте это, если хотите использовать Android SDK версии 35 для компиляции
 
     defaultConfig {
         applicationId = "com.example.myapplication"
-        minSdk = 34
-        targetSdk = 35
+        minSdk = 24 // Установите минимальную версию Android на 7 (API Level 24)
+        targetSdk = 35 // Оставьте targetSdk на уровне 35, чтобы приложение оптимизировалось для последней версии Android
         versionCode = 1
         versionName = "1.0"
 

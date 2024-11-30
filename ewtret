@@ -1,289 +1,63 @@
-package com.example.myapplication
+from flask import Flask, request, jsonify
+from werkzeug.security import generate_password_hash, check_password_hash
+import sqlite3
 
-import androidx.compose.ui.platform.LocalContext
-import android.os.Bundle
-import android.widget.Toast
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.unit.dp
-import com.example.myapplication.ui.theme.MyApplicationTheme
-import okhttp3.*
-import java.io.IOException
+app = Flask(__name__)
 
-class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent {
-            MyApplicationTheme {
-                LoginScreen()
-            }
-        }
-    }
-}
+# Подключение к базе данных
+def init_db():
+    conn = sqlite3.connect('users.db')  # Локальная база данных
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, password TEXT)''')
+    conn.commit()
+    conn.close()
 
-@Composable
-fun LoginScreen() {
-    var showLogin by remember { mutableStateOf(true) }
-    var isLoggedIn by remember { mutableStateOf(false) }
-    val context = LocalContext.current // Get the context
+@app.route('/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    print(f"Received registration request: {data}")  # Логируем данные для отладки
 
-    when {
-        isLoggedIn -> MessengerHome(onLogoutClick = {
-            isLoggedIn = false
-            showLogin = true
-        })
-        showLogin -> LoginContent(
-            onLoginClick = { username, password ->
-                loginUser(username, password) { success ->
-                    if (success) {
-                        isLoggedIn = true
-                    } else {
-                        Toast.makeText(context, "Login Failed", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            },
-            onRegisterClick = { showLogin = false }
-        )
-        else -> RegisterContent(
-            onLoginClick = { showLogin = true },
-            onRegisterSuccess = { isLoggedIn = true }
-        )
-    }
-}
+    username = data.get('username')
+    password = data.get('password')
+    confirm_password = data.get('confirm_password')
 
-@Composable
-fun LoginContent(onLoginClick: (String, String) -> Unit, onRegisterClick: () -> Unit) {
-    val username = remember { mutableStateOf("") }
-    val password = remember { mutableStateOf("") }
-    val context = LocalContext.current // Get the context
+    if password != confirm_password:
+        return jsonify({"message": "Passwords do not match"}), 400
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFE0E0E0))
-    ) {
-        Column(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Messenger App",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 32.dp)
-            )
+    conn = sqlite3.connect('users.db')  # Локальная база данных
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE username = ?", (username,))
+    user = c.fetchone()
 
-            OutlinedTextField(
-                value = username.value,
-                onValueChange = { username.value = it },
-                label = { Text("Username") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            )
+    if user:
+        return jsonify({"message": "User already exists"}), 400
 
-            OutlinedTextField(
-                value = password.value,
-                onValueChange = { password.value = it },
-                label = { Text("Password") },
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp)
-            )
+    hashed_password = generate_password_hash(password)
+    c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_password))
+    conn.commit()
+    conn.close()
 
-            Button(
-                onClick = {
-                    onLoginClick(username.value, password.value)
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Login")
-            }
+    return jsonify({"message": "Registration successful"}), 201
 
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Don't have an account? Sign Up",
-                color = Color.Blue,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.clickable { onRegisterClick() }
-            )
-        }
-    }
-}
 
-@Composable
-fun RegisterContent(onLoginClick: () -> Unit, onRegisterSuccess: () -> Unit) {
-    val username = remember { mutableStateOf("") }
-    val password = remember { mutableStateOf("") }
-    val confirmPassword = remember { mutableStateOf("") }
-    val context = LocalContext.current // Get the context
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFE0E0E0))
-    ) {
-        Column(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Create Account",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 32.dp)
-            )
+    conn = sqlite3.connect('users.db')  # Локальная база данных
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE username = ?", (username,))
+    user = c.fetchone()
+    conn.close()
 
-            OutlinedTextField(
-                value = username.value,
-                onValueChange = { username.value = it },
-                label = { Text("Username") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            )
+    if not user or not check_password_hash(user[2], password):
+        return jsonify({"message": "Invalid username or password"}), 401
 
-            OutlinedTextField(
-                value = password.value,
-                onValueChange = { password.value = it },
-                label = { Text("Password") },
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            )
+    return jsonify({"message": "Login successful"}), 200
 
-            OutlinedTextField(
-                value = confirmPassword.value,
-                onValueChange = { confirmPassword.value = it },
-                label = { Text("Confirm Password") },
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp)
-            )
 
-            Button(
-                onClick = {
-                    if (password.value != confirmPassword.value) {
-                        Toast.makeText(context, "Passwords do not match", Toast.LENGTH_SHORT).show()
-                    } else {
-                        registerUser(username.value, password.value) { success ->
-                            if (success) {
-                                onRegisterSuccess()
-                            } else {
-                                Toast.makeText(context, "Registration Failed", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Register")
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Already have an account? Login",
-                color = Color.Blue,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.clickable { onLoginClick() }
-            )
-        }
-    }
-}
-
-@Composable
-fun MessengerHome(onLogoutClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFBBDEFB))
-    ) {
-        Column(
-            modifier = Modifier.align(Alignment.Center),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Welcome to Messenger!",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
-            Button(
-                onClick = { onLogoutClick() },
-                modifier = Modifier.padding(top = 16.dp)
-            ) {
-                Text("Logout")
-            }
-        }
-    }
-}
-
-private fun loginUser(username: String, password: String, callback: (Boolean) -> Unit) {
-    val client = OkHttpClient()
-    val formBody = FormBody.Builder()
-        .add("username", username)
-        .add("password", password)
-        .build()
-    val request = Request.Builder()
-        .url("http://192.168.146.1/login")
-        .post(formBody)
-        .build()
-
-    client.newCall(request).enqueue(object : Callback {
-        override fun onFailure(call: Call, e: IOException) {
-            callback(false)
-        }
-
-        override fun onResponse(call: Call, response: Response) {
-            callback(response.isSuccessful)
-        }
-    })
-}
-
-private fun registerUser(username: String, password: String, callback: (Boolean) -> Unit) {
-    val client = OkHttpClient()
-    val formBody = FormBody.Builder()
-        .add("username", username)
-        .add("password", password)
-        .build()
-    val request = Request.Builder()
-        .url("http://192.168.146.1/register")
-        .post(formBody)
-        .build()
-
-    client.newCall(request).enqueue(object : Callback {
-        override fun onFailure(call: Call, e: IOException) {
-            callback(false)
-        }
-
-        override fun onResponse(call: Call, response: Response) {
-            callback(response.isSuccessful)
-        }
-    })
-}
-
-@Composable
-fun DefaultPreview() {
-    MyApplicationTheme {
-        LoginScreen()
-    }
-}
-
-Variable 'context' is never used
-Function "DefaultPreview" is never used
+if __name__ == '__main__':
+    init_db()  # Инициализация базы данных
+    app.run(host='127.0.0.1', port=5000, debug=True)  # Работает локально на 127.0.0.1 (localhost)

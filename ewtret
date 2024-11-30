@@ -1,1 +1,1 @@
-    val context = LocalContext.current // Получаем контекст активности
+import androidx.compose.ui.platform.LocalContext

@@ -1,1 +1,15 @@
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/build.gradle.kts:8:19: Unexpected tokens (use ';' to separate expressions on the same line)
+// build.gradle.kts (уровень проекта)
+plugins {
+    id("com.android.application") version "8.0.0" apply false
+    id("org.jetbrains.kotlin.android") version "1.8.0" apply false
+}
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath("com.google.gms:google-services:4.3.15") // Плагин для Google Services
+    }
+}

@@ -1,58 +1,91 @@
-package com.example.myapplication
+package com.example.myapp
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.myapplication.ui.theme.MyApplicationTheme
+import com.google.gson.Gson
+import java.io.File
+import java.io.FileReader
+import java.io.FileWriter
 
-class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent {
-            MyApplicationTheme {
-                LoginScreen()
+data class User(val username: String, val password: String)
+
+class UserManager(private val context: ComponentActivity) {
+    private val fileName = "users.json"
+    private val gson = Gson()
+
+    // Чтение данных из файла
+    fun readUsers(): List<User> {
+        val file = File(context.filesDir, fileName)
+        return if (file.exists()) {
+            FileReader(file).use {
+                gson.fromJson(it, Array<User>::class.java).toList()
             }
+        } else {
+            emptyList()
         }
     }
+
+    // Запись данных в файл
+    fun saveUsers(users: List<User>) {
+        val file = File(context.filesDir, fileName)
+        FileWriter(file).use {
+            gson.toJson(users, it)
+        }
+    }
+
+    // Добавление нового пользователя
+    fun addUser(user: User) {
+        val users = readUsers().toMutableList()
+        users.add(user)
+        saveUsers(users)
+    }
+
+    // Проверка существует ли пользователь
+    fun isUserExist(username: String): Boolean {
+        return readUsers().any { it.username == username }
+    }
+
+    // Проверка пароля для пользователя
+    fun validateUser(username: String, password: String): Boolean {
+        return readUsers().any { it.username == username && it.password == password }
+    }
 }
 
 @Composable
-fun LoginScreen() {
-    var showLogin by remember { mutableStateOf(true) }
-    var isLoggedIn by remember { mutableStateOf(false) }
+fun LoginScreen(userManager: UserManager) {
+    var isLoginMode by remember { mutableStateOf(true) }
 
-    when {
-        isLoggedIn -> MessengerHome(onLogoutClick = {
-            isLoggedIn = false
-            showLogin = true
-        })
-        showLogin -> LoginContent(
-            onLoginClick = { isLoggedIn = true },
-            onRegisterClick = { showLogin = false }
+    if (isLoginMode) {
+        LoginContent(
+            onLoginClick = { /* Логика для успешного входа */ },
+            onRegisterClick = { isLoginMode = false },
+            userManager = userManager
         )
-        else -> RegisterContent(
-            onLoginClick = { showLogin = true },
-            onRegisterSuccess = { isLoggedIn = true }
+    } else {
+        RegisterContent(
+            onLoginClick = { isLoginMode = true },
+            userManager = userManager
         )
     }
 }
 
 @Composable
-fun LoginContent(onLoginClick: () -> Unit, onRegisterClick: () -> Unit) {
+fun LoginContent(onLoginClick: () -> Unit, onRegisterClick: () -> Unit, userManager: UserManager) {
     val username = remember { mutableStateOf("") }
     val password = remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf("") }
 
     Box(
         modifier = Modifier
@@ -67,7 +100,7 @@ fun LoginContent(onLoginClick: () -> Unit, onRegisterClick: () -> Unit) {
         ) {
             Text(
                 text = "Messenger App",
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.h4,
                 modifier = Modifier.padding(bottom = 32.dp)
             )
 
@@ -84,7 +117,7 @@ fun LoginContent(onLoginClick: () -> Unit, onRegisterClick: () -> Unit) {
                 value = password.value,
                 onValueChange = { password.value = it },
                 label = { Text("Password") },
-                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 24.dp)
@@ -92,18 +125,31 @@ fun LoginContent(onLoginClick: () -> Unit, onRegisterClick: () -> Unit) {
 
             Button(
                 onClick = {
-                    onLoginClick()
+                    if (userManager.validateUser(username.value, password.value)) {
+                        onLoginClick()
+                    } else {
+                        errorMessage = "Invalid username or password"
+                    }
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Login")
             }
 
+            if (errorMessage.isNotEmpty()) {
+                Text(
+                    text = errorMessage,
+                    color = Color.Red,
+                    style = MaterialTheme.typography.body2,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "Don't have an account? Sign Up",
                 color = Color.Blue,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.body2,
                 modifier = Modifier.clickable { onRegisterClick() }
             )
         }
@@ -111,10 +157,11 @@ fun LoginContent(onLoginClick: () -> Unit, onRegisterClick: () -> Unit) {
 }
 
 @Composable
-fun RegisterContent(onLoginClick: () -> Unit, onRegisterSuccess: () -> Unit) {
+fun RegisterContent(onLoginClick: () -> Unit, userManager: UserManager) {
     val username = remember { mutableStateOf("") }
     val password = remember { mutableStateOf("") }
     val confirmPassword = remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf("") }
 
     Box(
         modifier = Modifier
@@ -129,7 +176,7 @@ fun RegisterContent(onLoginClick: () -> Unit, onRegisterSuccess: () -> Unit) {
         ) {
             Text(
                 text = "Create Account",
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.h4,
                 modifier = Modifier.padding(bottom = 32.dp)
             )
 
@@ -146,7 +193,7 @@ fun RegisterContent(onLoginClick: () -> Unit, onRegisterSuccess: () -> Unit) {
                 value = password.value,
                 onValueChange = { password.value = it },
                 label = { Text("Password") },
-                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp)
@@ -156,7 +203,7 @@ fun RegisterContent(onLoginClick: () -> Unit, onRegisterSuccess: () -> Unit) {
                 value = confirmPassword.value,
                 onValueChange = { confirmPassword.value = it },
                 label = { Text("Confirm Password") },
-                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 24.dp)
@@ -164,47 +211,49 @@ fun RegisterContent(onLoginClick: () -> Unit, onRegisterSuccess: () -> Unit) {
 
             Button(
                 onClick = {
-                    // Здесь можно добавить логику для проверки данных регистрации
-                    onRegisterSuccess() // Вызываем onRegisterSuccess при успешной регистрации
+                    if (password.value != confirmPassword.value) {
+                        errorMessage = "Passwords do not match"
+                    } else if (userManager.isUserExist(username.value)) {
+                        errorMessage = "Username already exists"
+                    } else {
+                        userManager.addUser(User(username.value, password.value))
+                        onLoginClick()
+                    }
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Register")
             }
 
+            if (errorMessage.isNotEmpty()) {
+                Text(
+                    text = errorMessage,
+                    color = Color.Red,
+                    style = MaterialTheme.typography.body2,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "Already have an account? Login",
                 color = Color.Blue,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.body2,
                 modifier = Modifier.clickable { onLoginClick() }
             )
         }
     }
 }
 
-@Composable
-fun MessengerHome(onLogoutClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFBBDEFB))
-    ) {
-        Column(
-            modifier = Modifier.align(Alignment.Center),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Welcome to Messenger!",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
 
-            Button(
-                onClick = { onLogoutClick() },
-                modifier = Modifier.padding(top = 16.dp)
-            ) {
-                Text("Logout")
+        val userManager = UserManager(this)
+
+        setContent {
+            MaterialTheme {
+                LoginScreen(userManager = userManager)
             }
         }
     }
@@ -213,136 +262,8 @@ fun MessengerHome(onLogoutClick: () -> Unit) {
 @Preview(showBackground = true)
 @Composable
 fun DefaultPreview() {
-    MyApplicationTheme {
-        LoginScreen()
+    val userManager = UserManager(Context())
+    MaterialTheme {
+        LoginScreen(userManager = userManager)
     }
 }
-
-Connect and retrieve data from databases﻿
-Edit pageLast modified: 25 September 2024
-Kotlin Notebook offers capabilities for connecting to and retrieving data from various types of SQL databases, such as MariaDB, PostgreSQL, MySQL, and SQLite. Utilizing the Kotlin DataFrame library, Kotlin Notebook can establish connections to databases, execute SQL queries, and import the results for further operations.
-
-For a detailed example, see the Notebook in the KotlinDataFrame SQL Examples GitHub repository.
-
-Before you start﻿
-Download and install the latest version of IntelliJ IDEA Ultimate.
-
-Install the Kotlin Notebook plugin in IntelliJ IDEA.
-
-Alternatively, access the Kotlin Notebook plugin from Settings | Plugins | Marketplace within IntelliJ IDEA.
-
-Create a new Kotlin Notebook by selecting File | New | Kotlin Notebook.
-
-Ensure you have access to an SQL database, such as MariaDB or MySQL.
-
-Connect to database﻿
-You can connect to and interact with an SQL database using specific functions from the Kotlin DataFrame library. You can use DatabaseConfiguration to establish a connection to your database and getSchemaForAllSqlTables() to retrieve the schema of all tables within it.
-
-Let's look at an example:
-
-Open your Kotlin Notebook file (.ipynb).
-
-Add a dependency for a JDBC (Java Database Connectivity) driver, and specify the JDBC driver version. This example uses MariaDB:
-
-USE {
-   dependencies("org.mariadb.jdbc:mariadb-java-client:$version")
-}
-Import the Kotlin DataFrame library, which is essential for data manipulation tasks, along with the necessary Java libraries for SQL connectivity and utility functions:
-
-%use dataframe
-import java.sql.DriverManager
-import java.util.*
-Use the DatabaseConfiguration class to define your database's connection parameters, including the URL, username, and password:
-
-val URL = "YOUR_URL"
-val USER_NAME = "YOUR_USERNAME"
-val PASSWORD = "YOUR_PASSWORD"
-
-val dbConfig = DatabaseConfiguration(URL, USER_NAME, PASSWORD)
-Once connected, use the getSchemaForAllSqlTables() function to fetch and display the schema information for each table in the database:
-
-val dataschemas = DataFrame.getSchemaForAllSqlTables(dbConfig)
-
-dataschemas.forEach {
-    println("---Yet another table schema---")
-    println(it)
-    println()
-}
-For more information on connecting to SQL databases, see Read from SQL databases in the Kotlin DataFrame documentation.
-
-Retrieve and manipulate data﻿
-After establishing a connection to an SQL database, you can retrieve and manipulate data in Kotlin Notebook, utilizing the Kotlin DataFrame library. You can use the readSqlTable() function to retrieve data. To manipulate data, you can use methods, such as filter, groupBy, and convert.
-
-Let's look at an example of connecting to an IMDB database and retrieving data about movies directed by Quentin Tarantino:
-
-Use the readSqlTable() function to retrieve data from the "movies" table, setting limit to restrict the query to the first 100 records for efficiency:
-
-val dfs = DataFrame.readSqlTable(dbConfig, tableName = "movies", limit = 100)
-Use an SQL query to retrieve a specific dataset related to movies directed by Quentin Tarantino. This query selects movie details and combines genres for each movie:
-
-val props = Properties()
-props.setProperty("user", USER_NAME)
-props.setProperty("password", PASSWORD)
-
-val TARANTINO_FILMS_SQL_QUERY = """
-    SELECT name, year, rank, GROUP_CONCAT(genre) as "genres"
-    FROM movies JOIN movies_directors ON movie_id = movies.id
-    JOIN directors ON directors.id=director_id LEFT JOIN movies_genres ON movies.id = movies_genres.movie_id
-    WHERE directors.first_name = "Quentin" AND directors.last_name = "Tarantino"
-    GROUP BY name, year, rank
-    ORDER BY year
-    """
-
-// Retrieves a list of Quentin Tarantino's movies, including their name, year, rank, and a concatenated string of all genres.
-// The results are grouped by name, year, rank, and sorted by year.
-
-var dfTarantinoMovies: DataFrame<*>
-
-DriverManager.getConnection(URL, props).use { connection ->
-   connection.createStatement().use { st ->
-      st.executeQuery(TARANTINO_FILMS_SQL_QUERY).use { rs ->
-         val dfTarantinoFilmsSchema = DataFrame.getSchemaForResultSet(rs, connection)
-         dfTarantinoFilmsSchema.print()
-
-         dfTarantinoMovies = DataFrame.readResultSet(rs, connection)
-         dfTarantinoMovies
-      }
-   }
-}
-After fetching the Tarantino movies dataset, you can further manipulate and filter the data.
-
-val df = dfTarantinoMovies
-    // Replaces any missing values in the 'year' column with 0.
-    .fillNA { year }.with { 0 }
-
-    // Converts the 'year' column to integers.
-    .convert { year }.toInt()
-
-    // Filters the data to include only movies released after the year 2000.
-    .filter { year > 2000 }
-df
-The resulting output is a DataFrame where missing values in the year column are replaced with 0 using the fillNA method. The year column is converted to integer values with the convert method, and the data is filtered to include only rows from the year 2000 onwards using the filter method.
-
-Analyze data in Kotlin Notebook﻿
-After establishing a connection to an SQL database, you can use Kotlin Notebook for in-depth data analysis utilizing the Kotlin DataFrame library. This includes functions for grouping, sorting, and aggregating data, helping you to uncover and understand patterns within your data.
-
-Let's dive into an example that involves analyzing actor data from a movie database, focusing on the most frequently occurring first names of actors:
-
-Extract data from the "actors" table using the readSqlTable() function:
-
-val actorDf = DataFrame.readSqlTable(dbConfig, "actors", 10000)
-Process the retrieved data to identify the top 20 most common actor first names. This analysis involves several DataFrame methods:
-
-val top20ActorNames = actorDf
-    // Groups the data by the first_name column to organize it based on actor first names.
-   .groupBy { first_name }
-
-    // Counts the occurrences of each unique first name, providing a frequency distribution.
-   .count()
-
-    // Sorts the results in descending order of count to identify the most common names.
-   .sortByDesc("count")
-
-    // Selects the top 20 most frequent names for analysis.
-   .take(20)
-top20ActorNames

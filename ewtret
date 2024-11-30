@@ -67,7 +67,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MyApplicationTheme {
+            MaterialTheme {
                 LoginScreen()
             }
         }
@@ -276,15 +276,7 @@ fun MessengerHome(onLogoutClick: () -> Unit) {
 @Preview(showBackground = true)
 @Composable
 fun DefaultPreview() {
-    MyApplicationTheme {
+    MaterialTheme {
         LoginScreen()
     }
 }
-
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:70:13 Unresolved reference 'MyApplicationTheme'.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:71:17 @Composable invocations can only happen from the context of a @Composable function
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:279:5 Unresolved reference 'MyApplicationTheme'.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:280:9 @Composable invocations can only happen from the context of a @Composable function
-
-Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilation error. See log for more details
-Compilation error. See log for more details

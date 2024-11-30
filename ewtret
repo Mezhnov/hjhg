@@ -1,12 +1,27 @@
-2024-11-30 19:24:55.069   607-1959  NotificationService     system_server                        E  Package has already queued 5 toasts. Not showing more. Package=com.example.myapplication
-2024-11-30 19:24:55.248   607-1959  NotificationService     system_server                        E  Package has already queued 5 toasts. Not showing more. Package=com.example.myapplication
-2024-11-30 19:24:55.262 20816-20831 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=501.62ms min=499.61ms max=503.63ms count=2
-2024-11-30 19:24:55.410   607-1959  NotificationService     system_server                        E  Package has already queued 5 toasts. Not showing more. Package=com.example.myapplication
-2024-11-30 19:24:55.586   607-1959  NotificationService     system_server                        E  Package has already queued 5 toasts. Not showing more. Package=com.example.myapplication
-2024-11-30 19:24:55.762   607-1959  NotificationService     system_server                        E  Package has already queued 5 toasts. Not showing more. Package=com.example.myapplication
-2024-11-30 19:24:55.938   607-1959  NotificationService     system_server                        E  Package has already queued 5 toasts. Not showing more. Package=com.example.myapplication
-2024-11-30 19:24:56.105   607-1959  NotificationService     system_server                        E  Package has already queued 5 toasts. Not showing more. Package=com.example.myapplication
-2024-11-30 19:24:56.290   607-1959  NotificationService     system_server                        E  Package has already queued 5 toasts. Not showing more. Package=com.example.myapplication
-2024-11-30 19:24:56.644   607-1959  NotificationService     system_server                        E  Package has already queued 5 toasts. Not showing more. Package=com.example.myapplication
-2024-11-30 19:24:56.747 20816-20831 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=494.81ms min=489.58ms max=500.28ms count=3
-2024-11-30 19:24:56.812   607-1959  NotificationService     system_server                        E  Package has already queued 5 toasts. Not showing more. Package=com.example.myapplication
+private fun registerUser(username: String, password: String, callback: (Boolean) -> Unit) {
+    val client = OkHttpClient()
+    val formBody = FormBody.Builder()
+        .add("username", username)
+        .add("password", password)
+        .build()
+    val request = Request.Builder()
+        .url("http://192.168.0.119:5000/register")
+        .post(formBody)
+        .build()
+
+    client.newCall(request).enqueue(object : Callback {
+        override fun onFailure(call: Call, e: IOException) {
+            Log.e("Register", "Failed to register", e)
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                callback(false)
+            }
+        }
+
+        override fun onResponse(call: Call, response: Response) {
+            Log.d("Register", "Register response: ${response.body?.string()}")
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                callback(response.isSuccessful)
+            }
+        }
+    })
+}

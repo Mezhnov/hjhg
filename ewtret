@@ -7,14 +7,11 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.myapplication.ui.theme.MyApplicationTheme
@@ -182,112 +179,34 @@ fun RegisterContent(onLoginClick: () -> Unit) {
 
 @Composable
 fun MessengerHome(onLogoutClick: () -> Unit) {
-    // Пример данных для списка чатов
-    val chats = remember { generateSampleChats() }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Messenger") },
-                backgroundColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                actions = {
-                    Text(
-                        text = "Logout",
-                        modifier = Modifier
-                            .padding(horizontal = 16.dp)
-                            .clickable { onLogoutClick() },
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
-            )
-        }
-    ) { paddingValues ->
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            // Левая панель со списком чатов
-            Box(
-                modifier = Modifier
-                    .width(300.dp)
-                    .fillMaxHeight()
-                    .background(Color(0xFFF5F5F5))
-            ) {
-                LazyColumn {
-                    items(chats) { chat ->
-                        ChatItem(chat = chat, onClick = {
-                            // Обработка нажатия на чат
-                        })
-                    }
-                }
-            }
-
-            // Правая панель - пустая или с открытым чатом
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.White),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Select a chat to start messaging",
-                    style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun ChatItem(chat: Chat, onClick: () -> Unit) {
-    Column(
+    Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(vertical = 12.dp, horizontal = 16.dp)
+            .fillMaxSize()
+            .background(Color(0xFFBBDEFB))
     ) {
-        Text(
-            text = chat.name,
-            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = chat.lastMessage,
-            style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray),
-            maxLines = 1
-        )
-    }
-}
+        Column(
+            modifier = Modifier.align(Alignment.Center),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Welcome to Messenger!",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
 
-data class Chat(
-    val id: Int,
-    val name: String,
-    val lastMessage: String
-)
-
-fun generateSampleChats(): List<Chat> {
-    return List(20) { index ->
-        Chat(
-            id = index,
-            name = "Contact ${index + 1}",
-            lastMessage = "Last message from Contact ${index + 1}"
-        )
-    }
-}
-
-@Preview(showBackground = true, widthDp = 800, heightDp = 600)
-@Composable
-fun MessengerHomePreview() {
-    MyApplicationTheme {
-        MessengerHome(onLogoutClick = {})
+            Button(
+                onClick = { onLogoutClick() },
+                modifier = Modifier.padding(top = 16.dp)
+            ) {
+                Text("Logout")
+            }
+        }
     }
 }
 
 @Preview(showBackground = true)
 @Composable
-fun LoginScreenPreview() {
+fun DefaultPreview() {
     MyApplicationTheme {
         LoginScreen()
     }

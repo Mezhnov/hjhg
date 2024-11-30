@@ -1,63 +1,81 @@
-from flask import Flask, request, jsonify
-from werkzeug.security import generate_password_hash, check_password_hash
-import sqlite3
-
-app = Flask(__name__)
-
-# Подключение к базе данных
-def init_db():
-    conn = sqlite3.connect('users.db')  # Локальная база данных
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, password TEXT)''')
-    conn.commit()
-    conn.close()
-
-@app.route('/register', methods=['POST'])
-def register():
-    data = request.get_json()
-    print(f"Received registration request: {data}")  # Логируем данные для отладки
-
-    username = data.get('username')
-    password = data.get('password')
-    confirm_password = data.get('confirm_password')
-
-    if password != confirm_password:
-        return jsonify({"message": "Passwords do not match"}), 400
-
-    conn = sqlite3.connect('users.db')  # Локальная база данных
-    c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE username = ?", (username,))
-    user = c.fetchone()
-
-    if user:
-        return jsonify({"message": "User already exists"}), 400
-
-    hashed_password = generate_password_hash(password)
-    c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_password))
-    conn.commit()
-    conn.close()
-
-    return jsonify({"message": "Registration successful"}), 201
-
-
-@app.route('/login', methods=['POST'])
-def login():
-    data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
-
-    conn = sqlite3.connect('users.db')  # Локальная база данных
-    c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE username = ?", (username,))
-    user = c.fetchone()
-    conn.close()
-
-    if not user or not check_password_hash(user[2], password):
-        return jsonify({"message": "Invalid username or password"}), 401
-
-    return jsonify({"message": "Login successful"}), 200
-
-
-if __name__ == '__main__':
-    init_db()  # Инициализация базы данных
-    app.run(host='127.0.0.1', port=5000, debug=True)  # Работает локально на 127.0.0.1 (localhost)
+2024-11-30 16:13:41.918 16820-16854 Process                 com.example.myapplication            I  Sending signal. PID: 16820 SIG: 9
+2024-11-30 16:27:44.943 16920-16920 ziparchive              com.example.myapplication            W  Unable to open '/data/data/com.example.myapplication/code_cache/.overlay/base.apk/classes5.dm': No such file or directory
+2024-11-30 16:27:44.945 16920-16920 ziparchive              com.example.myapplication            W  Unable to open '/data/app/~~OhI6Yp4Ajssks2qDPwC96w==/com.example.myapplication-iTZPg85bpwwr1c60S_0Drg==/base.dm': No such file or directory
+2024-11-30 16:27:44.945 16920-16920 ziparchive              com.example.myapplication            W  Unable to open '/data/app/~~OhI6Yp4Ajssks2qDPwC96w==/com.example.myapplication-iTZPg85bpwwr1c60S_0Drg==/base.dm': No such file or directory
+2024-11-30 16:27:45.086 16920-16920 nativeloader            com.example.myapplication            D  Configuring clns-7 for other apk /data/app/~~OhI6Yp4Ajssks2qDPwC96w==/com.example.myapplication-iTZPg85bpwwr1c60S_0Drg==/base.apk. target_sdk_version=35, uses_libraries=, library_path=/data/app/~~OhI6Yp4Ajssks2qDPwC96w==/com.example.myapplication-iTZPg85bpwwr1c60S_0Drg==/lib/x86_64, permitted_path=/data:/mnt/expand:/data/user/0/com.example.myapplication
+2024-11-30 16:27:45.092 16920-16920 CompatChangeReporter    com.example.myapplication            D  Compat change id reported: 202956589; UID 10208; state: ENABLED
+2024-11-30 16:27:45.109 16920-16920 GraphicsEnvironment     com.example.myapplication            V  Currently set values for:
+2024-11-30 16:27:45.109 16920-16920 GraphicsEnvironment     com.example.myapplication            V    angle_gl_driver_selection_pkgs=[]
+2024-11-30 16:27:45.109 16920-16920 GraphicsEnvironment     com.example.myapplication            V    angle_gl_driver_selection_values=[]
+2024-11-30 16:27:45.109 16920-16920 GraphicsEnvironment     com.example.myapplication            V  Global.Settings values are invalid: number of packages: 0, number of values: 0
+2024-11-30 16:27:45.109 16920-16920 GraphicsEnvironment     com.example.myapplication            V  Neither updatable production driver nor prerelease driver is supported.
+2024-11-30 16:27:45.147 16920-16920 CompatChangeReporter    com.example.myapplication            D  Compat change id reported: 279646685; UID 10208; state: ENABLED
+2024-11-30 16:27:45.212 16920-16920 CompatChangeReporter    com.example.myapplication            D  Compat change id reported: 309578419; UID 10208; state: ENABLED
+2024-11-30 16:27:45.320 16920-16920 HWUI                    com.example.myapplication            W  Unknown dataspace 0
+2024-11-30 16:27:45.549 16920-16924 e.myapplication         com.example.myapplication            I  Compiler allocated 5174KB to compile void android.view.ViewRootImpl.performTraversals()
+2024-11-30 16:27:45.862 16920-16920 e.myapplication         com.example.myapplication            W  Method boolean androidx.compose.runtime.snapshots.SnapshotStateList.conditionalUpdate(boolean, kotlin.jvm.functions.Function1) failed lock verification and will run slower.
+                                                                                                    Common causes for lock verification issues are non-optimized dex code
+                                                                                                    and incorrect proguard optimizations.
+2024-11-30 16:27:45.862 16920-16920 e.myapplication         com.example.myapplication            W  Method boolean androidx.compose.runtime.snapshots.SnapshotStateList.conditionalUpdate$default(androidx.compose.runtime.snapshots.SnapshotStateList, boolean, kotlin.jvm.functions.Function1, int, java.lang.Object) failed lock verification and will run slower.
+2024-11-30 16:27:45.862 16920-16920 e.myapplication         com.example.myapplication            W  Method java.lang.Object androidx.compose.runtime.snapshots.SnapshotStateList.mutate(kotlin.jvm.functions.Function1) failed lock verification and will run slower.
+2024-11-30 16:27:45.862 16920-16920 e.myapplication         com.example.myapplication            W  Method void androidx.compose.runtime.snapshots.SnapshotStateList.update(boolean, kotlin.jvm.functions.Function1) failed lock verification and will run slower.
+2024-11-30 16:27:45.862 16920-16920 e.myapplication         com.example.myapplication            W  Method void androidx.compose.runtime.snapshots.SnapshotStateList.update$default(androidx.compose.runtime.snapshots.SnapshotStateList, boolean, kotlin.jvm.functions.Function1, int, java.lang.Object) failed lock verification and will run slower.
+2024-11-30 16:27:46.130 16920-16936 EGL_emulation           com.example.myapplication            I  Opening libGLESv1_CM_emulation.so
+2024-11-30 16:27:46.132 16920-16936 EGL_emulation           com.example.myapplication            I  Opening libGLESv2_emulation.so
+2024-11-30 16:27:46.145 16920-16936 HWUI                    com.example.myapplication            W  Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+2024-11-30 16:27:46.145 16920-16936 HWUI                    com.example.myapplication            W  Failed to initialize 101010-2 format, error = EGL_SUCCESS
+2024-11-30 16:27:46.561 16920-16936 Gralloc4                com.example.myapplication            I  mapper 4.x is not supported
+2024-11-30 16:27:46.650 16920-16920 Choreographer           com.example.myapplication            I  Skipped 70 frames!  The application may be doing too much work on its main thread.
+2024-11-30 16:27:46.661 16920-16933 HWUI                    com.example.myapplication            I  Davey! duration=1470ms; Flags=1, FrameTimelineVsyncId=479874, IntendedVsync=26907259279590, Vsync=26907409279584, InputEventId=0, HandleInputStart=26907419868400, AnimationStart=26907419888100, PerformTraversalsStart=26907420090700, DrawStart=26908671398900, FrameDeadline=26907275946256, FrameInterval=26907419304900, FrameStartTime=16666666, SyncQueued=26908684522700, SyncStart=26908699147100, IssueDrawCommandsStart=26908699950800, SwapBuffers=26908723785200, FrameCompleted=26908743940000, DequeueBufferDuration=15100, QueueBufferDuration=163400, GpuCompleted=26908743940000, SwapBuffersCompleted=26908725818900, DisplayPresentTime=0, CommandSubmissionCompleted=26908723785200, 
+2024-11-30 16:27:48.326 16920-16920 Compose Focus           com.example.myapplication            D  Owner FocusChanged(true)
+2024-11-30 16:27:48.387 16920-16920 InsetsController        com.example.myapplication            D  show(ime(), fromIme=false)
+2024-11-30 16:27:48.391 16920-16920 ImeTracker              com.example.myapplication            I  com.example.myapplication:4b2b91a2: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT_BY_INSETS_API fromUser false
+2024-11-30 16:27:48.396 16920-16920 InputMethodManager      com.example.myapplication            D  showSoftInput() view=androidx.compose.ui.platform.AndroidComposeView{dc467d0 VFED..... .F....ID 0,0-1080,2400 aid=1073741824} flags=0 reason=SHOW_SOFT_INPUT_BY_INSETS_API
+2024-11-30 16:27:48.413 16920-16936 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=173.19ms min=2.35ms max=831.72ms count=10
+2024-11-30 16:27:48.426 16920-16920 ImeTracker              com.example.myapplication            I  com.example.myapplication:b9dfd637: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT fromUser false
+2024-11-30 16:27:48.426 16920-16920 InputMethodManager      com.example.myapplication            D  showSoftInput() view=androidx.compose.ui.platform.AndroidComposeView{dc467d0 VFED..... .F...... 0,0-1080,2400 aid=1073741824} flags=0 reason=SHOW_SOFT_INPUT
+2024-11-30 16:27:48.616 16920-16920 InsetsController        com.example.myapplication            D  show(ime(), fromIme=true)
+2024-11-30 16:27:48.621 16920-16920 InsetsController        com.example.myapplication            D  show(ime(), fromIme=true)
+2024-11-30 16:27:48.622 16920-16920 ImeTracker              com.example.myapplication            I  com.example.myapplication:b9dfd637: onCancelled at PHASE_CLIENT_APPLY_ANIMATION
+2024-11-30 16:27:48.626 16920-16953 InteractionJankMonitor  com.example.myapplication            W  Initializing without READ_DEVICE_CONFIG permission. enabled=false, interval=1, missedFrameThreshold=3, frameTimeThreshold=64, package=com.example.myapplication
+2024-11-30 16:27:48.842 16920-16920 ImeTracker              com.example.myapplication            I  com.example.myapplication:4b2b91a2: onShown
+2024-11-30 16:27:49.447 16920-16936 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=112.51ms min=14.22ms max=503.13ms count=9
+2024-11-30 16:27:49.548 16920-16920 InsetsController        com.example.myapplication            D  show(ime(), fromIme=false)
+2024-11-30 16:27:49.548 16920-16920 ImeTracker              com.example.myapplication            I  com.example.myapplication:b672f7e0: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT_BY_INSETS_API fromUser false
+2024-11-30 16:27:49.549 16920-16920 ImeTracker              com.example.myapplication            I  com.example.myapplication:b672f7e0: onCancelled at PHASE_CLIENT_APPLY_ANIMATION
+2024-11-30 16:27:49.564 16920-16920 ImeTracker              com.example.myapplication            I  com.example.myapplication:eb9da0ec: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT fromUser false
+2024-11-30 16:27:49.564 16920-16920 InputMethodManager      com.example.myapplication            D  showSoftInput() view=androidx.compose.ui.platform.AndroidComposeView{dc467d0 VFED..... .F...... 0,0-1080,2400 aid=1073741824} flags=0 reason=SHOW_SOFT_INPUT
+2024-11-30 16:27:49.642 16920-16920 InsetsController        com.example.myapplication            D  show(ime(), fromIme=true)
+2024-11-30 16:27:49.642 16920-16920 ImeTracker              com.example.myapplication            I  com.example.myapplication:50eeb17d: onCancelled at PHASE_CLIENT_APPLY_ANIMATION
+2024-11-30 16:27:49.660 16920-16920 InsetsController        com.example.myapplication            D  show(ime(), fromIme=true)
+2024-11-30 16:27:49.660 16920-16920 ImeTracker              com.example.myapplication            I  com.example.myapplication:eb9da0ec: onCancelled at PHASE_CLIENT_APPLY_ANIMATION
+2024-11-30 16:27:50.573 16920-16936 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=92.89ms min=9.40ms max=494.89ms count=12
+2024-11-30 16:27:50.660 16920-16956 ProfileInstaller        com.example.myapplication            D  Installing profile for com.example.myapplication
+2024-11-30 16:27:51.575 16920-16936 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=500.63ms min=485.51ms max=515.76ms count=2
+2024-11-30 16:27:52.642 16920-16936 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=146.62ms min=3.71ms max=485.42ms count=7
+2024-11-30 16:27:53.367 16920-16920 InsetsController        com.example.myapplication            D  show(ime(), fromIme=false)
+2024-11-30 16:27:53.367 16920-16920 ImeTracker              com.example.myapplication            I  com.example.myapplication:a5909d66: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT_BY_INSETS_API fromUser false
+2024-11-30 16:27:53.369 16920-16920 ImeTracker              com.example.myapplication            I  com.example.myapplication:a5909d66: onCancelled at PHASE_CLIENT_APPLY_ANIMATION
+2024-11-30 16:27:53.380 16920-16920 ImeTracker              com.example.myapplication            I  com.example.myapplication:6ca53947: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT fromUser false
+2024-11-30 16:27:53.380 16920-16920 InputMethodManager      com.example.myapplication            D  showSoftInput() view=androidx.compose.ui.platform.AndroidComposeView{dc467d0 VFED..... .F...... 0,0-1080,2400 aid=1073741824} flags=0 reason=SHOW_SOFT_INPUT
+2024-11-30 16:27:53.475 16920-16920 InsetsController        com.example.myapplication            D  show(ime(), fromIme=true)
+2024-11-30 16:27:53.475 16920-16920 ImeTracker              com.example.myapplication            I  com.example.myapplication:6ca53947: onCancelled at PHASE_CLIENT_APPLY_ANIMATION
+2024-11-30 16:27:53.701 16920-16936 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=70.55ms min=10.18ms max=298.77ms count=15
+2024-11-30 16:27:54.773 16920-16936 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=150.97ms min=4.85ms max=497.89ms count=7
+2024-11-30 16:27:55.397 16920-16959 AndroidRuntime          com.example.myapplication            E  FATAL EXCEPTION: OkHttp Dispatcher
+                                                                                                    Process: com.example.myapplication, PID: 16920
+                                                                                                    java.lang.NullPointerException: Can't toast on a thread that has not called Looper.prepare()
+                                                                                                    	at com.android.internal.util.Preconditions.checkNotNull(Preconditions.java:174)
+                                                                                                    	at android.widget.Toast.getLooper(Toast.java:188)
+                                                                                                    	at android.widget.Toast.<init>(Toast.java:173)
+                                                                                                    	at android.widget.Toast.makeText(Toast.java:518)
+                                                                                                    	at android.widget.Toast.makeText(Toast.java:507)
+                                                                                                    	at com.example.myapplication.MainActivityKt.RegisterContent$lambda$44$lambda$43$lambda$40$lambda$39(MainActivity.kt:189)
+                                                                                                    	at com.example.myapplication.MainActivityKt.$r8$lambda$H2wOugGEJkBb7B1xVaMivlhRp_8(Unknown Source:0)
+                                                                                                    	at com.example.myapplication.MainActivityKt$$ExternalSyntheticLambda5.invoke(D8$$SyntheticClass:0)
+                                                                                                    	at com.example.myapplication.MainActivityKt$registerUser$1.onFailure(MainActivity.kt:272)
+                                                                                                    	at okhttp3.internal.connection.RealCall$AsyncCall.run(RealCall.kt:525)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+                                                                                                    	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+                                                                                                    	at java.lang.Thread.run(Thread.java:1012)
+2024-11-30 16:27:55.407 16920-16959 Process                 com.example.myapplication            I  Sending signal. PID: 16920 SIG: 9

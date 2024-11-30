@@ -1,300 +1,173 @@
-Download https://dl.google.com/dl/android/maven2/com/android/application/com.android.application.gradle.plugin/8.0.2/com.android.application.gradle.plugin-8.0.2.pom, took 354 ms
-Download https://dl.google.com/dl/android/maven2/com/google/gms/google-services/4.4.2/google-services-4.4.2.pom, took 109 ms
-Download https://dl.google.com/dl/android/maven2/com/google/gms/google-services/4.4.2/google-services-4.4.2.module, took 38 ms
-Download https://dl.google.com/dl/android/maven2/com/google/android/gms/strict-version-matcher-plugin/1.2.4/strict-version-matcher-plugin-1.2.4.pom, took 41 ms
-Download https://dl.google.com/dl/android/maven2/com/google/android/gms/strict-version-matcher-plugin/1.2.4/strict-version-matcher-plugin-1.2.4.module, took 40 ms
-Download https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk8/1.7.22/kotlin-stdlib-jdk8-1.7.22.pom, took 282 ms
-Download https://repo.maven.apache.org/maven2/com/google/code/gson/gson/2.8.5/gson-2.8.5.pom, took 210 ms
-Download https://repo.maven.apache.org/maven2/com/google/guava/guava/27.0.1-jre/guava-27.0.1-jre.pom, took 234 ms
-Download https://repo.maven.apache.org/maven2/com/google/code/gson/gson-parent/2.8.5/gson-parent-2.8.5.pom, took 42 ms
-Download https://repo.maven.apache.org/maven2/com/google/guava/guava-parent/27.0.1-jre/guava-parent-27.0.1-jre.pom, took 45 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/8.0.2/gradle-8.0.2.pom, took 57 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/8.0.2/gradle-8.0.2.module, took 68 ms
-Download https://repo.maven.apache.org/maven2/com/google/j2objc/j2objc-annotations/1.1/j2objc-annotations-1.1.pom, took 42 ms
-Download https://repo.maven.apache.org/maven2/org/codehaus/mojo/animal-sniffer-annotations/1.17/animal-sniffer-annotations-1.17.pom, took 42 ms
-Download https://repo.maven.apache.org/maven2/com/google/errorprone/error_prone_annotations/2.2.0/error_prone_annotations-2.2.0.pom, took 36 ms
-Download https://repo.maven.apache.org/maven2/org/codehaus/mojo/animal-sniffer-parent/1.17/animal-sniffer-parent-1.17.pom, took 38 ms
-Download https://repo.maven.apache.org/maven2/com/google/errorprone/error_prone_parent/2.2.0/error_prone_parent-2.2.0.pom, took 39 ms
-Download https://repo.maven.apache.org/maven2/org/checkerframework/checker-qual/2.5.2/checker-qual-2.5.2.pom, took 142 ms
-Download https://repo.maven.apache.org/maven2/org/codehaus/mojo/mojo-parent/40/mojo-parent-40.pom, took 52 ms
-Download https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk7/1.7.22/kotlin-stdlib-jdk7-1.7.22.pom, took 40 ms
-Download https://repo.maven.apache.org/maven2/com/google/code/gson/gson/2.8.6/gson-2.8.6.pom, took 39 ms
-Download https://repo.maven.apache.org/maven2/com/google/code/gson/gson-parent/2.8.6/gson-parent-2.8.6.pom, took 38 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/sdk-common/31.0.2/sdk-common-31.0.2.pom, took 35 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/sdklib/31.0.2/sdklib-31.0.2.pom, took 53 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/lint/lint-model/31.0.2/lint-model-31.0.2.pom, took 115 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-device-provider-ddmlib-proto/31.0.2/android-device-provider-ddmlib-proto-31.0.2.pom, took 126 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/builder-test-api/8.0.2/builder-test-api-8.0.2.pom, took 126 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/ddms/ddmlib/31.0.2/ddmlib-31.0.2.pom, took 129 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/aapt2-proto/8.0.2-9289358/aapt2-proto-8.0.2-9289358.pom, took 133 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/layoutlib/layoutlib-api/31.0.2/layoutlib-api-31.0.2.pom, took 132 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/repository/31.0.2/repository-31.0.2.pom, took 139 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/lint/lint-typedef-remover/31.0.2/lint-typedef-remover-31.0.2.pom, took 144 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/aaptcompiler/8.0.2/aaptcompiler-8.0.2.pom, took 146 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/analytics-library/crash/31.0.2/crash-31.0.2.pom, took 148 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle-settings-api/8.0.2/gradle-settings-api-8.0.2.pom, took 153 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-test-plugin-result-listener-gradle-proto/31.0.2/android-test-plugin-result-listener-gradle-proto-31.0.2.pom, took 37 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/analytics-library/shared/31.0.2/shared-31.0.2.pom, took 162 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-test-plugin-host-logcat-proto/31.0.2/android-test-plugin-host-logcat-proto-31.0.2.pom, took 144 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-device-provider-gradle-proto/31.0.2/android-device-provider-gradle-proto-31.0.2.pom, took 185 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-test-plugin-host-additional-test-output-proto/31.0.2/android-test-plugin-host-additional-test-output-proto-31.0.2.pom, took 184 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-test-plugin-host-coverage-proto/31.0.2/android-test-plugin-host-coverage-proto-31.0.2.pom, took 188 ms
-Download https://dl.google.com/dl/android/maven2/androidx/databinding/databinding-compiler-common/8.0.2/databinding-compiler-common-8.0.2.pom, took 193 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-test-plugin-host-retention-proto/31.0.2/android-test-plugin-host-retention-proto-31.0.2.pom, took 136 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/aaptcompiler/8.0.2/aaptcompiler-8.0.2.module, took 36 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/builder-test-api/8.0.2/builder-test-api-8.0.2.module, took 67 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/aapt2-proto/8.0.2-9289358/aapt2-proto-8.0.2-9289358.module, took 87 ms
-Download https://repo.maven.apache.org/maven2/org/ow2/asm/asm/9.2/asm-9.2.pom, took 54 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle-settings-api/8.0.2/gradle-settings-api-8.0.2.module, took 68 ms
-Download https://repo.maven.apache.org/maven2/org/ow2/asm/asm-commons/9.2/asm-commons-9.2.pom, took 39 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/bundletool/1.13.2/bundletool-1.13.2.pom, took 40 ms
-Download https://repo.maven.apache.org/maven2/org/ow2/asm/asm-util/9.2/asm-util-9.2.pom, took 37 ms
-Download https://dl.google.com/dl/android/maven2/com/google/testing/platform/core-proto/0.0.8-alpha08/core-proto-0.0.8-alpha08.pom, took 37 ms
-Download https://repo.maven.apache.org/maven2/org/ow2/asm/asm-analysis/9.2/asm-analysis-9.2.pom, took 39 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/builder-model/8.0.2/builder-model-8.0.2.pom, took 54 ms
-Download https://repo.maven.apache.org/maven2/com/google/protobuf/protobuf-java/3.19.3/protobuf-java-3.19.3.pom, took 39 ms
-Download https://repo.maven.apache.org/maven2/io/grpc/grpc-core/1.45.1/grpc-core-1.45.1.pom, took 42 ms
-Download https://repo.maven.apache.org/maven2/io/grpc/grpc-netty/1.45.1/grpc-netty-1.45.1.pom, took 51 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle-api/8.0.2/gradle-api-8.0.2.pom, took 63 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/builder/8.0.2/builder-8.0.2.pom, took 79 ms
-Download https://repo.maven.apache.org/maven2/org/ow2/ow2/1.5/ow2-1.5.pom, took 55 ms
-Download https://repo.maven.apache.org/maven2/org/bouncycastle/bcpkix-jdk15on/1.67/bcpkix-jdk15on-1.67.pom, took 115 ms
-Download https://repo.maven.apache.org/maven2/commons-io/commons-io/2.4/commons-io-2.4.pom, took 117 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/builder-model/8.0.2/builder-model-8.0.2.module, took 65 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle-api/8.0.2/gradle-api-8.0.2.module, took 39 ms
-Download https://repo.maven.apache.org/maven2/com/google/protobuf/protobuf-java-util/3.19.3/protobuf-java-util-3.19.3.pom, took 115 ms
-Download https://repo.maven.apache.org/maven2/io/grpc/grpc-stub/1.45.1/grpc-stub-1.45.1.pom, took 128 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/builder/8.0.2/builder-8.0.2.module, took 69 ms
-Download https://repo.maven.apache.org/maven2/com/google/protobuf/protobuf-parent/3.19.3/protobuf-parent-3.19.3.pom, took 51 ms
-Download https://repo.maven.apache.org/maven2/io/grpc/grpc-protobuf/1.45.1/grpc-protobuf-1.45.1.pom, took 126 ms
-Download https://repo.maven.apache.org/maven2/org/apache/commons/commons-parent/25/commons-parent-25.pom, took 66 ms
-Download https://repo.maven.apache.org/maven2/com/google/protobuf/protobuf-bom/3.19.3/protobuf-bom-3.19.3.pom, took 36 ms
-Download https://repo.maven.apache.org/maven2/org/apache/apache/9/apache-9.pom, took 43 ms
-Download https://repo.maven.apache.org/maven2/com/google/code/gson/gson/2.8.9/gson-2.8.9.pom, took 39 ms
-Download https://repo.maven.apache.org/maven2/com/google/code/gson/gson-parent/2.8.9/gson-parent-2.8.9.pom, took 37 ms
-Download https://repo.maven.apache.org/maven2/com/google/guava/guava/31.0.1-jre/guava-31.0.1-jre.pom, took 40 ms
-Download https://repo.maven.apache.org/maven2/com/google/guava/guava-parent/31.0.1-jre/guava-parent-31.0.1-jre.pom, took 42 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/common/31.0.2/common-31.0.2.pom, took 62 ms
-Download https://repo.maven.apache.org/maven2/org/bouncycastle/bcprov-jdk15on/1.67/bcprov-jdk15on-1.67.pom, took 33 ms
-Download https://repo.maven.apache.org/maven2/xerces/xercesImpl/2.12.0/xercesImpl-2.12.0.pom, took 37 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/dvlib/31.0.2/dvlib-31.0.2.pom, took 62 ms
-Download https://repo.maven.apache.org/maven2/org/apache/commons/commons-compress/1.20/commons-compress-1.20.pom, took 37 ms
-Download https://repo.maven.apache.org/maven2/org/apache/httpcomponents/httpcore/4.4.15/httpcore-4.4.15.pom, took 38 ms
-Download https://repo.maven.apache.org/maven2/org/apache/httpcomponents/httpcomponents-core/4.4.15/httpcomponents-core-4.4.15.pom, took 36 ms
-Download https://repo.maven.apache.org/maven2/org/apache/commons/commons-parent/48/commons-parent-48.pom, took 79 ms
-Download https://repo.maven.apache.org/maven2/org/apache/httpcomponents/httpclient/4.5.13/httpclient-4.5.13.pom, took 39 ms
-Download https://repo.maven.apache.org/maven2/org/apache/httpcomponents/httpcomponents-client/4.5.13/httpcomponents-client-4.5.13.pom, took 38 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/analytics-library/protos/31.0.2/protos-31.0.2.pom, took 64 ms
-Download https://repo.maven.apache.org/maven2/org/ow2/asm/asm-tree/9.2/asm-tree-9.2.pom, took 36 ms
-Download https://repo.maven.apache.org/maven2/org/bitbucket/b_c/jose4j/0.7.0/jose4j-0.7.0.pom, took 38 ms
-Download https://repo.maven.apache.org/maven2/com/google/errorprone/error_prone_annotations/2.5.1/error_prone_annotations-2.5.1.pom, took 37 ms
-Download https://repo.maven.apache.org/maven2/com/google/errorprone/error_prone_parent/2.5.1/error_prone_parent-2.5.1.pom, took 37 ms
-Download https://repo.maven.apache.org/maven2/com/google/errorprone/error_prone_annotations/2.10.0/error_prone_annotations-2.10.0.pom, took 36 ms
-Download https://repo.maven.apache.org/maven2/com/google/errorprone/error_prone_parent/2.10.0/error_prone_parent-2.10.0.pom, took 39 ms
-Download https://repo.maven.apache.org/maven2/org/codehaus/mojo/animal-sniffer-annotations/1.19/animal-sniffer-annotations-1.19.pom, took 34 ms
-Download https://repo.maven.apache.org/maven2/io/perfmark/perfmark-api/0.23.0/perfmark-api-0.23.0.pom, took 37 ms
-Download https://repo.maven.apache.org/maven2/io/grpc/grpc-api/1.45.1/grpc-api-1.45.1.pom, took 50 ms
-Download https://repo.maven.apache.org/maven2/io/perfmark/perfmark-api/0.23.0/perfmark-api-0.23.0.module, took 37 ms
-Download https://repo.maven.apache.org/maven2/org/codehaus/mojo/animal-sniffer-parent/1.19/animal-sniffer-parent-1.19.pom, took 42 ms
-Download https://repo.maven.apache.org/maven2/org/codehaus/mojo/mojo-parent/50/mojo-parent-50.pom, took 54 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-codec-http2/4.1.72.Final/netty-codec-http2-4.1.72.Final.pom, took 38 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-handler-proxy/4.1.72.Final/netty-handler-proxy-4.1.72.Final.pom, took 41 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-parent/4.1.72.Final/netty-parent-4.1.72.Final.pom, took 79 ms
-Download https://repo.maven.apache.org/maven2/com/google/api/grpc/proto-google-common-protos/2.0.1/proto-google-common-protos-2.0.1.pom, took 40 ms
-Download https://repo.maven.apache.org/maven2/io/grpc/grpc-protobuf-lite/1.45.1/grpc-protobuf-lite-1.45.1.pom, took 37 ms
-Download https://dl.google.com/dl/android/maven2/com/android/signflinger/8.0.2/signflinger-8.0.2.pom, took 38 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/manifest-merger/31.0.2/manifest-merger-31.0.2.pom, took 54 ms
-Download https://dl.google.com/dl/android/maven2/com/android/zipflinger/8.0.2/zipflinger-8.0.2.pom, took 63 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/analytics-library/tracker/31.0.2/tracker-31.0.2.pom, took 63 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/apkzlib/8.0.2/apkzlib-8.0.2.pom, took 67 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/manifest-merger/31.0.2/manifest-merger-31.0.2.module, took 211 ms
-Download https://repo.maven.apache.org/maven2/org/checkerframework/checker-qual/3.12.0/checker-qual-3.12.0.pom, took 38 ms
-Download https://repo.maven.apache.org/maven2/org/checkerframework/checker-qual/3.12.0/checker-qual-3.12.0.module, took 37 ms
-Download https://repo.maven.apache.org/maven2/xml-apis/xml-apis/1.4.01/xml-apis-1.4.01.pom, took 37 ms
-Download https://repo.maven.apache.org/maven2/io/grpc/grpc-context/1.45.1/grpc-context-1.45.1.pom, took 37 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-handler/4.1.72.Final/netty-handler-4.1.72.Final.pom, took 34 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-transport/4.1.72.Final/netty-transport-4.1.72.Final.pom, took 41 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-codec/4.1.72.Final/netty-codec-4.1.72.Final.pom, took 42 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-codec-http/4.1.72.Final/netty-codec-http-4.1.72.Final.pom, took 50 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-buffer/4.1.72.Final/netty-buffer-4.1.72.Final.pom, took 51 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-common/4.1.72.Final/netty-common-4.1.72.Final.pom, took 57 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-codec-socks/4.1.72.Final/netty-codec-socks-4.1.72.Final.pom, took 41 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-resolver/4.1.72.Final/netty-resolver-4.1.72.Final.pom, took 41 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-tcnative-classes/2.0.46.Final/netty-tcnative-classes-2.0.46.Final.pom, took 40 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-tcnative-parent/2.0.46.Final/netty-tcnative-parent-2.0.46.Final.pom, took 57 ms
-Download https://dl.google.com/dl/android/maven2/com/google/gms/google-services/4.4.2/google-services-4.4.2.jar, took 141 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle-settings-api/8.0.2/gradle-settings-api-8.0.2.jar, took 141 ms
-Download https://dl.google.com/dl/android/maven2/com/google/android/gms/strict-version-matcher-plugin/1.2.4/strict-version-matcher-plugin-1.2.4.jar, took 145 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/builder-test-api/8.0.2/builder-test-api-8.0.2.jar, took 152 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-test-plugin-host-retention-proto/31.0.2/android-test-plugin-host-retention-proto-31.0.2.jar, took 157 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/analytics-library/tracker/31.0.2/tracker-31.0.2.jar, took 212 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/dvlib/31.0.2/dvlib-31.0.2.jar, took 77 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/analytics-library/shared/31.0.2/shared-31.0.2.jar, took 242 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/builder-model/8.0.2/builder-model-8.0.2.jar, took 270 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/layoutlib/layoutlib-api/31.0.2/layoutlib-api-31.0.2.jar, took 292 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle-api/8.0.2/gradle-api-8.0.2.jar, took 323 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/lint/lint-typedef-remover/31.0.2/lint-typedef-remover-31.0.2.jar, took 89 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/analytics-library/crash/31.0.2/crash-31.0.2.jar, took 111 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/manifest-merger/31.0.2/manifest-merger-31.0.2.jar, took 435 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-test-plugin-result-listener-gradle-proto/31.0.2/android-test-plugin-result-listener-gradle-proto-31.0.2.jar, took 282 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/lint/lint-model/31.0.2/lint-model-31.0.2.jar, took 443 ms
-Download https://repo.maven.apache.org/maven2/com/google/protobuf/protobuf-java-util/3.19.3/protobuf-java-util-3.19.3.jar, took 308 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/repository/31.0.2/repository-31.0.2.jar, took 485 ms
-Download https://repo.maven.apache.org/maven2/io/grpc/grpc-protobuf-lite/1.45.1/grpc-protobuf-lite-1.45.1.jar, took 257 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/ddms/ddmlib/31.0.2/ddmlib-31.0.2.jar, took 714 ms
-Download https://repo.maven.apache.org/maven2/com/google/j2objc/j2objc-annotations/1.3/j2objc-annotations-1.3.jar, took 79 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/aaptcompiler/8.0.2/aaptcompiler-8.0.2.jar, took 750 ms
-Download https://repo.maven.apache.org/maven2/org/checkerframework/checker-qual/3.12.0/checker-qual-3.12.0.jar, took 353 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/sdklib/31.0.2/sdklib-31.0.2.jar, took 826 ms
-Download https://dl.google.com/dl/android/maven2/androidx/databinding/databinding-common/8.0.2/databinding-common-8.0.2.jar, took 75 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/apkzlib/8.0.2/apkzlib-8.0.2.jar, took 428 ms
-Download https://repo.maven.apache.org/maven2/io/grpc/grpc-netty/1.45.1/grpc-netty-1.45.1.jar, took 659 ms
-Download https://repo.maven.apache.org/maven2/io/grpc/grpc-api/1.45.1/grpc-api-1.45.1.jar, took 441 ms
-Download https://repo.maven.apache.org/maven2/com/google/code/gson/gson/2.8.9/gson-2.8.9.jar, took 651 ms
-Download https://dl.google.com/dl/android/maven2/com/android/databinding/baseLibrary/8.0.2/baseLibrary-8.0.2.jar, took 109 ms
-Download https://repo.maven.apache.org/maven2/org/codehaus/mojo/animal-sniffer-annotations/1.19/animal-sniffer-annotations-1.19.jar, took 235 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-test-plugin-host-additional-test-output-proto/31.0.2/android-test-plugin-host-additional-test-output-proto-31.0.2.jar, took 101 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-device-provider-gradle-proto/31.0.2/android-device-provider-gradle-proto-31.0.2.jar, took 176 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-device-provider-ddmlib-proto/31.0.2/android-device-provider-ddmlib-proto-31.0.2.jar, took 187 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/common/31.0.2/common-31.0.2.jar, took 873 ms
-Download https://repo.maven.apache.org/maven2/io/grpc/grpc-stub/1.45.1/grpc-stub-1.45.1.jar, took 665 ms
-Download https://repo.maven.apache.org/maven2/org/ow2/asm/asm-analysis/9.2/asm-analysis-9.2.jar, took 106 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-test-plugin-host-logcat-proto/31.0.2/android-test-plugin-host-logcat-proto-31.0.2.jar, took 229 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-test-plugin-host-coverage-proto/31.0.2/android-test-plugin-host-coverage-proto-31.0.2.jar, took 242 ms
-Download https://repo.maven.apache.org/maven2/org/ow2/asm/asm-tree/9.2/asm-tree-9.2.jar, took 114 ms
-Download https://dl.google.com/dl/android/maven2/androidx/databinding/databinding-compiler-common/8.0.2/databinding-compiler-common-8.0.2.jar, took 1 s 141 ms
-Download https://repo.maven.apache.org/maven2/org/ow2/asm/asm-util/9.2/asm-util-9.2.jar, took 197 ms
-Download https://repo.maven.apache.org/maven2/io/grpc/grpc-protobuf/1.45.1/grpc-protobuf-1.45.1.jar, took 889 ms
-Download https://repo.maven.apache.org/maven2/org/ow2/asm/asm/9.2/asm-9.2.jar, took 211 ms
-Download https://repo.maven.apache.org/maven2/org/ow2/asm/asm-commons/9.2/asm-commons-9.2.jar, took 352 ms
-Download https://dl.google.com/dl/android/maven2/com/android/signflinger/8.0.2/signflinger-8.0.2.jar, took 128 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/aapt2-proto/8.0.2-9289358/aapt2-proto-8.0.2-9289358.jar, took 763 ms
-Download https://repo.maven.apache.org/maven2/commons-io/commons-io/2.4/commons-io-2.4.jar, took 612 ms
-Download https://dl.google.com/dl/android/maven2/com/android/zipflinger/8.0.2/zipflinger-8.0.2.jar, took 166 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/annotations/31.0.2/annotations-31.0.2.jar, took 101 ms
-Download https://repo.maven.apache.org/maven2/org/apache/httpcomponents/httpcore/4.4.15/httpcore-4.4.15.jar, took 404 ms
-Download https://repo.maven.apache.org/maven2/io/perfmark/perfmark-api/0.23.0/perfmark-api-0.23.0.jar, took 78 ms
-Download https://repo.maven.apache.org/maven2/com/google/errorprone/error_prone_annotations/2.10.0/error_prone_annotations-2.10.0.jar, took 1 s 238 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-handler-proxy/4.1.72.Final/netty-handler-proxy-4.1.72.Final.jar, took 98 ms
-Download https://repo.maven.apache.org/maven2/io/grpc/grpc-context/1.45.1/grpc-context-1.45.1.jar, took 107 ms
-Download https://dl.google.com/dl/android/maven2/com/google/testing/platform/core-proto/0.0.8-alpha08/core-proto-0.0.8-alpha08.jar, took 782 ms
-Download https://repo.maven.apache.org/maven2/org/apache/commons/commons-compress/1.20/commons-compress-1.20.jar, took 767 ms
-Download https://repo.maven.apache.org/maven2/xml-apis/xml-apis/1.4.01/xml-apis-1.4.01.jar, took 267 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-codec-socks/4.1.72.Final/netty-codec-socks-4.1.72.Final.jar, took 274 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-codec-http2/4.1.72.Final/netty-codec-http2-4.1.72.Final.jar, took 632 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/apksig/8.0.2/apksig-8.0.2.jar, took 570 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-codec/4.1.72.Final/netty-codec-4.1.72.Final.jar, took 257 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/sdk-common/31.0.2/sdk-common-31.0.2.jar, took 2 s 265 ms
-Download https://repo.maven.apache.org/maven2/com/google/guava/guava/31.0.1-jre/guava-31.0.1-jre.jar, took 1 s 818 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-handler/4.1.72.Final/netty-handler-4.1.72.Final.jar, took 413 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-resolver/4.1.72.Final/netty-resolver-4.1.72.Final.jar, took 176 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-tcnative-classes/2.0.46.Final/netty-tcnative-classes-2.0.46.Final.jar, took 186 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-buffer/4.1.72.Final/netty-buffer-4.1.72.Final.jar, took 225 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-common/4.1.72.Final/netty-common-4.1.72.Final.jar, took 323 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-codec-http/4.1.72.Final/netty-codec-http-4.1.72.Final.jar, took 738 ms
-Download https://repo.maven.apache.org/maven2/org/bitbucket/b_c/jose4j/0.7.0/jose4j-0.7.0.jar, took 1 s 168 ms
-Download https://repo.maven.apache.org/maven2/io/grpc/grpc-core/1.45.1/grpc-core-1.45.1.jar, took 2 s 508 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-transport/4.1.72.Final/netty-transport-4.1.72.Final.jar, took 562 ms
-Download https://repo.maven.apache.org/maven2/org/bouncycastle/bcpkix-jdk15on/1.67/bcpkix-jdk15on-1.67.jar, took 2 s 129 ms
-Download https://repo.maven.apache.org/maven2/com/google/api/grpc/proto-google-common-protos/2.0.1/proto-google-common-protos-2.0.1.jar, took 2 s 875 ms
-Download https://repo.maven.apache.org/maven2/org/apache/httpcomponents/httpclient/4.5.13/httpclient-4.5.13.jar, took 3 s 264 ms
-Download https://repo.maven.apache.org/maven2/xerces/xercesImpl/2.12.0/xercesImpl-2.12.0.jar, took 3 s 586 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/bundletool/1.13.2/bundletool-1.13.2.jar, took 5 s 23 ms
-Download https://repo.maven.apache.org/maven2/com/google/protobuf/protobuf-java/3.19.3/protobuf-java-3.19.3.jar, took 4 s 103 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/analytics-library/protos/31.0.2/protos-31.0.2.jar, took 5 s 8 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/8.0.2/gradle-8.0.2.jar, took 6 s 714 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/builder/8.0.2/builder-8.0.2.jar, took 7 s 55 ms
-Download https://repo.maven.apache.org/maven2/org/bouncycastle/bcprov-jdk15on/1.67/bcprov-jdk15on-1.67.jar, took 6 s 445 ms
+Execution failed for task ':app:processDebugGoogleServices'.
+> No matching client found for package name 'com.example.myapplication' in C:\Users\User\AndroidStudioProjects\MyApplication2\app\google-services.json
 
-> Configure project :app
-w: The Compose compiler plugin is now a part of Kotlin, please apply the 'org.jetbrains.kotlin.plugin.compose' Gradle plugin to enable it. Learn more about this at https://kotl.in/compose-plugin
+* Try:
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+* Exception is:
+org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:processDebugGoogleServices'.
+	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.lambda$executeIfValid$1(ExecuteActionsTaskExecuter.java:130)
+	at org.gradle.internal.Try$Failure.ifSuccessfulOrElse(Try.java:293)
+	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:128)
+	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.execute(ExecuteActionsTaskExecuter.java:116)
+	at org.gradle.api.internal.tasks.execution.FinalizePropertiesTaskExecuter.execute(FinalizePropertiesTaskExecuter.java:46)
+	at org.gradle.api.internal.tasks.execution.ResolveTaskExecutionModeExecuter.execute(ResolveTaskExecutionModeExecuter.java:51)
+	at org.gradle.api.internal.tasks.execution.SkipTaskWithNoActionsExecuter.execute(SkipTaskWithNoActionsExecuter.java:57)
+	at org.gradle.api.internal.tasks.execution.SkipOnlyIfTaskExecuter.execute(SkipOnlyIfTaskExecuter.java:74)
+	at org.gradle.api.internal.tasks.execution.CatchExceptionTaskExecuter.execute(CatchExceptionTaskExecuter.java:36)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.executeTask(EventFiringTaskExecuter.java:77)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:55)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:52)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:209)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:204)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter.execute(EventFiringTaskExecuter.java:52)
+	at org.gradle.execution.plan.LocalTaskNodeExecutor.execute(LocalTaskNodeExecutor.java:42)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:331)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:318)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.lambda$execute$0(DefaultTaskExecutionGraph.java:314)
+	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:85)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:314)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:303)
+	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
+	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
+	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
+	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
+Caused by: org.gradle.api.GradleException: No matching client found for package name 'com.example.myapplication' in C:\Users\User\AndroidStudioProjects\MyApplication2\app\google-services.json
+	at com.google.gms.googleservices.GoogleServicesTask.action(GoogleServicesTask.kt:113)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(Unknown Source)
+	at org.gradle.internal.reflect.JavaMethod.invoke(JavaMethod.java:125)
+	at org.gradle.api.internal.project.taskfactory.StandardTaskAction.doExecute(StandardTaskAction.java:58)
+	at org.gradle.api.internal.project.taskfactory.StandardTaskAction.execute(StandardTaskAction.java:51)
+	at org.gradle.api.internal.project.taskfactory.StandardTaskAction.execute(StandardTaskAction.java:29)
+	at org.gradle.api.internal.tasks.execution.TaskExecution$3.run(TaskExecution.java:244)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$1.execute(DefaultBuildOperationRunner.java:29)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$1.execute(DefaultBuildOperationRunner.java:26)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.run(DefaultBuildOperationRunner.java:47)
+	at org.gradle.api.internal.tasks.execution.TaskExecution.executeAction(TaskExecution.java:229)
+	at org.gradle.api.internal.tasks.execution.TaskExecution.executeActions(TaskExecution.java:212)
+	at org.gradle.api.internal.tasks.execution.TaskExecution.executeWithPreviousOutputFiles(TaskExecution.java:195)
+	at org.gradle.api.internal.tasks.execution.TaskExecution.execute(TaskExecution.java:162)
+	at org.gradle.internal.execution.steps.ExecuteStep.executeInternal(ExecuteStep.java:105)
+	at org.gradle.internal.execution.steps.ExecuteStep.access$000(ExecuteStep.java:44)
+	at org.gradle.internal.execution.steps.ExecuteStep$1.call(ExecuteStep.java:59)
+	at org.gradle.internal.execution.steps.ExecuteStep$1.call(ExecuteStep.java:56)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:209)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:204)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
+	at org.gradle.internal.execution.steps.ExecuteStep.execute(ExecuteStep.java:56)
+	at org.gradle.internal.execution.steps.ExecuteStep.execute(ExecuteStep.java:44)
+	at org.gradle.internal.execution.steps.CancelExecutionStep.execute(CancelExecutionStep.java:42)
+	at org.gradle.internal.execution.steps.TimeoutStep.executeWithoutTimeout(TimeoutStep.java:75)
+	at org.gradle.internal.execution.steps.TimeoutStep.execute(TimeoutStep.java:55)
+	at org.gradle.internal.execution.steps.PreCreateOutputParentsStep.execute(PreCreateOutputParentsStep.java:50)
+	at org.gradle.internal.execution.steps.PreCreateOutputParentsStep.execute(PreCreateOutputParentsStep.java:28)
+	at org.gradle.internal.execution.steps.RemovePreviousOutputsStep.execute(RemovePreviousOutputsStep.java:67)
+	at org.gradle.internal.execution.steps.RemovePreviousOutputsStep.execute(RemovePreviousOutputsStep.java:37)
+	at org.gradle.internal.execution.steps.BroadcastChangingOutputsStep.execute(BroadcastChangingOutputsStep.java:61)
+	at org.gradle.internal.execution.steps.BroadcastChangingOutputsStep.execute(BroadcastChangingOutputsStep.java:26)
+	at org.gradle.internal.execution.steps.CaptureOutputsAfterExecutionStep.execute(CaptureOutputsAfterExecutionStep.java:69)
+	at org.gradle.internal.execution.steps.CaptureOutputsAfterExecutionStep.execute(CaptureOutputsAfterExecutionStep.java:46)
+	at org.gradle.internal.execution.steps.ResolveInputChangesStep.execute(ResolveInputChangesStep.java:40)
+	at org.gradle.internal.execution.steps.ResolveInputChangesStep.execute(ResolveInputChangesStep.java:29)
+	at org.gradle.internal.execution.steps.BuildCacheStep.executeWithoutCache(BuildCacheStep.java:189)
+	at org.gradle.internal.execution.steps.BuildCacheStep.lambda$execute$1(BuildCacheStep.java:75)
+	at org.gradle.internal.Either$Right.fold(Either.java:175)
+	at org.gradle.internal.execution.caching.CachingState.fold(CachingState.java:62)
+	at org.gradle.internal.execution.steps.BuildCacheStep.execute(BuildCacheStep.java:73)
+	at org.gradle.internal.execution.steps.BuildCacheStep.execute(BuildCacheStep.java:48)
+	at org.gradle.internal.execution.steps.StoreExecutionStateStep.execute(StoreExecutionStateStep.java:46)
+	at org.gradle.internal.execution.steps.StoreExecutionStateStep.execute(StoreExecutionStateStep.java:35)
+	at org.gradle.internal.execution.steps.SkipUpToDateStep.executeBecause(SkipUpToDateStep.java:75)
+	at org.gradle.internal.execution.steps.SkipUpToDateStep.lambda$execute$2(SkipUpToDateStep.java:53)
+	at org.gradle.internal.execution.steps.SkipUpToDateStep.execute(SkipUpToDateStep.java:53)
+	at org.gradle.internal.execution.steps.SkipUpToDateStep.execute(SkipUpToDateStep.java:35)
+	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsFinishedStep.execute(MarkSnapshottingInputsFinishedStep.java:37)
+	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsFinishedStep.execute(MarkSnapshottingInputsFinishedStep.java:27)
+	at org.gradle.internal.execution.steps.ResolveIncrementalCachingStateStep.executeDelegate(ResolveIncrementalCachingStateStep.java:49)
+	at org.gradle.internal.execution.steps.ResolveIncrementalCachingStateStep.executeDelegate(ResolveIncrementalCachingStateStep.java:27)
+	at org.gradle.internal.execution.steps.AbstractResolveCachingStateStep.execute(AbstractResolveCachingStateStep.java:71)
+	at org.gradle.internal.execution.steps.AbstractResolveCachingStateStep.execute(AbstractResolveCachingStateStep.java:39)
+	at org.gradle.internal.execution.steps.ResolveChangesStep.execute(ResolveChangesStep.java:65)
+	at org.gradle.internal.execution.steps.ResolveChangesStep.execute(ResolveChangesStep.java:36)
+	at org.gradle.internal.execution.steps.ValidateStep.execute(ValidateStep.java:105)
+	at org.gradle.internal.execution.steps.ValidateStep.execute(ValidateStep.java:54)
+	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.execute(AbstractCaptureStateBeforeExecutionStep.java:64)
+	at org.gradle.internal.execution.steps.AbstractCaptureStateBeforeExecutionStep.execute(AbstractCaptureStateBeforeExecutionStep.java:43)
+	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.executeWithNonEmptySources(AbstractSkipEmptyWorkStep.java:125)
+	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.execute(AbstractSkipEmptyWorkStep.java:56)
+	at org.gradle.internal.execution.steps.AbstractSkipEmptyWorkStep.execute(AbstractSkipEmptyWorkStep.java:36)
+	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsStartedStep.execute(MarkSnapshottingInputsStartedStep.java:38)
+	at org.gradle.internal.execution.steps.LoadPreviousExecutionStateStep.execute(LoadPreviousExecutionStateStep.java:36)
+	at org.gradle.internal.execution.steps.LoadPreviousExecutionStateStep.execute(LoadPreviousExecutionStateStep.java:23)
+	at org.gradle.internal.execution.steps.HandleStaleOutputsStep.execute(HandleStaleOutputsStep.java:75)
+	at org.gradle.internal.execution.steps.HandleStaleOutputsStep.execute(HandleStaleOutputsStep.java:41)
+	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.lambda$execute$0(AssignMutableWorkspaceStep.java:35)
+	at org.gradle.api.internal.tasks.execution.TaskExecution$4.withWorkspace(TaskExecution.java:289)
+	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.execute(AssignMutableWorkspaceStep.java:31)
+	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.execute(AssignMutableWorkspaceStep.java:22)
+	at org.gradle.internal.execution.steps.ChoosePipelineStep.execute(ChoosePipelineStep.java:40)
+	at org.gradle.internal.execution.steps.ChoosePipelineStep.execute(ChoosePipelineStep.java:23)
+	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.lambda$execute$2(ExecuteWorkBuildOperationFiringStep.java:67)
+	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.execute(ExecuteWorkBuildOperationFiringStep.java:67)
+	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.execute(ExecuteWorkBuildOperationFiringStep.java:39)
+	at org.gradle.internal.execution.steps.IdentityCacheStep.execute(IdentityCacheStep.java:46)
+	at org.gradle.internal.execution.steps.IdentityCacheStep.execute(IdentityCacheStep.java:34)
+	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:48)
+	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:35)
+	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:61)
+	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:127)
+	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.execute(ExecuteActionsTaskExecuter.java:116)
+	at org.gradle.api.internal.tasks.execution.FinalizePropertiesTaskExecuter.execute(FinalizePropertiesTaskExecuter.java:46)
+	at org.gradle.api.internal.tasks.execution.ResolveTaskExecutionModeExecuter.execute(ResolveTaskExecutionModeExecuter.java:51)
+	at org.gradle.api.internal.tasks.execution.SkipTaskWithNoActionsExecuter.execute(SkipTaskWithNoActionsExecuter.java:57)
+	at org.gradle.api.internal.tasks.execution.SkipOnlyIfTaskExecuter.execute(SkipOnlyIfTaskExecuter.java:74)
+	at org.gradle.api.internal.tasks.execution.CatchExceptionTaskExecuter.execute(CatchExceptionTaskExecuter.java:36)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.executeTask(EventFiringTaskExecuter.java:77)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:55)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:52)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:209)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:204)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter.execute(EventFiringTaskExecuter.java:52)
+	at org.gradle.execution.plan.LocalTaskNodeExecutor.execute(LocalTaskNodeExecutor.java:42)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:331)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:318)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.lambda$execute$0(DefaultTaskExecutionGraph.java:314)
+	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:85)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:314)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:303)
+	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
+	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
+	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
+	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
 
 
-> Task :prepareKotlinBuildScriptModel UP-TO-DATE
-Download https://dl.google.com/dl/android/maven2/com/google/gms/google-services/4.4.2/google-services-4.4.2-sources.jar, took 56 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/8.0.2/gradle-8.0.2-sources.jar, took 481 ms
-Download https://dl.google.com/dl/android/maven2/androidx/databinding/databinding-compiler-common/8.0.2/databinding-compiler-common-8.0.2-sources.jar, took 80 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle-settings-api/8.0.2/gradle-settings-api-8.0.2-sources.jar, took 54 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/lint/lint-model/31.0.2/lint-model-31.0.2-sources.jar, took 76 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/builder/8.0.2/builder-8.0.2-sources.jar, took 95 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/manifest-merger/31.0.2/manifest-merger-31.0.2-sources.jar, took 65 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/sdk-common/31.0.2/sdk-common-31.0.2-sources.jar, took 133 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/sdklib/31.0.2/sdklib-31.0.2-sources.jar, took 111 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/repository/31.0.2/repository-31.0.2-sources.jar, took 87 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/aaptcompiler/8.0.2/aaptcompiler-8.0.2-sources.jar, took 83 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/analytics-library/tracker/31.0.2/tracker-31.0.2-sources.jar, took 202 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/analytics-library/shared/31.0.2/shared-31.0.2-sources.jar, took 71 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-test-plugin-host-retention-proto/31.0.2/android-test-plugin-host-retention-proto-31.0.2-sources.jar, took 72 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/builder-model/8.0.2/builder-model-8.0.2-sources.jar, took 83 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle-api/8.0.2/gradle-api-8.0.2-sources.jar, took 95 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/builder-test-api/8.0.2/builder-test-api-8.0.2-sources.jar, took 76 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/ddms/ddmlib/31.0.2/ddmlib-31.0.2-sources.jar, took 103 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/layoutlib/layoutlib-api/31.0.2/layoutlib-api-31.0.2-sources.jar, took 82 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/dvlib/31.0.2/dvlib-31.0.2-sources.jar, took 71 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/common/31.0.2/common-31.0.2-sources.jar, took 92 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-test-plugin-result-listener-gradle-proto/31.0.2/android-test-plugin-result-listener-gradle-proto-31.0.2-sources.jar, took 75 ms
-Download https://repo.maven.apache.org/maven2/com/google/protobuf/protobuf-java-util/3.19.3/protobuf-java-util-3.19.3-sources.jar, took 64 ms
-Download https://repo.maven.apache.org/maven2/io/grpc/grpc-netty/1.45.1/grpc-netty-1.45.1-sources.jar, took 106 ms
-Download https://repo.maven.apache.org/maven2/io/grpc/grpc-core/1.45.1/grpc-core-1.45.1-sources.jar, took 105 ms
-Download https://repo.maven.apache.org/maven2/com/google/code/gson/gson/2.8.9/gson-2.8.9-sources.jar, took 64 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/analytics-library/crash/31.0.2/crash-31.0.2-sources.jar, took 49 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/lint/lint-typedef-remover/31.0.2/lint-typedef-remover-31.0.2-sources.jar, took 75 ms
-Download https://repo.maven.apache.org/maven2/io/grpc/grpc-protobuf/1.45.1/grpc-protobuf-1.45.1-sources.jar, took 52 ms
-Download https://repo.maven.apache.org/maven2/io/grpc/grpc-stub/1.45.1/grpc-stub-1.45.1-sources.jar, took 53 ms
-Download https://repo.maven.apache.org/maven2/io/grpc/grpc-protobuf-lite/1.45.1/grpc-protobuf-lite-1.45.1-sources.jar, took 51 ms
-Download https://repo.maven.apache.org/maven2/io/grpc/grpc-api/1.45.1/grpc-api-1.45.1-sources.jar, took 71 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/apkzlib/8.0.2/apkzlib-8.0.2-sources.jar, took 60 ms
-Download https://repo.maven.apache.org/maven2/com/google/guava/guava/31.0.1-jre/guava-31.0.1-jre-sources.jar, took 202 ms
-Download https://repo.maven.apache.org/maven2/org/checkerframework/checker-qual/3.12.0/checker-qual-3.12.0-sources.jar, took 74 ms
-Download https://repo.maven.apache.org/maven2/com/google/errorprone/error_prone_annotations/2.10.0/error_prone_annotations-2.10.0-sources.jar, took 52 ms
-Download https://repo.maven.apache.org/maven2/com/google/j2objc/j2objc-annotations/1.3/j2objc-annotations-1.3-sources.jar, took 50 ms
-Download https://repo.maven.apache.org/maven2/org/codehaus/mojo/animal-sniffer-annotations/1.19/animal-sniffer-annotations-1.19-sources.jar, took 50 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/aapt2-proto/8.0.2-9289358/aapt2-proto-8.0.2-9289358-sources.jar, took 87 ms
-Download https://dl.google.com/dl/android/maven2/androidx/databinding/databinding-common/8.0.2/databinding-common-8.0.2-sources.jar, took 65 ms
-Download https://dl.google.com/dl/android/maven2/com/android/databinding/baseLibrary/8.0.2/baseLibrary-8.0.2-sources.jar, took 63 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-device-provider-ddmlib-proto/31.0.2/android-device-provider-ddmlib-proto-31.0.2-sources.jar, took 74 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-device-provider-gradle-proto/31.0.2/android-device-provider-gradle-proto-31.0.2-sources.jar, took 47 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-test-plugin-host-additional-test-output-proto/31.0.2/android-test-plugin-host-additional-test-output-proto-31.0.2-sources.jar, took 62 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-test-plugin-host-coverage-proto/31.0.2/android-test-plugin-host-coverage-proto-31.0.2-sources.jar, took 74 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-test-plugin-host-logcat-proto/31.0.2/android-test-plugin-host-logcat-proto-31.0.2-sources.jar, took 72 ms
-Download https://repo.maven.apache.org/maven2/commons-io/commons-io/2.4/commons-io-2.4-sources.jar, took 70 ms
-Download https://repo.maven.apache.org/maven2/org/ow2/asm/asm-commons/9.2/asm-commons-9.2-sources.jar, took 56 ms
-Download https://repo.maven.apache.org/maven2/org/ow2/asm/asm-util/9.2/asm-util-9.2-sources.jar, took 56 ms
-Download https://repo.maven.apache.org/maven2/org/ow2/asm/asm-analysis/9.2/asm-analysis-9.2-sources.jar, took 53 ms
-Download https://repo.maven.apache.org/maven2/org/ow2/asm/asm-tree/9.2/asm-tree-9.2-sources.jar, took 46 ms
-Download https://repo.maven.apache.org/maven2/org/ow2/asm/asm/9.2/asm-9.2-sources.jar, took 64 ms
-Download https://repo.maven.apache.org/maven2/org/bouncycastle/bcpkix-jdk15on/1.67/bcpkix-jdk15on-1.67-sources.jar, took 97 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/analytics-library/protos/31.0.2/protos-31.0.2-sources.jar, took 306 ms
-Download https://repo.maven.apache.org/maven2/com/google/api/grpc/proto-google-common-protos/2.0.1/proto-google-common-protos-2.0.1-sources.jar, took 125 ms
-Download https://repo.maven.apache.org/maven2/com/google/protobuf/protobuf-java/3.19.3/protobuf-java-3.19.3-sources.jar, took 123 ms
-Download https://dl.google.com/dl/android/maven2/com/google/testing/platform/core-proto/0.0.8-alpha08/core-proto-0.0.8-alpha08-sources.jar, took 101 ms
-Download https://repo.maven.apache.org/maven2/org/bouncycastle/bcprov-jdk15on/1.67/bcprov-jdk15on-1.67-sources.jar, took 380 ms
-Download https://repo.maven.apache.org/maven2/xerces/xercesImpl/2.12.0/xercesImpl-2.12.0-sources.jar, took 226 ms
-Download https://repo.maven.apache.org/maven2/org/apache/commons/commons-compress/1.20/commons-compress-1.20-sources.jar, took 101 ms
-Download https://repo.maven.apache.org/maven2/org/apache/httpcomponents/httpclient/4.5.13/httpclient-4.5.13-sources.jar, took 109 ms
-Download https://repo.maven.apache.org/maven2/org/apache/httpcomponents/httpcore/4.4.15/httpcore-4.4.15-sources.jar, took 80 ms
-Download https://dl.google.com/dl/android/maven2/com/android/signflinger/8.0.2/signflinger-8.0.2-sources.jar, took 63 ms
-Download https://dl.google.com/dl/android/maven2/com/android/zipflinger/8.0.2/zipflinger-8.0.2-sources.jar, took 73 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/annotations/31.0.2/annotations-31.0.2-sources.jar, took 63 ms
-Download https://repo.maven.apache.org/maven2/org/bitbucket/b_c/jose4j/0.7.0/jose4j-0.7.0-sources.jar, took 62 ms
-Download https://repo.maven.apache.org/maven2/io/perfmark/perfmark-api/0.23.0/perfmark-api-0.23.0-sources.jar, took 47 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-codec-http2/4.1.72.Final/netty-codec-http2-4.1.72.Final-sources.jar, took 80 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-handler-proxy/4.1.72.Final/netty-handler-proxy-4.1.72.Final-sources.jar, took 46 ms
-Download https://dl.google.com/dl/android/maven2/com/android/tools/build/apksig/8.0.2/apksig-8.0.2-sources.jar, took 94 ms
-Download https://repo.maven.apache.org/maven2/xml-apis/xml-apis/1.4.01/xml-apis-1.4.01-sources.jar, took 103 ms
-Download https://repo.maven.apache.org/maven2/io/grpc/grpc-context/1.45.1/grpc-context-1.45.1-sources.jar, took 46 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-codec-http/4.1.72.Final/netty-codec-http-4.1.72.Final-sources.jar, took 94 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-handler/4.1.72.Final/netty-handler-4.1.72.Final-sources.jar, took 77 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-codec-socks/4.1.72.Final/netty-codec-socks-4.1.72.Final-sources.jar, took 52 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-codec/4.1.72.Final/netty-codec-4.1.72.Final-sources.jar, took 69 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-transport/4.1.72.Final/netty-transport-4.1.72.Final-sources.jar, took 78 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-buffer/4.1.72.Final/netty-buffer-4.1.72.Final-sources.jar, took 65 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-resolver/4.1.72.Final/netty-resolver-4.1.72.Final-sources.jar, took 48 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-common/4.1.72.Final/netty-common-4.1.72.Final-sources.jar, took 88 ms
-Download https://repo.maven.apache.org/maven2/io/netty/netty-tcnative-classes/2.0.46.Final/netty-tcnative-classes-2.0.46.Final-sources.jar, took 43 ms
-Warning: SDK processing. This version only understands SDK XML versions up to 3 but an SDK XML file of version 4 was encountered. This can happen if you use versions of Android Studio and the command-line tools that were released at different times.
-Errors during XML parse:
-Additionally, the fallback loader failed to parse the XML.
-Checking the license for package Android SDK Tools in C:\Users\User\AppData\Local\Android\Sdk\licenses
-License for package Android SDK Tools accepted.
-Preparing "Install Android SDK Tools (revision: 26.1.1)".
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.9/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 14s
+18 actionable tasks: 18 executed
+
+

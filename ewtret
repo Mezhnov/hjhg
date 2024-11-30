@@ -1,1 +1,66 @@
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:17:12 Unresolved reference 'google'.
+Ошибка **"Unresolved reference 'google'"** говорит о том, что в вашем проекте не найдена зависимость для библиотеки `Gson`, которая необходима для сериализации и десериализации данных. Чтобы исправить ошибку, нужно добавить зависимость в файл `build.gradle` вашего проекта.
+
+Вот шаги для решения:
+
+1. **Добавление зависимости Gson в `build.gradle`**
+
+   Откройте файл `build.gradle` (Module: app) вашего проекта и добавьте следующую зависимость в секцию `dependencies`:
+
+   ```gradle
+   dependencies {
+       // другие зависимости
+
+       implementation 'com.google.code.gson:gson:2.8.9'  // Добавьте эту строку
+   }
+   ```
+
+   **Примечание**: Это добавит библиотеку Gson для вашего проекта.
+
+2. **Синхронизация проекта с Gradle**
+
+   После добавления зависимости нужно синхронизировать проект с Gradle. Для этого:
+
+   - Нажмите кнопку **"Sync Now"** в верхней части файла, или
+   - В Android Studio выберите **File > Sync Project with Gradle Files**.
+
+3. **Использование Gson в проекте**
+
+   После того как зависимость будет добавлена и проект синхронизируется, вы сможете использовать `Gson` в своем коде.
+
+Вот как должен выглядеть ваш файл `build.gradle` (Module: app):
+
+```gradle
+plugins {
+    id 'com.android.application'
+    id 'kotlin-android'
+}
+
+android {
+    compileSdkVersion 33
+
+    defaultConfig {
+        applicationId "com.example.myapplication"
+        minSdkVersion 21
+        targetSdkVersion 33
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    implementation 'com.android.support:appcompat-v7:28.0.0'
+    implementation 'com.google.code.gson:gson:2.8.9'  // Эта строка добавляется для Gson
+
+    // Другие зависимости вашего проекта
+}
+```
+
+После этих изменений проблема с отсутствием ссылки на `google` должна быть решена, и код должен скомпилироваться без ошибок.

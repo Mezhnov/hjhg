@@ -3,33 +3,30 @@ package com.example.myapplication
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.drawer.DrawerValue
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.*
-import androidx.compose.material.DrawerValue.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.rememberDrawerState
+
 import androidx.compose.material3.*
+
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
+
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+
 import androidx.compose.ui.unit.dp
+
 import com.example.myapplication.ui.theme.MyApplicationTheme
+
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
                 LoginScreen()
@@ -58,8 +55,8 @@ fun LoginScreen() {
 
 @Composable
 fun LoginContent(onLoginClick: () -> Unit, onRegisterClick: () -> Unit) {
-    val username = remember { mutableStateOf("") }
-    val password = remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
 
     Box(
         modifier = Modifier
@@ -74,13 +71,13 @@ fun LoginContent(onLoginClick: () -> Unit, onRegisterClick: () -> Unit) {
         ) {
             Text(
                 text = "Messenger App",
-                style = MaterialTheme.typography.h5,
+                style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 32.dp)
             )
 
             OutlinedTextField(
-                value = username.value,
-                onValueChange = { username.value = it },
+                value = username,
+                onValueChange = { username = it },
                 label = { Text("Username") },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -88,8 +85,8 @@ fun LoginContent(onLoginClick: () -> Unit, onRegisterClick: () -> Unit) {
             )
 
             OutlinedTextField(
-                value = password.value,
-                onValueChange = { password.value = it },
+                value = password,
+                onValueChange = { password = it },
                 label = { Text("Password") },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier
@@ -110,7 +107,7 @@ fun LoginContent(onLoginClick: () -> Unit, onRegisterClick: () -> Unit) {
             Text(
                 text = "Don't have an account? Sign Up",
                 color = Color.Blue,
-                style = MaterialTheme.typography.body2,
+                style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.clickable { onRegisterClick() }
             )
         }
@@ -119,9 +116,9 @@ fun LoginContent(onLoginClick: () -> Unit, onRegisterClick: () -> Unit) {
 
 @Composable
 fun RegisterContent(onLoginClick: () -> Unit) {
-    val username = remember { mutableStateOf("") }
-    val password = remember { mutableStateOf("") }
-    val confirmPassword = remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
 
     Box(
         modifier = Modifier
@@ -136,13 +133,13 @@ fun RegisterContent(onLoginClick: () -> Unit) {
         ) {
             Text(
                 text = "Create Account",
-                style = MaterialTheme.typography.h5,
+                style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 32.dp)
             )
 
             OutlinedTextField(
-                value = username.value,
-                onValueChange = { username.value = it },
+                value = username,
+                onValueChange = { username = it },
                 label = { Text("Username") },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -150,8 +147,8 @@ fun RegisterContent(onLoginClick: () -> Unit) {
             )
 
             OutlinedTextField(
-                value = password.value,
-                onValueChange = { password.value = it },
+                value = password,
+                onValueChange = { password = it },
                 label = { Text("Password") },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier
@@ -160,8 +157,8 @@ fun RegisterContent(onLoginClick: () -> Unit) {
             )
 
             OutlinedTextField(
-                value = confirmPassword.value,
-                onValueChange = { confirmPassword.value = it },
+                value = confirmPassword,
+                onValueChange = { confirmPassword = it },
                 label = { Text("Confirm Password") },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier
@@ -170,7 +167,7 @@ fun RegisterContent(onLoginClick: () -> Unit) {
             )
 
             Button(
-                onClick = { /* Handle register logic */ },
+                onClick = { /* Обработка регистрации */ },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Register")
@@ -180,7 +177,7 @@ fun RegisterContent(onLoginClick: () -> Unit) {
             Text(
                 text = "Already have an account? Login",
                 color = Color.Blue,
-                style = MaterialTheme.typography.body2,
+                style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.clickable { onLoginClick() }
             )
         }
@@ -189,8 +186,7 @@ fun RegisterContent(onLoginClick: () -> Unit) {
 
 @Composable
 fun MessengerHome(onLogoutClick: () -> Unit) {
-    val scaffoldState = rememberScaffoldState()
-    val drawerState = scaffoldState.drawerState
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
     val messages = remember {
@@ -203,58 +199,57 @@ fun MessengerHome(onLogoutClick: () -> Unit) {
         )
     }
 
-    Scaffold(
-        scaffoldState = scaffoldState,
+    ModalNavigationDrawer(
         drawerContent = {
-            DrawerContent()
+            DrawerContent(onLogoutClick)
         },
-        topBar = {
-            TopAppBar(
-                title = { Text("Messenger") },
-                navigationIcon = {
-                    IconButton(onClick = {
-                        scope.launch {
-                            if (drawerState.isClosed) drawerState.open()
-                            else drawerState.close()
-                        }
-                    }) {
-                        Icon(Icons.Filled.Menu, contentDescription = "Menu")
-                    }
-                }
-            )
-        },
-        content = { paddingValues ->
-            MessagesList(messages = messages, modifier = Modifier.padding(paddingValues))
-        }
-    )
-}
-
-@Composable
-fun DrawerContent() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
+        drawerState = drawerState
     ) {
-        // Заголовок бокового меню
-        Text(
-            text = "Menu",
-            style = MaterialTheme.typography.h6,
-            modifier = Modifier.padding(16.dp)
+        Scaffold(
+            topBar = {
+                SmallTopAppBar(
+                    title = {
+                        Text(
+                            text = "Messenger",
+                            modifier = Modifier.clickable {
+                                scope.launch {
+                                    drawerState.open()
+                                }
+                            }
+                        )
+                    }
+                )
+            },
+            content = { paddingValues ->
+                MessagesList(messages = messages, modifier = Modifier.padding(paddingValues))
+            }
         )
-        Divider()
-
-        // Пункты меню
-        DrawerItem(icon = Icons.Filled.Settings, label = "Settings", onClick = { /* Handle click */ })
-        DrawerItem(icon = Icons.Filled.Settings, label = "Profile", onClick = { /* Handle click */ })
-        DrawerItem(icon = Icons.Filled.Settings, label = "Logout", onClick = { /* Handle click */ })
     }
 }
 
 @Composable
-fun DrawerItem(icon: ImageVector, label: String, onClick: () -> Unit) {
+fun DrawerContent(onLogoutClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+    ) {
+        Text(
+            text = "Menu",
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(16.dp)
+        )
+        Divider()
+
+        DrawerItem(label = "Settings", onClick = { /* Обработка клика */ })
+        DrawerItem(label = "Profile", onClick = { /* Обработка клика */ })
+        DrawerItem(label = "Logout", onClick = { onLogoutClick() })
+    }
+}
+
+@Composable
+fun DrawerItem(label: String, onClick: () -> Unit) {
     ListItem(
-        icon = { Icon(icon, contentDescription = label) },
-        text = { Text(label) },
+        headlineText = { Text(label) },
         modifier = Modifier.clickable(onClick = onClick)
     )
 }
@@ -274,25 +269,20 @@ fun MessageItem(message: String) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(8.dp),
-        elevation = 2.dp
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            // Здесь можно добавить изображение профиля пользователя
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = "User Name",
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.subtitle1
-                )
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.body1
-                )
-            }
+            Text(
+                text = "User Name",
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium
+            )
         }
     }
 }
@@ -304,39 +294,3 @@ fun DefaultPreview() {
         LoginScreen()
     }
 }
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:9:36 Unresolved reference 'drawer'.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:13:34 Unresolved reference 'DrawerValue'.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:17:34 Unresolved reference 'rememberDrawerState'.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:77:50 Unresolved reference 'h5'.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:94:40 Unresolved reference 'PasswordVisualTransformation'.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:113:50 Unresolved reference 'body2'.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:139:50 Unresolved reference 'h5'.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:156:40 Unresolved reference 'PasswordVisualTransformation'.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:166:40 Unresolved reference 'PasswordVisualTransformation'.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:183:50 Unresolved reference 'body2'.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:192:25 Unresolved reference 'rememberScaffoldState'.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:207:9 No parameter with name 'scaffoldState' found.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:208:9 No parameter with name 'drawerContent' found.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:209:13 @Composable invocations can only happen from the context of a @Composable function
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:212:13 @Composable invocations can only happen from the context of a @Composable function
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:212:13 This material API is experimental and is likely to change or to be removed in the future.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:216:31 Unresolved reference 'launch'.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:227:13 @Composable invocations can only happen from the context of a @Composable function
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:241:46 Unresolved reference 'h6'.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:254:22 Unresolved reference 'ImageVector'.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:256:9 No parameter with name 'icon' found.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:256:18 Overload resolution ambiguity between candidates:
-@Composable() @ComposableTarget(...) fun Icon(bitmap: ImageBitmap, contentDescription: String?, modifier: Modifier = ..., tint: Color = ...): Unit
-@Composable() @ComposableTarget(...) fun Icon(painter: Painter, contentDescription: String?, modifier: Modifier = ..., tint: Color = ...): Unit
-@Composable() @ComposableTarget(...) fun Icon(imageVector: ImageVector, contentDescription: String?, modifier: Modifier = ..., tint: Color = ...): Unit
-
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:257:9 No parameter with name 'text' found.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:257:18 @Composable invocations can only happen from the context of a @Composable function
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:258:9 No value passed for parameter 'headlineContent'.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:277:21 Argument type mismatch: actual type is 'androidx.compose.ui.unit.Dp', but 'androidx.compose.material3.CardElevation' was expected.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:279:9 @Composable invocations can only happen from the context of a @Composable function
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:289:54 Unresolved reference 'subtitle1'.
-e: file:///C:/Users/User/AndroidStudioProjects/MyApplication2/app/src/main/java/com/example/myapplication/MainActivity.kt:293:54 Unresolved reference 'body1'.
-
-
-

@@ -1,509 +1,296 @@
-#include <windows.h>
-#include <string>
-#include <vector>
-#include <map>
-#include <sstream>
+package com.example.myapplication
 
-#pragma comment (lib,"user32.lib")
+import androidx.compose.ui.platform.LocalContext
+import android.os.Bundle
+import android.util.Log
+import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
+import com.example.myapplication.ui.theme.MyApplicationTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import okhttp3.*
+import java.io.IOException
 
-// Глобальные переменные
-HINSTANCE hInst;
-HWND hMarkyEdit;
-HWND hStylinEdit;
-HWND hRunButton;
-HWND hMainWnd;
-
-struct UIElement {
-    std::wstring type;
-    std::map<std::wstring, std::wstring> attributes;
-    std::vector<UIElement> children;
-    std::wstring id; // Изменено для хранения идентификатора в wstring
-    HWND hWnd; // Дескриптор окна/контрола
-};
-
-struct Style {
-    std::map<std::wstring, std::wstring> properties;
-};
-
-std::vector<UIElement> uiElements;
-std::map<std::wstring, Style> styles;
-
-// Функции парсинга
-void ParseMarky(const std::wstring& markyCode);
-void ParseStylin(const std::wstring& stylinCode);
-
-// Функция создания интерфейса
-void CreateUI(HWND parent, const std::vector<UIElement>& elements);
-
-// Вспомогательные функции
-COLORREF ParseColor(const std::wstring& colorStr);
-int ParseSize(const std::wstring& sizeStr);
-HFONT CreateFontFromStyle(const Style& style);
-void ApplyStyle(HWND hWnd, const UIElement& element);
-
-// Оконные процедуры
-LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
-LRESULT CALLBACK UIWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
-// Главная функция
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
-    hInst = hInstance;
-
-    // Регистрация класса главного окна
-    WNDCLASS wc = {};
-    wc.lpfnWndProc = MainWndProc;
-    wc.hInstance = hInstance;
-    wc.lpszClassName = TEXT("MarkyStylinIDE");
-
-    RegisterClass(&wc);
-
-    // Создание главного окна
-    hMainWnd = CreateWindowEx(
-        0,
-        wc.lpszClassName,
-        TEXT("Marky & Stylin IDE"),
-        WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, 800, 600,
-        nullptr,
-        nullptr,
-        hInstance,
-        nullptr
-    );
-
-    ShowWindow(hMainWnd, nCmdShow);
-
-    // Цикл обработки сообщений
-    MSG msg = {};
-    while (GetMessage(&msg, nullptr, 0, 0)) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-    }
-    return 0;
-}
-
-// Создание элементов управления в главном окне
-void CreateControls(HWND hwnd) {
-    CreateWindow(TEXT("STATIC"), TEXT("Marky Code:"),
-        WS_VISIBLE | WS_CHILD,
-        10, 10, 100, 20,
-        hwnd, nullptr, hInst, nullptr);
-
-    hMarkyEdit = CreateWindowEx(WS_EX_CLIENTEDGE, TEXT("EDIT"), TEXT(""),
-        WS_VISIBLE | WS_CHILD | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL,
-        10, 30, 360, 500,
-        hwnd, nullptr, hInst, nullptr);
-
-    CreateWindow(TEXT("STATIC"), TEXT("Stylin Code:"),
-        WS_VISIBLE | WS_CHILD,
-        380, 10, 100, 20,
-        hwnd, nullptr, hInst, nullptr);
-
-    hStylinEdit = CreateWindowEx(WS_EX_CLIENTEDGE, TEXT("EDIT"), TEXT(""),
-        WS_VISIBLE | WS_CHILD | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL,
-        380, 30, 360, 500,
-        hwnd, nullptr, hInst, nullptr);
-
-    hRunButton = CreateWindow(TEXT("BUTTON"), TEXT("Запустить"),
-        WS_VISIBLE | WS_CHILD,
-        10, 540, 100, 30,
-        hwnd, (HMENU)1, hInst, nullptr);
-}
-
-// Оконная процедура главного окна
-LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    switch (msg)
-    {
-    case WM_CREATE:
-        CreateControls(hwnd);
-        break;
-    case WM_COMMAND:
-        if (LOWORD(wParam) == 1) { // Нажата кнопка "Запустить"
-            // Получаем код из контролов
-            TCHAR markyBuffer[10000];
-            GetWindowText(hMarkyEdit, markyBuffer, 10000);
-            std::wstring markyCode = markyBuffer;
-
-            TCHAR stylinBuffer[10000];
-            GetWindowText(hStylinEdit, stylinBuffer, 10000);
-            std::wstring stylinCode = stylinBuffer;
-
-            // Парсим код
-            ParseMarky(markyCode);
-            ParseStylin(stylinCode);
-
-            // Создаем новое окно для отображения интерфейса
-            WNDCLASS wc = {};
-            wc.lpfnWndProc = UIWndProc;
-            wc.hInstance = hInst;
-            wc.lpszClassName = TEXT("UIWindowClass");
-
-            RegisterClass(&wc);
-
-            HWND hUIWindow = CreateWindowEx(
-                0,
-                wc.lpszClassName,
-                TEXT("Результат"),
-                WS_OVERLAPPEDWINDOW,
-                CW_USEDEFAULT, CW_USEDEFAULT, 800, 600,
-                nullptr,
-                nullptr,
-                hInst,
-                nullptr
-            );
-
-            ShowWindow(hUIWindow, SW_SHOW);
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent {
+            MyApplicationTheme {
+                LoginScreen()
+            }
         }
-        break;
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        break;
-    default:
-        return DefWindowProc(hwnd, msg, wParam, lParam);
     }
-    return 0;
 }
 
-// Оконная процедура окна интерфейса
-LRESULT CALLBACK UIWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    switch (msg)
-    {
-    case WM_CREATE:
-        CreateUI(hwnd, uiElements);
-        break;
-    case WM_DESTROY:
-        // Очищаем элементы и стили после закрытия окна
-        uiElements.clear();
-        styles.clear();
-        break;
-    default:
-        return DefWindowProc(hwnd, msg, wParam, lParam);
-    }
-    return 0;
-}
+@Composable
+fun LoginScreen() {
+    var showLogin by remember { mutableStateOf(true) }
+    var isLoggedIn by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
-// Функция парсинга Marky
-void ParseMarky(const std::wstring& markyCode) {
-    uiElements.clear();
-
-    std::wistringstream iss(markyCode);
-    std::wstring line;
-    std::vector<std::pair<int, UIElement*>> elementStack;
-
-    while (std::getline(iss, line)) {
-        // Убираем пробелы и переводы строк
-        line.erase(line.find_last_not_of(L" \t\r\n") + 1);
-        // Пропускаем пустые строки
-        if (line.empty()) continue;
-
-        // Определяем уровень отступа
-        size_t indent = 0;
-        while (indent < line.length() && (line[indent] == L' ' || line[indent] == L'\t')) {
-            indent++;
-        }
-
-        std::wstring trimmedLine = line.substr(indent);
-        // Создаем новый элемент
-        UIElement element;
-        size_t pos = trimmedLine.find(L'(');
-        if (pos != std::wstring::npos) {
-            element.type = trimmedLine.substr(0, pos);
-            size_t endPos = trimmedLine.find(L')', pos);
-            if (endPos != std::wstring::npos) {
-                std::wstring attrs = trimmedLine.substr(pos + 1, endPos - pos - 1);
-                // Разбиваем атрибуты
-                std::wistringstream attrStream(attrs);
-                std::wstring attrPair;
-                while (std::getline(attrStream, attrPair, L',')) {
-                    size_t eqPos = attrPair.find(L'=');
-                    if (eqPos != std::wstring::npos) {
-                        std::wstring key = attrPair.substr(0, eqPos);
-                        std::wstring value = attrPair.substr(eqPos + 1);
-                        // Убираем возможные кавычки и пробелы
-                        key.erase(0, key.find_first_not_of(L" \t"));
-                        key.erase(key.find_last_not_of(L" \t") + 1);
-                        value.erase(0, value.find_first_not_of(L" \t\""));
-                        value.erase(value.find_last_not_of(L" \t\"") + 1);
-                        element.attributes[key] = value;
+    when {
+        isLoggedIn -> MessengerHome(onLogoutClick = {
+            isLoggedIn = false
+            showLogin = true
+        })
+        showLogin -> LoginContent(
+            onLoginClick = { username, password ->
+                loginUser(username, password) { success ->
+                    if (success) {
+                        isLoggedIn = true
+                    } else {
+                        scope.launch(Dispatchers.Main) {
+                            Toast.makeText(context, "Login Failed", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
+            },
+            onRegisterClick = { showLogin = false }
+        )
+        else -> RegisterContent(
+            onLoginClick = { showLogin = true },
+            onRegisterSuccess = { isLoggedIn = true }
+        )
+    }
+}
+
+
+@Composable
+fun LoginContent(onLoginClick: (String, String) -> Unit, onRegisterClick: () -> Unit) {
+    val username = remember { mutableStateOf("") }
+    val password = remember { mutableStateOf("") }
+    LocalContext.current // Get the context
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFE0E0E0))
+    ) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Messenger App",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(bottom = 32.dp)
+            )
+
+            OutlinedTextField(
+                value = username.value,
+                onValueChange = { username.value = it },
+                label = { Text("Username") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            )
+
+            OutlinedTextField(
+                value = password.value,
+                onValueChange = { password.value = it },
+                label = { Text("Password") },
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp)
+            )
+
+            Button(
+                onClick = {
+                    onLoginClick(username.value, password.value)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Login")
             }
-            else {
-                element.type = trimmedLine.substr(0, pos);
-            }
-        }
-        else {
-            element.type = trimmedLine;
-        }
 
-        // Получаем id элемента, если есть
-        auto itId = element.attributes.find(L"id");
-        if (itId != element.attributes.end()) {
-            element.id = itId->second;
-        }
-
-        // Обрабатываем иерархию на основе отступов
-        while (!elementStack.empty() && indent <= elementStack.back().first) {
-            elementStack.pop_back();
-        }
-
-        if (elementStack.empty()) {
-            uiElements.push_back(element);
-            elementStack.push_back({ indent, &uiElements.back() });
-        }
-        else {
-            elementStack.back().second->children.push_back(element);
-            elementStack.push_back({ indent, &elementStack.back().second->children.back() });
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Don't have an account? Sign Up",
+                color = Color.Blue,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.clickable { onRegisterClick() }
+            )
         }
     }
 }
 
-// Функция парсинга Stylin
-void ParseStylin(const std::wstring& stylinCode) {
-    styles.clear();
+@Composable
+fun RegisterContent(onLoginClick: () -> Unit, onRegisterSuccess: () -> Unit) {
+    val username = remember { mutableStateOf("") }
+    val password = remember { mutableStateOf("") }
+    val confirmPassword = remember { mutableStateOf("") }
+    val context = LocalContext.current // Get the context
 
-    std::wistringstream iss(stylinCode);
-    std::wstring line;
-    std::wstring currentSelector;
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFE0E0E0))
+    ) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Create Account",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(bottom = 32.dp)
+            )
 
-    while (std::getline(iss, line)) {
-        // Убираем пробелы и переводы строк
-        line.erase(line.find_last_not_of(L" \t\r\n") + 1);
-        line.erase(0, line.find_first_not_of(L" \t"));
+            OutlinedTextField(
+                value = username.value,
+                onValueChange = { username.value = it },
+                label = { Text("Username") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            )
 
-        if (line.empty()) continue;
+            OutlinedTextField(
+                value = password.value,
+                onValueChange = { password.value = it },
+                label = { Text("Password") },
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            )
 
-        // Если строка заканчивается двоеточием, это селектор
-        if (line.back() == L':') {
-            currentSelector = line.substr(0, line.length() - 1);
-            styles[currentSelector] = Style();
-        }
-        else {
-            // Это свойство стиля
-            size_t colonPos = line.find(L':');
-            if (colonPos != std::wstring::npos) {
-                std::wstring property = line.substr(0, colonPos);
-                std::wstring value = line.substr(colonPos + 1);
-                // Убираем пробелы
-                property.erase(property.find_last_not_of(L" \t") + 1);
-                property.erase(0, property.find_first_not_of(L" \t"));
-                value.erase(0, value.find_first_not_of(L" \t"));
-                value.erase(value.find_last_not_of(L" \t") + 1);
-                styles[currentSelector].properties[property] = value;
+            OutlinedTextField(
+                value = confirmPassword.value,
+                onValueChange = { confirmPassword.value = it },
+                label = { Text("Confirm Password") },
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp)
+            )
+
+            Button(
+                onClick = {
+                    if (password.value != confirmPassword.value) {
+                        Toast.makeText(context, "Passwords do not match", Toast.LENGTH_SHORT).show()
+                    } else {
+                        registerUser(username.value, password.value) { success ->
+                            if (success) {
+                                onRegisterSuccess()
+                            } else {
+                                Toast.makeText(context, "Registration Failed", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Register")
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Already have an account? Login",
+                color = Color.Blue,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.clickable { onLoginClick() }
+            )
         }
     }
 }
 
-// Функция создания интерфейса на основе парсинга
-void CreateUI(HWND parent, const std::vector<UIElement>& elements) {
-    for (const auto& element : elements) {
-        HWND hControl = nullptr;
-        if (element.type == L"Window") {
-            // Создаем новое окно
-            std::wstring title = L"Window";
-            int width = 800, height = 600;
-            auto itTitle = element.attributes.find(L"title");
-            if (itTitle != element.attributes.end()) {
-                title = itTitle->second;
-            }
-            auto itSize = element.attributes.find(L"size");
-            if (itSize != element.attributes.end()) {
-                std::wstring sizeStr = itSize->second;
-                size_t xPos = sizeStr.find(L'x');
-                if (xPos != std::wstring::npos) {
-                    width = _wtoi(sizeStr.substr(0, xPos).c_str());
-                    height = _wtoi(sizeStr.substr(xPos + 1).c_str());
-                }
-            }
+@Composable
+fun MessengerHome(onLogoutClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFBBDEFB))
+    ) {
+        Column(
+            modifier = Modifier.align(Alignment.Center),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Welcome to Messenger!",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
 
-            // Регистрируем класс окна, если он не зарегистрирован
-            static bool isWindowClassRegistered = false;
-            if (!isWindowClassRegistered) {
-                WNDCLASS wc = {};
-                wc.lpfnWndProc = DefWindowProc;
-                wc.hInstance = hInst;
-                wc.lpszClassName = TEXT("UIWindow");
-
-                RegisterClass(&wc);
-                isWindowClassRegistered = true;
-            }
-
-            hControl = CreateWindowEx(
-                0,
-                TEXT("UIWindow"),
-                title.c_str(),
-                WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-                CW_USEDEFAULT, CW_USEDEFAULT, width, height,
-                nullptr,
-                nullptr,
-                hInst,
-                nullptr
-            );
-
-            // Создаем дочерние элементы
-            if (hControl != nullptr) {
-                // Сохраняем дескриптор окна
-                const_cast<UIElement&>(element).hWnd = hControl;
-                // Применяем стили
-                ApplyStyle(hControl, element);
-
-                CreateUI(hControl, element.children);
-            }
-        }
-        else {
-            // Создаем контролы
-            std::wstring text = L"";
-            int x = 10, y = 10, width = 100, height = 30;
-            std::wstring id = element.id;
-            std::wstring className = L"";
-
-            auto itText = element.attributes.find(L"text");
-            if (itText != element.attributes.end()) {
-                text = itText->second;
-            }
-            auto itClass = element.attributes.find(L"class");
-            if (itClass != element.attributes.end()) {
-                className = itClass->second;
-            }
-            auto itX = element.attributes.find(L"x");
-            if (itX != element.attributes.end()) {
-                x = _wtoi(itX->second.c_str());
-            }
-            auto itY = element.attributes.find(L"y");
-            if (itY != element.attributes.end()) {
-                y = _wtoi(itY->second.c_str());
-            }
-            auto itWidth = element.attributes.find(L"width");
-            if (itWidth != element.attributes.end()) {
-                width = _wtoi(itWidth->second.c_str());
-            }
-            auto itHeight = element.attributes.find(L"height");
-            if (itHeight != element.attributes.end()) {
-                height = _wtoi(itHeight->second.c_str());
-            }
-
-            DWORD style = WS_VISIBLE | WS_CHILD;
-            const wchar_t* wndClass = nullptr;
-
-            if (element.type == L"Label") {
-                wndClass = TEXT("STATIC");
-                style |= SS_CENTER;
-            }
-            else if (element.type == L"Button") {
-                wndClass = TEXT("BUTTON");
-            }
-            else if (element.type == L"Edit") {
-                wndClass = TEXT("EDIT");
-                style |= WS_BORDER;
-            }
-            // Добавьте другие типы контролов при необходимости
-
-            if (wndClass != nullptr) {
-                hControl = CreateWindowEx(
-                    0,
-                    wndClass,
-                    text.c_str(),
-                    style,
-                    x, y, width, height,
-                    parent,
-                    nullptr,
-                    hInst,
-                    nullptr
-                );
-            }
-
-            if (hControl != nullptr) {
-                // Сохраняем дескриптор окна
-                const_cast<UIElement&>(element).hWnd = hControl;
-
-                // Применяем стили
-                ApplyStyle(hControl, element);
-
-                // Создаем дочерние элементы
-                if (!element.children.empty()) {
-                    CreateUI(hControl, element.children);
-                }
+            Button(
+                onClick = { onLogoutClick() },
+                modifier = Modifier.padding(top = 16.dp)
+            ) {
+                Text("Logout")
             }
         }
     }
 }
 
-// Вспомогательные функции
+private fun loginUser(username: String, password: String, callback: (Boolean) -> Unit) {
+    val client = OkHttpClient()
+    val formBody = FormBody.Builder()
+        .add("username", username)
+        .add("password", password)
+        .build()
+    val request = Request.Builder()
+        .url("http://192.168.0.119:5000/login")
+        .post(formBody)
+        .build()
 
-COLORREF ParseColor(const std::wstring& colorStr) {
-    if (colorStr[0] == L'#') {
-        // Цвет в формате HEX
-        unsigned int rgb = 0;
-        std::wstringstream ss;
-        ss << std::hex << colorStr.substr(1);
-        ss >> rgb;
-        return RGB((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
-    }
-    return 0;
+    client.newCall(request).enqueue(object : Callback {
+        override fun onFailure(call: Call, e: IOException) {
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                callback(false)
+            }
+        }
+
+        override fun onResponse(call: Call, response: Response) {
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                callback(response.isSuccessful)
+            }
+        }
+    })
 }
 
-int ParseSize(const std::wstring& sizeStr) {
-    // Преобразуем строку в число
-    return _wtoi(sizeStr.c_str());
+private fun registerUser(username: String, password: String, callback: (Boolean) -> Unit) {
+    val client = OkHttpClient()
+    val formBody = FormBody.Builder()
+        .add("username", username)
+        .add("password", password)
+        .build()
+    val request = Request.Builder()
+        .url("http://192.168.0.119:5000/register")
+        .post(formBody)
+        .build()
+
+    client.newCall(request).enqueue(object : Callback {
+        override fun onFailure(call: Call, e: IOException) {
+            Log.e("Register", "Failed to register", e)
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                callback(false)
+            }
+        }
+
+        override fun onResponse(call: Call, response: Response) {
+            Log.d("Register", "Register response: ${response.body?.string()}")
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                callback(response.isSuccessful)
+            }
+        }
+    })
 }
-
-HFONT CreateFontFromStyle(const Style& style) {
-    int fontSize = 16; // Размер по умолчанию
-    std::wstring fontName = L"Arial"; // Шрифт по умолчанию
-    bool bold = false;
-    bool italic = false;
-
-    auto itFontSize = style.properties.find(L"font-size");
-    if (itFontSize != style.properties.end()) {
-        fontSize = ParseSize(itFontSize->second);
-    }
-    auto itFontFamily = style.properties.find(L"font-family");
-    if (itFontFamily != style.properties.end()) {
-        fontName = itFontFamily->second;
-    }
-    auto itFontWeight = style.properties.find(L"font-weight");
-    if (itFontWeight != style.properties.end() && itFontWeight->second == L"bold") {
-        bold = true;
-    }
-    auto itFontStyle = style.properties.find(L"font-style");
-    if (itFontStyle != style.properties.end() && itFontStyle->second == L"italic") {
-        italic = true;
-    }
-
-    return CreateFont(-fontSize, 0, 0, 0, bold ? FW_BOLD : FW_NORMAL,
-        italic ? TRUE : FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_OUTLINE_PRECIS,
-        CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, VARIABLE_PITCH, fontName.c_str());
-}
-
-void ApplyStyle(HWND hWnd, const UIElement& element) {
-    // Определяем соответствующий стиль
-    Style style;
-
-    std::wstring idSelector = L"@" + element.id;
-    std::wstring classSelector;
-    auto itClass = element.attributes.find(L"class");
-    if (itClass != element.attributes.end()) {
-        classSelector = L"." + itClass->second;
-    }
-
-    if (!element.id.empty() && styles.find(idSelector) != styles.end()) {
-        style = styles[idSelector];
-    }
-    else if (!classSelector.empty() && styles.find(classSelector) != styles.end()) {
-        style = styles[classSelector];
-    }
-    else if (styles.find(element.type) != styles.end()) {
-        style = styles[element.type];
-    }
-
-    // Применяем свойства стиля
-    // Пример: установка шрифта
-    HFONT hFont = CreateFontFromStyle(style);
-    if (hFont != nullptr) {
-        SendMessage(hWnd, WM_SETFONT, (WPARAM)hFont, TRUE);
-    }
-
-    // Для установки цвета текста и фона требуется дополнительная реализация
-    // включая обработку сообщений WM_CTLCOLOR*
-}
-

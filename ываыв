@@ -1,296 +1,97 @@
-package com.example.myapplication
-
-import androidx.compose.ui.platform.LocalContext
-import android.os.Bundle
-import android.util.Log
-import android.widget.Toast
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.unit.dp
-import com.example.myapplication.ui.theme.MyApplicationTheme
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import okhttp3.*
-import java.io.IOException
-
-class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent {
-            MyApplicationTheme {
-                LoginScreen()
-            }
-        }
-    }
-}
-
-@Composable
-fun LoginScreen() {
-    var showLogin by remember { mutableStateOf(true) }
-    var isLoggedIn by remember { mutableStateOf(false) }
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
-    when {
-        isLoggedIn -> MessengerHome(onLogoutClick = {
-            isLoggedIn = false
-            showLogin = true
-        })
-        showLogin -> LoginContent(
-            onLoginClick = { username, password ->
-                loginUser(username, password) { success ->
-                    if (success) {
-                        isLoggedIn = true
-                    } else {
-                        scope.launch(Dispatchers.Main) {
-                            Toast.makeText(context, "Login Failed", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                }
-            },
-            onRegisterClick = { showLogin = false }
-        )
-        else -> RegisterContent(
-            onLoginClick = { showLogin = true },
-            onRegisterSuccess = { isLoggedIn = true }
-        )
-    }
-}
-
-
-@Composable
-fun LoginContent(onLoginClick: (String, String) -> Unit, onRegisterClick: () -> Unit) {
-    val username = remember { mutableStateOf("") }
-    val password = remember { mutableStateOf("") }
-    LocalContext.current // Get the context
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFE0E0E0))
-    ) {
-        Column(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Messenger App",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 32.dp)
-            )
-
-            OutlinedTextField(
-                value = username.value,
-                onValueChange = { username.value = it },
-                label = { Text("Username") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            )
-
-            OutlinedTextField(
-                value = password.value,
-                onValueChange = { password.value = it },
-                label = { Text("Password") },
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp)
-            )
-
-            Button(
-                onClick = {
-                    onLoginClick(username.value, password.value)
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Login")
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Don't have an account? Sign Up",
-                color = Color.Blue,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.clickable { onRegisterClick() }
-            )
-        }
-    }
-}
-
-@Composable
-fun RegisterContent(onLoginClick: () -> Unit, onRegisterSuccess: () -> Unit) {
-    val username = remember { mutableStateOf("") }
-    val password = remember { mutableStateOf("") }
-    val confirmPassword = remember { mutableStateOf("") }
-    val context = LocalContext.current // Get the context
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFE0E0E0))
-    ) {
-        Column(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Create Account",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 32.dp)
-            )
-
-            OutlinedTextField(
-                value = username.value,
-                onValueChange = { username.value = it },
-                label = { Text("Username") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            )
-
-            OutlinedTextField(
-                value = password.value,
-                onValueChange = { password.value = it },
-                label = { Text("Password") },
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            )
-
-            OutlinedTextField(
-                value = confirmPassword.value,
-                onValueChange = { confirmPassword.value = it },
-                label = { Text("Confirm Password") },
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp)
-            )
-
-            Button(
-                onClick = {
-                    if (password.value != confirmPassword.value) {
-                        Toast.makeText(context, "Passwords do not match", Toast.LENGTH_SHORT).show()
-                    } else {
-                        registerUser(username.value, password.value) { success ->
-                            if (success) {
-                                onRegisterSuccess()
-                            } else {
-                                Toast.makeText(context, "Registration Failed", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Register")
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Already have an account? Login",
-                color = Color.Blue,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.clickable { onLoginClick() }
-            )
-        }
-    }
-}
-
-@Composable
-fun MessengerHome(onLogoutClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFBBDEFB))
-    ) {
-        Column(
-            modifier = Modifier.align(Alignment.Center),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Welcome to Messenger!",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
-            Button(
-                onClick = { onLogoutClick() },
-                modifier = Modifier.padding(top = 16.dp)
-            ) {
-                Text("Logout")
-            }
-        }
-    }
-}
-
-private fun loginUser(username: String, password: String, callback: (Boolean) -> Unit) {
-    val client = OkHttpClient()
-    val formBody = FormBody.Builder()
-        .add("username", username)
-        .add("password", password)
-        .build()
-    val request = Request.Builder()
-        .url("http://192.168.0.119:5000/login")
-        .post(formBody)
-        .build()
-
-    client.newCall(request).enqueue(object : Callback {
-        override fun onFailure(call: Call, e: IOException) {
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
-                callback(false)
-            }
-        }
-
-        override fun onResponse(call: Call, response: Response) {
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
-                callback(response.isSuccessful)
-            }
-        }
-    })
-}
-
-private fun registerUser(username: String, password: String, callback: (Boolean) -> Unit) {
-    val client = OkHttpClient()
-    val formBody = FormBody.Builder()
-        .add("username", username)
-        .add("password", password)
-        .build()
-    val request = Request.Builder()
-        .url("http://192.168.0.119:5000/register")
-        .post(formBody)
-        .build()
-
-    client.newCall(request).enqueue(object : Callback {
-        override fun onFailure(call: Call, e: IOException) {
-            Log.e("Register", "Failed to register", e)
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
-                callback(false)
-            }
-        }
-
-        override fun onResponse(call: Call, response: Response) {
-            Log.d("Register", "Register response: ${response.body?.string()}")
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
-                callback(response.isSuccessful)
-            }
-        }
-    })
-}
+---------------------------- PROCESS STARTED (25331) for package com.example.myapplication ----------------------------
+2024-12-01 12:46:50.244 25331-25331 ziparchive              com.example.myapplication            W  Unable to open '/data/data/com.example.myapplication/code_cache/.overlay/base.apk/classes5.dm': No such file or directory
+2024-12-01 12:46:50.246 25331-25331 ziparchive              com.example.myapplication            W  Unable to open '/data/app/~~UH8zjMNkx_K3Ge2lapqqaA==/com.example.myapplication-guHQqi1jc-RU-mMQGqXDeQ==/base.dm': No such file or directory
+2024-12-01 12:46:50.247 25331-25331 ziparchive              com.example.myapplication            W  Unable to open '/data/app/~~UH8zjMNkx_K3Ge2lapqqaA==/com.example.myapplication-guHQqi1jc-RU-mMQGqXDeQ==/base.dm': No such file or directory
+2024-12-01 12:46:50.415 25331-25331 nativeloader            com.example.myapplication            D  Configuring clns-7 for other apk /data/app/~~UH8zjMNkx_K3Ge2lapqqaA==/com.example.myapplication-guHQqi1jc-RU-mMQGqXDeQ==/base.apk. target_sdk_version=35, uses_libraries=, library_path=/data/app/~~UH8zjMNkx_K3Ge2lapqqaA==/com.example.myapplication-guHQqi1jc-RU-mMQGqXDeQ==/lib/x86_64, permitted_path=/data:/mnt/expand:/data/user/0/com.example.myapplication
+2024-12-01 12:46:50.420 25331-25331 CompatChangeReporter    com.example.myapplication            D  Compat change id reported: 202956589; UID 10208; state: ENABLED
+2024-12-01 12:46:50.440 25331-25331 GraphicsEnvironment     com.example.myapplication            V  Currently set values for:
+2024-12-01 12:46:50.440 25331-25331 GraphicsEnvironment     com.example.myapplication            V    angle_gl_driver_selection_pkgs=[]
+2024-12-01 12:46:50.440 25331-25331 GraphicsEnvironment     com.example.myapplication            V    angle_gl_driver_selection_values=[]
+2024-12-01 12:46:50.440 25331-25331 GraphicsEnvironment     com.example.myapplication            V  Global.Settings values are invalid: number of packages: 0, number of values: 0
+2024-12-01 12:46:50.440 25331-25331 GraphicsEnvironment     com.example.myapplication            V  Neither updatable production driver nor prerelease driver is supported.
+2024-12-01 12:46:50.477 25331-25331 CompatChangeReporter    com.example.myapplication            D  Compat change id reported: 279646685; UID 10208; state: ENABLED
+2024-12-01 12:46:50.571 25331-25331 CompatChangeReporter    com.example.myapplication            D  Compat change id reported: 309578419; UID 10208; state: ENABLED
+2024-12-01 12:46:50.679 25331-25331 HWUI                    com.example.myapplication            W  Unknown dataspace 0
+2024-12-01 12:46:50.876 25331-25335 e.myapplication         com.example.myapplication            I  Compiler allocated 5174KB to compile void android.view.ViewRootImpl.performTraversals()
+2024-12-01 12:46:51.238 25331-25331 e.myapplication         com.example.myapplication            W  Method boolean androidx.compose.runtime.snapshots.SnapshotStateList.conditionalUpdate(boolean, kotlin.jvm.functions.Function1) failed lock verification and will run slower.
+                                                                                                    Common causes for lock verification issues are non-optimized dex code
+                                                                                                    and incorrect proguard optimizations.
+2024-12-01 12:46:51.238 25331-25331 e.myapplication         com.example.myapplication            W  Method boolean androidx.compose.runtime.snapshots.SnapshotStateList.conditionalUpdate$default(androidx.compose.runtime.snapshots.SnapshotStateList, boolean, kotlin.jvm.functions.Function1, int, java.lang.Object) failed lock verification and will run slower.
+2024-12-01 12:46:51.238 25331-25331 e.myapplication         com.example.myapplication            W  Method java.lang.Object androidx.compose.runtime.snapshots.SnapshotStateList.mutate(kotlin.jvm.functions.Function1) failed lock verification and will run slower.
+2024-12-01 12:46:51.238 25331-25331 e.myapplication         com.example.myapplication            W  Method void androidx.compose.runtime.snapshots.SnapshotStateList.update(boolean, kotlin.jvm.functions.Function1) failed lock verification and will run slower.
+2024-12-01 12:46:51.238 25331-25331 e.myapplication         com.example.myapplication            W  Method void androidx.compose.runtime.snapshots.SnapshotStateList.update$default(androidx.compose.runtime.snapshots.SnapshotStateList, boolean, kotlin.jvm.functions.Function1, int, java.lang.Object) failed lock verification and will run slower.
+2024-12-01 12:46:51.528 25331-25348 EGL_emulation           com.example.myapplication            I  Opening libGLESv1_CM_emulation.so
+2024-12-01 12:46:51.530 25331-25348 EGL_emulation           com.example.myapplication            I  Opening libGLESv2_emulation.so
+2024-12-01 12:46:51.548 25331-25348 HWUI                    com.example.myapplication            W  Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+2024-12-01 12:46:51.548 25331-25348 HWUI                    com.example.myapplication            W  Failed to initialize 101010-2 format, error = EGL_SUCCESS
+2024-12-01 12:46:51.634 25331-25348 Gralloc4                com.example.myapplication            I  mapper 4.x is not supported
+2024-12-01 12:46:51.723 25331-25331 Choreographer           com.example.myapplication            I  Skipped 53 frames!  The application may be doing too much work on its main thread.
+2024-12-01 12:46:51.728 25331-25342 HWUI                    com.example.myapplication            I  Davey! duration=1025ms; Flags=1, FrameTimelineVsyncId=10849785, IntendedVsync=61035257914470, Vsync=61035257914470, InputEventId=0, HandleInputStart=61035258849200, AnimationStart=61035258862500, PerformTraversalsStart=61035258888200, DrawStart=61036226112000, FrameDeadline=61035274581136, FrameInterval=61035258841700, FrameStartTime=16666666, SyncQueued=61036240997800, SyncStart=61036249248800, IssueDrawCommandsStart=61036249654500, SwapBuffers=61036261573300, FrameCompleted=61036291935100, DequeueBufferDuration=13300, QueueBufferDuration=159100, GpuCompleted=61036291935100, SwapBuffersCompleted=61036274318200, DisplayPresentTime=72904454231359566, CommandSubmissionCompleted=61036261573300, 
+2024-12-01 12:46:56.113 25331-25358 ProfileInstaller        com.example.myapplication            D  Installing profile for com.example.myapplication
+2024-12-01 12:55:23.260 25331-25331 Compose Focus           com.example.myapplication            D  Owner FocusChanged(true)
+2024-12-01 12:55:23.306 25331-25331 InsetsController        com.example.myapplication            D  show(ime(), fromIme=false)
+2024-12-01 12:55:23.330 25331-25331 ImeTracker              com.example.myapplication            I  com.example.myapplication:274b5bb: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT_BY_INSETS_API fromUser false
+2024-12-01 12:55:23.345 25331-25331 InputMethodManager      com.example.myapplication            D  showSoftInput() view=androidx.compose.ui.platform.AndroidComposeView{dc467d0 VFED..... .F....ID 0,0-1080,2400 aid=1073741824} flags=0 reason=SHOW_SOFT_INPUT_BY_INSETS_API
+2024-12-01 12:55:23.370 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=170554.48ms min=9.13ms max=511439.91ms count=3
+2024-12-01 12:55:23.379 25331-25331 ImeTracker              com.example.myapplication            I  com.example.myapplication:2287983b: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT fromUser false
+2024-12-01 12:55:23.380 25331-25331 InputMethodManager      com.example.myapplication            D  showSoftInput() view=androidx.compose.ui.platform.AndroidComposeView{dc467d0 VFED..... .F...... 0,0-1080,2400 aid=1073741824} flags=0 reason=SHOW_SOFT_INPUT
+2024-12-01 12:55:23.591 25331-25331 InsetsController        com.example.myapplication            D  show(ime(), fromIme=true)
+2024-12-01 12:55:23.601 25331-25385 InteractionJankMonitor  com.example.myapplication            W  Initializing without READ_DEVICE_CONFIG permission. enabled=false, interval=1, missedFrameThreshold=3, frameTimeThreshold=64, package=com.example.myapplication
+2024-12-01 12:55:23.607 25331-25331 InsetsController        com.example.myapplication            D  show(ime(), fromIme=true)
+2024-12-01 12:55:23.617 25331-25331 ImeTracker              com.example.myapplication            I  com.example.myapplication:2287983b: onCancelled at PHASE_CLIENT_APPLY_ANIMATION
+2024-12-01 12:55:23.809 25331-25331 ImeTracker              com.example.myapplication            I  com.example.myapplication:274b5bb: onShown
+2024-12-01 12:55:24.253 25331-25331 InsetsController        com.example.myapplication            D  show(ime(), fromIme=false)
+2024-12-01 12:55:24.253 25331-25331 ImeTracker              com.example.myapplication            I  com.example.myapplication:2841499b: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT_BY_INSETS_API fromUser false
+2024-12-01 12:55:24.255 25331-25331 ImeTracker              com.example.myapplication            I  com.example.myapplication:2841499b: onCancelled at PHASE_CLIENT_APPLY_ANIMATION
+2024-12-01 12:55:24.261 25331-25331 ImeTracker              com.example.myapplication            I  com.example.myapplication:617a4a86: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT fromUser false
+2024-12-01 12:55:24.262 25331-25331 InputMethodManager      com.example.myapplication            D  showSoftInput() view=androidx.compose.ui.platform.AndroidComposeView{dc467d0 VFED..... .F...... 0,0-1080,2400 aid=1073741824} flags=0 reason=SHOW_SOFT_INPUT
+2024-12-01 12:55:24.327 25331-25331 InsetsController        com.example.myapplication            D  show(ime(), fromIme=true)
+2024-12-01 12:55:24.327 25331-25331 ImeTracker              com.example.myapplication            I  com.example.myapplication:6581e8b6: onCancelled at PHASE_CLIENT_APPLY_ANIMATION
+2024-12-01 12:55:24.327 25331-25331 InsetsController        com.example.myapplication            D  show(ime(), fromIme=true)
+2024-12-01 12:55:24.332 25331-25331 ImeTracker              com.example.myapplication            I  com.example.myapplication:617a4a86: onCancelled at PHASE_CLIENT_APPLY_ANIMATION
+2024-12-01 12:55:24.379 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=36.50ms min=2.58ms max=162.27ms count=26
+2024-12-01 12:55:25.315 25331-25389 TrafficStats            com.example.myapplication            D  tagSocket(128) with statsTag=0xffffffff, statsUid=-1
+2024-12-01 12:55:25.410 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=40.80ms min=2.48ms max=196.56ms count=24
+2024-12-01 12:55:25.722 25331-25390 TrafficStats            com.example.myapplication            D  tagSocket(120) with statsTag=0xffffffff, statsUid=-1
+2024-12-01 12:55:25.894 25331-25391 TrafficStats            com.example.myapplication            D  tagSocket(127) with statsTag=0xffffffff, statsUid=-1
+2024-12-01 12:55:26.065 25331-25392 TrafficStats            com.example.myapplication            D  tagSocket(126) with statsTag=0xffffffff, statsUid=-1
+2024-12-01 12:55:26.235 25331-25393 TrafficStats            com.example.myapplication            D  tagSocket(129) with statsTag=0xffffffff, statsUid=-1
+2024-12-01 12:55:26.409 25331-25394 TrafficStats            com.example.myapplication            D  tagSocket(114) with statsTag=0xffffffff, statsUid=-1
+2024-12-01 12:55:26.412 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=21.06ms min=2.65ms max=35.50ms count=46
+2024-12-01 12:55:26.582 25331-25395 TrafficStats            com.example.myapplication            D  tagSocket(132) with statsTag=0xffffffff, statsUid=-1
+2024-12-01 12:55:26.756 25331-25396 TrafficStats            com.example.myapplication            D  tagSocket(136) with statsTag=0xffffffff, statsUid=-1
+2024-12-01 12:55:26.927 25331-25397 TrafficStats            com.example.myapplication            D  tagSocket(138) with statsTag=0xffffffff, statsUid=-1
+2024-12-01 12:55:27.430 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=18.42ms min=11.42ms max=36.85ms count=55
+2024-12-01 12:55:28.893 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=73.09ms min=13.19ms max=499.67ms count=20
+2024-12-01 12:55:30.394 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=500.30ms min=485.99ms max=515.49ms count=3
+2024-12-01 12:55:31.411 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=508.18ms min=482.86ms max=533.50ms count=2
+2024-12-01 12:55:32.897 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=495.33ms min=486.27ms max=501.32ms count=3
+2024-12-01 12:55:34.395 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=499.39ms min=498.51ms max=500.22ms count=3
+2024-12-01 12:55:35.401 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=502.78ms min=483.28ms max=522.29ms count=2
+2024-12-01 12:55:36.421   607-626   NotificationService     system_server                        E  Package has already queued 5 toasts. Not showing more. Package=com.example.myapplication
+2024-12-01 12:55:36.595   607-626   NotificationService     system_server                        E  Package has already queued 5 toasts. Not showing more. Package=com.example.myapplication
+2024-12-01 12:55:36.768   607-626   NotificationService     system_server                        E  Package has already queued 5 toasts. Not showing more. Package=com.example.myapplication
+2024-12-01 12:55:36.878 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=492.06ms min=483.21ms max=498.72ms count=3
+2024-12-01 12:55:36.940   607-2216  NotificationService     system_server                        E  Package has already queued 5 toasts. Not showing more. Package=com.example.myapplication
+2024-12-01 12:55:37.899 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=510.75ms min=504.16ms max=517.33ms count=2
+2024-12-01 12:55:39.395 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=498.36ms min=496.35ms max=500.00ms count=3
+2024-12-01 12:55:40.397 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=500.93ms min=496.37ms max=505.49ms count=2
+2024-12-01 12:55:41.893 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=498.80ms min=498.39ms max=499.23ms count=3
+2024-12-01 12:55:42.895 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=501.01ms min=500.24ms max=501.78ms count=2
+2024-12-01 12:55:44.431 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=511.67ms min=494.26ms max=536.29ms count=3
+2024-12-01 12:55:45.897 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=488.64ms min=446.06ms max=517.41ms count=3
+2024-12-01 12:55:47.396 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=499.59ms min=497.72ms max=501.05ms count=3
+2024-12-01 12:55:48.881 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=494.91ms min=485.63ms max=499.87ms count=3
+2024-12-01 12:55:49.894 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=506.54ms min=499.40ms max=513.68ms count=2
+2024-12-01 12:55:51.394 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=500.05ms min=498.19ms max=501.66ms count=3
+2024-12-01 12:55:52.896 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=500.39ms min=497.31ms max=502.41ms count=3
+2024-12-01 12:55:54.396 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=500.04ms min=497.16ms max=502.63ms count=3
+2024-12-01 12:55:55.895 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=499.80ms min=498.08ms max=501.56ms count=3
+2024-12-01 12:55:57.394 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=499.56ms min=488.45ms max=510.05ms count=3
+2024-12-01 12:55:58.396 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=500.84ms min=500.51ms max=501.17ms count=2
+2024-12-01 12:55:59.879 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=494.14ms min=484.87ms max=499.04ms count=3
+2024-12-01 12:56:00.895 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=508.09ms min=499.43ms max=516.75ms count=2
+2024-12-01 12:56:02.395 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=499.79ms min=498.72ms max=501.13ms count=3
+2024-12-01 12:56:03.894 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=499.85ms min=499.05ms max=500.39ms count=3
+2024-12-01 12:56:05.393 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=499.56ms min=485.77ms max=512.49ms count=3
+2024-12-01 12:56:06.894 25331-25348 EGL_emulation           com.example.myapplication            D  app_time_stats: avg=500.08ms min=487.10ms max=513.50ms count=3

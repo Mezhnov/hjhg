@@ -1,40 +1,84 @@
-  // Рисование панели, похожей на macOS Dock
-  {
-      // Параметры Dock
-      float dockWidth = 600.0f; // Ширина Dock
-      float dockHeight = 60.0f; // Высота Dock
-      float dockX = (windowRect.right - dockWidth) / 2.0f; // Центрирование по горизонтали
-      float dockY = windowRect.bottom - dockHeight - 20.0f; // Отступ от нижнего края
+// Рисование панели, похожей на macOS Dock
+{
+    // Параметры Dock
+    float dockWidth = 600.0f; // Ширина Dock
+    float dockHeight = 70.0f; // Высота Dock
+    float dockX = (windowRect.right - dockWidth) / 2.0f; // Центрирование по горизонтали
+    float dockY = windowRect.bottom - dockHeight - 20.0f; // Отступ от нижнего края
 
-      // Создание пути с округленными углами
-      GraphicsPath path;
-      float radius = dockHeight / 2.0f; // Радиус закругления
-      path.AddArc(dockX, dockY, dockHeight, dockHeight, 180, 90); // Левый нижний угол
-      path.AddArc(dockX + dockWidth - dockHeight, dockY, dockHeight, dockHeight, 270, 90); // Правый нижний угол
-      path.AddArc(dockX + dockWidth - dockHeight, dockY, dockHeight, dockHeight, 0, 90); // Правый верхний угол
-      path.AddArc(dockX, dockY, dockHeight, dockHeight, 90, 90); // Левый верхний угол
-      path.CloseFigure();
+    // Создание пути с округленными углами
+    GraphicsPath path;
+    float radius = dockHeight / 2.0f; // Радиус закругления
+    path.AddArc(dockX, dockY, radius * 2, radius * 2, 180, 90); // Левый нижний угол
+    path.AddArc(dockX + dockWidth - radius * 2, dockY, radius * 2, radius * 2, 270, 90); // Правый нижний угол
+    path.AddArc(dockX + dockWidth - radius * 2, dockY + dockHeight - radius * 2, radius * 2, radius * 2, 0, 90); // Правый верхний угол
+    path.AddArc(dockX, dockY + dockHeight - radius * 2, radius * 2, radius * 2, 90, 90); // Левый верхний угол
+    path.CloseFigure();
 
-      // Создание полупрозрачной кисти
-      SolidBrush dockBrush(Color(180, 255, 255, 255)); // Белый цвет с прозрачностью
-      graphics.FillPath(&dockBrush, &path);
+    // Градиентная заливка для более реалистичного вида
+    LinearGradientBrush gradientBrush(PointF(dockX, dockY), PointF(dockX, dockY + dockHeight),
+                                      Color(150, 255, 255, 255), Color(200, 255, 255, 255));
+    graphics.FillPath(&gradientBrush, &path);
 
-      // Отрисовка тени под Dock (опционально)
-      SolidBrush shadowBrush(Color(50, 0, 0, 0)); // Черный цвет с прозрачностью
-      graphics.TranslateTransform(0, 5); // Смещение вниз для тени
-      graphics.FillPath(&shadowBrush, &path);
-      graphics.TranslateTransform(0, -5); // Возврат обратно
+    // Отрисовка тени под Dock
+    GraphicsPath shadowPath = path;
+    Matrix shadowMatrix;
+    shadowMatrix.Translate(0, 5);
+    shadowPath.Transform(&shadowMatrix);
+    SolidBrush shadowBrush(Color(40, 0, 0, 0)); // Черный цвет с прозрачностью
+    graphics.FillPath(&shadowBrush, &shadowPath);
 
-      // Рисование иконок на Dock
-      std::vector<Image*> dockIcons = { mypassIcon, browser, office, newfolder };
-      float iconSize = 48.0f;
-      float iconSpacing = 10.0f;
-      float totalIconsWidth = dockIcons.size() * iconSize + (dockIcons.size() - 1) * iconSpacing;
-      float iconsStartX = dockX + (dockWidth - totalIconsWidth) / 2.0f;
-      float iconY = dockY + (dockHeight - iconSize) / 2.0f;
+    // Иконки для Dock
+    std::vector<Image*> dockIcons = { mypassIcon, browser, office, newfolder };
+    float iconBaseSize = 48.0f; // Базовый размер иконки
+    float iconSpacing = 10.0f;
+    float totalIconsWidth = dockIcons.size() * iconBaseSize + (dockIcons.size() - 1) * iconSpacing;
+    float iconsStartX = dockX + (dockWidth - totalIconsWidth) / 2.0f;
+    float iconY = dockY + (dockHeight - iconBaseSize) / 2.0f;
 
-      for (size_t i = 0; i < dockIcons.size(); ++i) {
-          float iconX = iconsStartX + i * (iconSize + iconSpacing);
-          graphics.DrawImage(dockIcons[i], iconX, iconY, iconSize, iconSize);
-      }
-  }
+    // Получение положения мыши
+    POINT mousePos;
+    GetCursorPos(&mousePos);
+    ScreenToClient(hwnd, &mousePos);
+
+    for (size_t i = 0; i < dockIcons.size(); ++i) {
+        float iconX = iconsStartX + i * (iconBaseSize + iconSpacing);
+        float scale = 1.0f;
+
+        // Масштабирование при наведении
+        if (mousePos.x >= iconX && mousePos.x < iconX + iconBaseSize &&
+            mousePos.y >= iconY && mousePos.y < iconY + iconBaseSize) {
+            scale = 1.3f; // Увеличение при наведении
+        }
+
+        // Вычисление новых размеров и позиций после масштабирования
+        float scaledWidth = iconBaseSize * scale;
+        float scaledHeight = iconBaseSize * scale;
+        float scaledX = iconX - (scaledWidth - iconBaseSize) / 2.0f;
+        float scaledY = iconY - (scaledHeight - iconBaseSize) / 2.0f;
+
+        // Рисование иконки
+        graphics.DrawImage(dockIcons[i], 
+                           RectF(scaledX, scaledY, scaledWidth, scaledHeight),
+                           0, 0, dockIcons[i]->GetWidth(), dockIcons[i]->GetHeight(), 
+                           UnitPixel, nullptr, nullptr, nullptr);
+
+        // Добавление отражения
+        GraphicsPath iconPath;
+        iconPath.AddRectangle(RectF(scaledX, scaledY, scaledWidth, scaledHeight));
+        Matrix reflectionMatrix;
+        reflectionMatrix.Scale(1.0f, -1.0f);
+        reflectionMatrix.Translate(0.0f, 2 * scaledY + scaledHeight);
+        iconPath.Transform(&reflectionMatrix);
+
+        // Градиентная маска для отражения
+        LinearGradientBrush reflectionBrush(PointF(scaledX, scaledY + scaledHeight), PointF(scaledX, scaledY + 2 * scaledHeight),
+                                            Color(100, 255, 255, 255), Color(0, 255, 255, 255)); // Снизу вверх прозрачность уменьшается
+        graphics.SetClip(&iconPath, CombineModeReplace);
+        graphics.DrawImage(dockIcons[i], 
+                           RectF(scaledX, scaledY + scaledHeight, scaledWidth, scaledHeight),
+                           0, 0, dockIcons[i]->GetWidth(), dockIcons[i]->GetHeight(), 
+                           UnitPixel, &reflectionBrush, nullptr, nullptr);
+        graphics.ResetClip();
+    }
+}

@@ -484,71 +484,57 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             graphics.DrawImage(backgroundImage, x, y, static_cast<REAL>(drawWidth), static_cast<REAL>(drawHeight));
         }
 
-        // Рисование нижней панели
-        RECT panelRect = { 0, windowRect.bottom - 40, windowRect.right, windowRect.bottom };
-        FillRect(hdc, &panelRect, (HBRUSH)(COLOR_BTNFACE + 1)); // Цвет панели
+        // Рисование панели, похожей на macOS Dock
+        {
+            // Параметры Dock
+            float dockWidth = 600.0f; // Ширина Dock
+            float dockHeight = 60.0f; // Высота Dock
+            float dockX = (windowRect.right - dockWidth) / 2.0f; // Центрирование по горизонтали
+            float dockY = windowRect.bottom - dockHeight - 20.0f; // Отступ от нижнего края
 
-        // Рисование иконки меню Пуск слева
-        if (mypassIcon) {
-            float iconSize = 42.0f; // Размер иконки
-            float iconY = static_cast<float>(windowRect.bottom - 40 + (40 - iconSize) / 2.0); // Вертикальное центрирование
+            // Создание пути с округленными углами
+            GraphicsPath path;
+            float radius = dockHeight / 2.0f; // Радиус закругления
+            path.AddArc(dockX, dockY, dockHeight, dockHeight, 180, 90); // Левый нижний угол
+            path.AddArc(dockX + dockWidth - dockHeight, dockY, dockHeight, dockHeight, 270, 90); // Правый нижний угол
+            path.AddArc(dockX + dockWidth - dockHeight, dockY, dockHeight, dockHeight, 0, 90); // Правый верхний угол
+            path.AddArc(dockX, dockY, dockHeight, dockHeight, 90, 90); // Левый верхний угол
+            path.CloseFigure();
 
-            float padding = 15.0f;
-            float startMenuX = padding;
+            // Создание полупрозрачной кисти
+            SolidBrush dockBrush(Color(180, 255, 255, 255)); // Белый цвет с прозрачностью
+            graphics.FillPath(&dockBrush, &path);
 
-            graphics.DrawImage(mypassIcon, startMenuX, iconY, iconSize, iconSize);
+            // Отрисовка тени под Dock (опционально)
+            SolidBrush shadowBrush(Color(50, 0, 0, 0)); // Черный цвет с прозрачностью
+            graphics.TranslateTransform(0, 5); // Смещение вниз для тени
+            graphics.FillPath(&shadowBrush, &path);
+            graphics.TranslateTransform(0, -5); // Возврат обратно
+
+            // Рисование иконок на Dock
+            std::vector<Image*> dockIcons = { mypassIcon, browser, office, newfolder };
+            float iconSize = 48.0f;
+            float iconSpacing = 10.0f;
+            float totalIconsWidth = dockIcons.size() * iconSize + (dockIcons.size() - 1) * iconSpacing;
+            float iconsStartX = dockX + (dockWidth - totalIconsWidth) / 2.0f;
+            float iconY = dockY + (dockHeight - iconSize) / 2.0f;
+
+            for (size_t i = 0; i < dockIcons.size(); ++i) {
+                float iconX = iconsStartX + i * (iconSize + iconSpacing);
+                graphics.DrawImage(dockIcons[i], iconX, iconY, iconSize, iconSize);
+            }
         }
 
-        if (office) {
-            float iconSize = 42.0f; // Размер иконки
-            float iconY = static_cast<float>(windowRect.bottom - 40 + (40 - iconSize) / 2.0); // Вертикальное центрирование
-
-            float padding = 170.0f;
-            float startMenuX = padding;
-
-            graphics.DrawImage(office, startMenuX, iconY, iconSize, iconSize);
-        }
-
-        if (browser) {
-            float iconSize = 42.0f; // Размер иконки
-            float iconY = static_cast<float>(windowRect.bottom - 40 + (40 - iconSize) / 2.0-2); // Вертикальное центрирование
-
-            float padding = 120.0f;
-            float startMenuX = padding;
-
-            graphics.DrawImage(browser, startMenuX, iconY, iconSize, iconSize);
-        }
-
-        if (newfolder) {
-            float iconSize = 50.0f; // Размер иконки
-            float iconY = static_cast<float>(windowRect.bottom - 40 + (40 - iconSize) / 2.0); // Вертикальное центрирование
-
-            float padding = 60.0f;
-            float startMenuX = padding;
-
-            graphics.DrawImage(newfolder, startMenuX, iconY, iconSize, iconSize);
-        }
-
-        if (notification) {
-            float iconSize = 62.0f; // Размер иконки
-            float iconY = static_cast<float>(windowRect.bottom - 40 + (40 - iconSize) / 2.0); // Вертикальное центрирование
-
-            float padding = 1470.0f;
-            float startMenuX = padding;
-
-            graphics.DrawImage(notification, startMenuX, iconY, iconSize, iconSize);
-        }
         // Рисование иконок Wi-Fi, Звука и Батареи справа горизонтально
         if (wifiIcon && soundIcon && batteryIcon) {
             float iconSize = 20.0f; // Размер иконки
             float iconPadding = 10.0f; // Отступ между иконками
 
-            // Фиксированная координата Y для всех иконок (вертикальное центрирование в нижней панели)
-            float panelHeight = 40.0f;
-            float iconY = static_cast<float>(windowRect.bottom - panelHeight + (panelHeight - iconSize) / 2.0f);
+            // Фиксированная координата Y для всех иконок (вертикальное центрирование)
+            float iconY = 20.0f;
 
             // Начальная координата X для самой правой иконки (Батарея)
-            float paddingRight = 145.0f; // Отступ от правого края
+            float paddingRight = 20.0f; // Отступ от правого края
             float iconX = static_cast<float>(windowRect.right - paddingRight - iconSize);
 
             // Рисование иконки Батареи (самая правая)
@@ -570,7 +556,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         // Использование GDI+ для рисования текста
         FontFamily fontFamilyObj(L"Segoe UI"); // Выбор шрифта
         Font font(&fontFamilyObj, 14, FontStyleRegular, UnitPixel); // Размер шрифта
-        SolidBrush brush(Color(255, 0, 0, 0)); // Черный цвет текста
+        SolidBrush brush(Color(255, 255, 255, 255)); // Белый цвет текста
 
         // Измерение размеров текста
         RectF timeRect;
@@ -581,7 +567,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         // Вычисление позиций для текста
         float paddingText = 15.0f;
         float xTime = static_cast<float>(windowRect.right - timeRect.Width - langRect.Width - 70); // Right margin
-        float yText = static_cast<float>(windowRect.bottom - 40 + (40 - timeRect.Height) / 2.0 - 1); // Vertical align // Вертикальное выравнивание
+        float yText = 20.0f; // Верхний отступ
 
         // Рисование текущего языка
         PointF langPoint(xTime, yText);
@@ -641,19 +627,33 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             int mouseY = GET_Y_LPARAM(lParam);
             POINT mousePt = { mouseX, mouseY };
 
-            // Проверка, находится ли клик на кнопке меню Пуск
-            bool isOnStartMenu = false;
-            RECT startMenuRect = {
-                15,
-                static_cast<LONG>(GetSystemMetrics(SM_CYSCREEN) - 40 + (40 - 42.0f) / 2),
-                15 + 42,
-                static_cast<LONG>(GetSystemMetrics(SM_CYSCREEN) - 40 + (40 - 42.0f) / 2 + 42)
-            };
-            if (PtInRect(&startMenuRect, mousePt)) {
-                isOnStartMenu = true;
-                // Обработка клика по меню Пуск
-                MessageBox(hwnd, L"Меню Пуск нажато!", L"Меню Пуск", MB_OK);
-                return 0;
+            // Проверка, находится ли клик на иконках Dock
+            std::vector<Image*> dockIcons = { mypassIcon, browser, office, newfolder };
+            float dockWidth = 600.0f; // Ширина Dock
+            float dockHeight = 60.0f; // Высота Dock
+            float dockX = (GetSystemMetrics(SM_CXSCREEN) - dockWidth) / 2.0f; // Центрирование по горизонтали
+            float dockY = GetSystemMetrics(SM_CYSCREEN) - dockHeight - 20.0f; // Отступ от нижнего края
+            float iconSize = 48.0f;
+            float iconSpacing = 10.0f;
+            float totalIconsWidth = dockIcons.size() * iconSize + (dockIcons.size() - 1) * iconSpacing;
+            float iconsStartX = dockX + (dockWidth - totalIconsWidth) / 2.0f;
+            float iconY = dockY + (dockHeight - iconSize) / 2.0f;
+
+            bool isOnDockIcon = false;
+            for (size_t i = 0; i < dockIcons.size(); ++i) {
+                float iconX = iconsStartX + i * (iconSize + iconSpacing);
+                RECT iconRect = {
+                    static_cast<LONG>(iconX),
+                    static_cast<LONG>(iconY),
+                    static_cast<LONG>(iconX + iconSize),
+                    static_cast<LONG>(iconY + iconSize)
+                };
+                if (PtInRect(&iconRect, mousePt)) {
+                    isOnDockIcon = true;
+                    // Обработка клика по иконке Dock
+                    MessageBox(hwnd, L"Иконка в Dock нажата!", L"Dock", MB_OK);
+                    return 0;
+                }
             }
 
             // Проверка, находится ли клик на каком-либо изображении (сверху вниз)

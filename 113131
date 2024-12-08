@@ -720,75 +720,63 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         return 0;
     }
 
-    case WM_MOUSEMOVE: {
-        if (data && data->isDragging && data->draggingImageIndex < images.size()) {
-            // Получение текущей позиции мыши
-            int mouseX = GET_X_LPARAM(lParam);
-            int mouseY = GET_Y_LPARAM(lParam);
-            POINT currentPt = { mouseX, mouseY };
+   case WM_MOUSEMOVE: {
+    if (data && data->isDragging && data->draggingImageIndex < images.size()) {
+        // Получение текущей позиции мыши
+        int mouseX = GET_X_LPARAM(lParam);
+        int mouseY = GET_Y_LPARAM(lParam);
+        POINT currentPt = { mouseX, mouseY };
 
-            // Вычисление дельты движения
-            int deltaX = currentPt.x - data->lastMousePos.x;
-            int deltaY = currentPt.y - data->lastMousePos.y;
+        // Вычисление дельты движения
+        int deltaX = currentPt.x - data->lastMousePos.x;
+        int deltaY = currentPt.y - data->lastMousePos.y;
 
-            if (deltaX != 0 || deltaY != 0) {
-                // Обновление позиции изображения
-                images[data->draggingImageIndex].x += static_cast<float>(deltaX);
-                images[data->draggingImageIndex].y += static_cast<float>(deltaY);
+        // Установка порогового значения для движения мыши
+        const int threshold = 5; // Должно быть минимум 5 пикселей перемещения для обновления
 
-                // Получение размеров окна
-                RECT windowRect;
-                GetClientRect(hwnd, &windowRect);
+        if (abs(deltaX) >= threshold || abs(deltaY) >= threshold) {
+            // Обновление позиции изображения
+            images[data->draggingImageIndex].x += static_cast<float>(deltaX);
+            images[data->draggingImageIndex].y += static_cast<float>(deltaY);
 
-                // Обеспечение того, чтобы изображение осталось внутри границ окна
-                if (images[data->draggingImageIndex].x < 0)
-                    images[data->draggingImageIndex].x = 0;
-                if (images[data->draggingImageIndex].y < 0)
-                    images[data->draggingImageIndex].y = 0;
-                if (images[data->draggingImageIndex].x +
-                    images[data->draggingImageIndex].width > windowRect.right)
-                    images[data->draggingImageIndex].x = windowRect.right - images[data->draggingImageIndex].width;
-                if (images[data->draggingImageIndex].y + images[data->draggingImageIndex].height > windowRect.bottom - 40) // 40 для панели
-                    images[data->draggingImageIndex].y = windowRect.bottom - 40 - images[data->draggingImageIndex].height;
+            // Обеспечение того, чтобы изображение осталось внутри границ окна
+            RECT windowRect;
+            GetClientRect(hwnd, &windowRect);
+            if (images[data->draggingImageIndex].x < 0)
+                images[data->draggingImageIndex].x = 0;
+            if (images[data->draggingImageIndex].y < 0)
+                images[data->draggingImageIndex].y = 0;
+            if (images[data->draggingImageIndex].x + images[data->draggingImageIndex].width > windowRect.right)
+                images[data->draggingImageIndex].x = windowRect.right - images[data->draggingImageIndex].width;
+            if (images[data->draggingImageIndex].y + images[data->draggingImageIndex].height > windowRect.bottom - 40)
+                images[data->draggingImageIndex].y = windowRect.bottom - 40 - images[data->draggingImageIndex].height;
 
-                // Обновление последней позиции мыши
-                data->lastMousePos = currentPt;
+            // Обновление последней позиции мыши
+            data->lastMousePos = currentPt;
 
-                // Перерисовка окна
-                InvalidateRect(hwnd, NULL, TRUE);
-            }
+            // Перерисовка окна только если перемещение превысило порог
+            InvalidateRect(hwnd, NULL, TRUE);
         }
-        return 0;
     }
+    return 0;
+}
 
-    case WM_LBUTTONUP: {
-        if (data) {
-            // Отпускание захвата мыши
-            ReleaseCapture();
+   case WM_LBUTTONUP: {
+    if (data) {
+        // Отпускание захвата мыши
+        ReleaseCapture();
 
-            if (data->isDragging && data->draggingImageIndex < images.size()) {
-                // Определение, был ли это клик или перетаскивание на основе движения
-                // Для простоты считаем это кликом, если позиция не сильно изменилась
-                // Для более надежного различения клика и перетаскивания можно добавить более точные проверки
+        if (data->isDragging && data->draggingImageIndex < images.size()) {
+            // Остановка перетаскивания
+            data->isDragging = false;
+            data->draggingImageIndex = SIZE_MAX;
 
-                // Проверка, если ли мышь близко к последней позиции
-                int mouseX = GET_X_LPARAM(lParam);
-                int mouseY = GET_Y_LPARAM(lParam);
-                POINT currentPt = { mouseX, mouseY };
-                int distance = abs(currentPt.x - data->lastMousePos.x) + abs(currentPt.y - data->lastMousePos.y);
-
-                if (distance < 5) { // Порог для клика
-                    // Это клик, а не перетаскивание
-                    CreateContextMenu(hwnd, mouseX, mouseY, data->draggingImageIndex, true);
-                }
-
-                // Остановка перетаскивания
-                data->isDragging = false;
-                data->draggingImageIndex = SIZE_MAX;
-            }
+            // Перерисовка окна один раз по завершении перетаскивания
+            InvalidateRect(hwnd, NULL, TRUE);
         }
-        return 0;
     }
+    return 0;
+}
 
     case WM_COMMAND: {
         if (HIWORD(wParam) == EN_KILLFOCUS && LOWORD(wParam) == 0) {

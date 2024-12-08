@@ -102,7 +102,6 @@ bool LoadImageFromURL(const std::wstring& url, Image*& outImage) {
     }
 
     ULONG written;
-    // **Исправлено Предупреждение C4267**: Явное приведение buffer.size() к ULONG
     if (FAILED(stream->Write(buffer.data(), static_cast<ULONG>(buffer.size()), &written)) || written != static_cast<ULONG>(buffer.size())) {
         OutputDebugString(L"Запись в поток не удалась\n");
         stream->Release();
@@ -152,8 +151,6 @@ void PlaySoundByLanguage(const std::wstring& soundName) {
     std::wstring soundPath;
     if (currentLanguageIndex == 0) { // Русский
         if (soundName == L"WindowsLogo") {
-            // Воспроизведение системного звука или указание пользовательского пути
-            // Пример: PlaySound(L"C:\\Sounds\\windows_logo.wav", NULL, SND_FILENAME | SND_ASYNC);
             PlaySound(MAKEINTRESOURCE(IDR_WAVE1), NULL, SND_RESOURCE | SND_ASYNC);
         }
         else if (soundName == L"WiFi") {
@@ -185,7 +182,7 @@ bool InitializeImages() {
     // Начальные позиции для изображений
     float startX = 50.0f;
     float startY = 150.0f; // Расположены ниже объявления
-    float spacing = 150.0f; // Уменьшено расстояние для лучшего макета
+    float spacing = 150.0f; // Расстояние между иконками
 
     for (size_t i = 0; i < imageData.size(); ++i) {
         Image* img = nullptr;
@@ -488,36 +485,67 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         {
             // Параметры Dock
             float dockWidth = 600.0f; // Ширина Dock
-            float dockHeight = 60.0f; // Высота Dock
+            float dockHeight = 80.0f; // Высота Dock
             float dockX = (windowRect.right - dockWidth) / 2.0f; // Центрирование по горизонтали
-            float dockY = windowRect.bottom - dockHeight - 20.0f; // Отступ от нижнего края
+            float dockY = windowRect.bottom - dockHeight - 40.0f; // Отступ от нижнего края
 
-            // Создание пути с округленными углами
+            // Создание пути с закругленными нижними углами
             GraphicsPath path;
-            float radius = dockHeight / 2.0f; // Радиус закругления
-            path.AddArc(dockX, dockY, dockHeight, dockHeight, 180, 90); // Левый нижний угол
-            path.AddArc(dockX + dockWidth - dockHeight, dockY, dockHeight, dockHeight, 270, 90); // Правый нижний угол
-            path.AddArc(dockX + dockWidth - dockHeight, dockY, dockHeight, dockHeight, 0, 90); // Правый верхний угол
-            path.AddArc(dockX, dockY, dockHeight, dockHeight, 90, 90); // Левый верхний угол
+            float radius = 20.0f; // Радиус закругления углов
+
+            // Верхняя сторона
+            path.StartFigure();
+            path.AddLine(dockX, dockY, dockX + dockWidth, dockY);
+
+            // Правая сторона
+            path.AddLine(dockX + dockWidth, dockY, dockX + dockWidth, dockY + dockHeight - radius);
+
+            // Правый нижний угол
+            path.AddArc(dockX + dockWidth - radius * 2, dockY + dockHeight - radius * 2, radius * 2, radius * 2, 0, 90);
+
+            // Нижняя сторона
+            path.AddLine(dockX + dockWidth - radius, dockY + dockHeight, dockX + radius, dockY + dockHeight);
+
+            // Левый нижний угол
+            path.AddArc(dockX, dockY + dockHeight - radius * 2, radius * 2, radius * 2, 90, 90);
+
+            // Левая сторона
+            path.AddLine(dockX, dockY + dockHeight - radius, dockX, dockY);
+
             path.CloseFigure();
 
-            // Создание полупрозрачной кисти
-            SolidBrush dockBrush(Color(180, 255, 255, 255)); // Белый цвет с прозрачностью
+            // Создание градиентной кисти для Dock
+            LinearGradientBrush dockBrush(
+                PointF(dockX, dockY),
+                PointF(dockX, dockY + dockHeight),
+                Color(200, 255, 255, 255), // Верхний цвет (почти прозрачный)
+                Color(220, 255, 255, 255)  // Нижний цвет (чуть менее прозрачный)
+            );
+
             graphics.FillPath(&dockBrush, &path);
 
-            // Отрисовка тени под Dock (опционально)
-            SolidBrush shadowBrush(Color(50, 0, 0, 0)); // Черный цвет с прозрачностью
-            graphics.TranslateTransform(0, 5); // Смещение вниз для тени
-            graphics.FillPath(&shadowBrush, &path);
-            graphics.TranslateTransform(0, -5); // Возврат обратно
+            // Рисование тени под Dock
+            GraphicsPath shadowPath;
+            Gdiplus::Matrix matrix;
+            matrix.Translate(0, 5); // Смещение тени вниз
+            shadowPath.AddPath(&path, FALSE);
+            shadowPath.Transform(&matrix);
+
+            PathGradientBrush shadowBrush(&shadowPath);
+            shadowBrush.SetCenterColor(Color(80, 0, 0, 0)); // Центр тени
+            int count = 1;
+            Color surroundColors = Color(0, 0, 0, 0); // Границы тени
+            shadowBrush.SetSurroundColors(&surroundColors, &count);
+
+            graphics.FillPath(&shadowBrush, &shadowPath);
 
             // Рисование иконок на Dock
             std::vector<Image*> dockIcons = { mypassIcon, browser, office, newfolder };
-            float iconSize = 48.0f;
-            float iconSpacing = 10.0f;
+            float iconSize = 64.0f;
+            float iconSpacing = 20.0f;
             float totalIconsWidth = dockIcons.size() * iconSize + (dockIcons.size() - 1) * iconSpacing;
             float iconsStartX = dockX + (dockWidth - totalIconsWidth) / 2.0f;
-            float iconY = dockY + (dockHeight - iconSize) / 2.0f;
+            float iconY = dockY + (dockHeight - iconSize) / 2.0f - 10.0f; // Поднять иконки чуть выше для эффекта
 
             for (size_t i = 0; i < dockIcons.size(); ++i) {
                 float iconX = iconsStartX + i * (iconSize + iconSpacing);
@@ -630,14 +658,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             // Проверка, находится ли клик на иконках Dock
             std::vector<Image*> dockIcons = { mypassIcon, browser, office, newfolder };
             float dockWidth = 600.0f; // Ширина Dock
-            float dockHeight = 60.0f; // Высота Dock
+            float dockHeight = 80.0f; // Высота Dock
             float dockX = (GetSystemMetrics(SM_CXSCREEN) - dockWidth) / 2.0f; // Центрирование по горизонтали
-            float dockY = GetSystemMetrics(SM_CYSCREEN) - dockHeight - 20.0f; // Отступ от нижнего края
-            float iconSize = 48.0f;
-            float iconSpacing = 10.0f;
+            float dockY = GetSystemMetrics(SM_CYSCREEN) - dockHeight - 40.0f; // Отступ от нижнего края
+            float iconSize = 64.0f;
+            float iconSpacing = 20.0f;
             float totalIconsWidth = dockIcons.size() * iconSize + (dockIcons.size() - 1) * iconSpacing;
             float iconsStartX = dockX + (dockWidth - totalIconsWidth) / 2.0f;
-            float iconY = dockY + (dockHeight - iconSize) / 2.0f;
+            float iconY = dockY + (dockHeight - iconSize) / 2.0f - 10.0f; // Поднять иконки чуть выше
 
             bool isOnDockIcon = false;
             for (size_t i = 0; i < dockIcons.size(); ++i) {
@@ -767,21 +795,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             ReleaseCapture();
 
             if (data->isDragging && data->draggingImageIndex < images.size()) {
-                // Определение, был ли это клик или перетаскивание на основе движения
-                // Для простоты считаем это кликом, если позиция не сильно изменилась
-                // Для более надежного различения клика и перетаскивания можно добавить более точные проверки
-
-                // Проверка, если ли мышь близко к последней позиции
-                int mouseX = GET_X_LPARAM(lParam);
-                int mouseY = GET_Y_LPARAM(lParam);
-                POINT currentPt = { mouseX, mouseY };
-                int distance = abs(currentPt.x - data->lastMousePos.x) + abs(currentPt.y - data->lastMousePos.y);
-
-                if (distance < 5) { // Порог для клика
-                    // Это клик, а не перетаскивание
-                    CreateContextMenu(hwnd, mouseX, mouseY, data->draggingImageIndex, true);
-                }
-
                 // Остановка перетаскивания
                 data->isDragging = false;
                 data->draggingImageIndex = SIZE_MAX;

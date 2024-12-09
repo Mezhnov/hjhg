@@ -34,7 +34,6 @@ void AddNewFile(HWND hWnd, const TCHAR* szFileName)
     HWND hTabCtrl = GetDlgItem(hWnd, ID_TAB_CONTROL);
 
     TabInfo newTab;
-    _tcscpy_s(newTab.fileName, MAX_PATH, szFileName);
     tabInfos.push_back(newTab);
 
     AddNewTab(hTabCtrl, newTab.fileName);
@@ -57,10 +56,9 @@ void UpdateFilePanel(HWND hFilePanel)
 
 void AddNewTab(HWND hTabCtrl, const TCHAR* szFileName)
 {
-    TC_ITEM tie = {0};
+    TC_ITEM tie = { 0 };
     tie.mask = TCIF_TEXT | TCIF_IMAGE;
     tie.pszText = (LPTSTR)szFileName;
-    tie.cchTextMax = _tcslen(szFileName);
 
     int index = TabCtrl_InsertItem(hTabCtrl, tabInfos.size(), &tie);
 
@@ -69,18 +67,18 @@ void AddNewTab(HWND hTabCtrl, const TCHAR* szFileName)
 }
 
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
-                     LPSTR lpCmdLine, int nCmdShow)
+    LPSTR lpCmdLine, int nCmdShow)
 {
     // Store instance handle in our global variable
     hInst = hInstance;
 
     // Register the window class
     WNDCLASS wc = {};
-    wc.lpfnWndProc   = WndProc;
-    wc.hInstance     = hInstance;
+    wc.lpfnWndProc = WndProc;
+    wc.hInstance = hInstance;
     wc.lpszClassName = TEXT("BasicIDEWindow");
-    wc.hCursor       = LoadCursor(nullptr, IDC_ARROW);
-    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
+    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 
     if (!RegisterClass(&wc))
     {
@@ -120,7 +118,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         }
     }
 
-    return (int) msg.wParam;
+    return (int)msg.wParam;
 }
 
 void InitializeControls(HWND hWnd)
@@ -130,7 +128,7 @@ void InitializeControls(HWND hWnd)
 
     // Create the Tab Control
     HWND hTabCtrl = CreateWindowEx(
-        0, WC_TABCONTROL, TEXT(""), 
+        0, WC_TABCONTROL, TEXT(""),
         WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | TCS_FOCUSONBUTTONDOWN | TCS_HOTTRACK,
         0, 0, 0, 0, hWnd, (HMENU)ID_TAB_CONTROL, hInst, NULL);
 
@@ -238,41 +236,27 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         ResizeControls(hWnd);
         break;
 
-    case WM_COMMAND:
-        {
-            int wmId    = LOWORD(wParam);
-            int wmEvent = HIWORD(wParam);
 
-            // Parse the menu selections:
-            switch (wmId)
-            {
-            case ID_FILE_NEW:
-                AddNewFile(hWnd, TEXT("Untitled1")); // Example, you might want to show a dialog for naming.
-                break;
-                // Add other menu items handlers here
-            }
-        }
-        break;
 
     case WM_NOTIFY:
+    {
+        LPNMHDR pnmh = (LPNMHDR)lParam;
+        switch (pnmh->code)
         {
-            LPNMHDR pnmh = (LPNMHDR)lParam;
-            switch (pnmh->code) 
+        case TCN_SELCHANGE:
+        {
+            HWND hTabCtrl = GetDlgItem(hWnd, ID_TAB_CONTROL);
+            int nTab = TabCtrl_GetCurSel(hTabCtrl);
+            if (nTab != -1 && nTab < (int)tabInfos.size())
             {
-            case TCN_SELCHANGE: 
-                {
-                    HWND hTabCtrl = GetDlgItem(hWnd, ID_TAB_CONTROL);
-                    int nTab = TabCtrl_GetCurSel(hTabCtrl);
-                    if (nTab != -1 && nTab < (int)tabInfos.size())
-                    {
-                        // Here you would update the edit control content or perform other actions based on the selected tab
-                        MessageBox(hWnd, tabInfos[nTab].fileName, TEXT("Current Tab"), MB_OK);
-                    }
-                }
-                break;
+                // Here you would update the edit control content or perform other actions based on the selected tab
+                MessageBox(hWnd, tabInfos[nTab].fileName, TEXT("Current Tab"), MB_OK);
             }
         }
         break;
+        }
+    }
+    break;
 
     case WM_DESTROY:
         PostQuitMessage(0);

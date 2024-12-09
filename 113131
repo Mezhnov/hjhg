@@ -2,10 +2,12 @@
 #include <commctrl.h>   // For common controls
 #include <richedit.h>   // For Rich Edit controls
 #include <string>
+#include <vector>
 
 // Resource identifiers
 #define ID_EDIT         101
 #define ID_DOWNLOAD_BAR 102
+#define ID_TAB_CONTROL  103
 
 // Global variables
 HINSTANCE hInst;
@@ -13,6 +15,15 @@ HINSTANCE hInst;
 // Forward declarations of functions
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 void InitializeControls(HWND);
+void ResizeControls(HWND);
+void AddNewTab(HWND hTabCtrl, const TCHAR* szFileName);
+
+// Structure to hold tab information
+struct TabInfo {
+    TCHAR fileName[MAX_PATH];
+};
+
+std::vector<TabInfo> tabInfos;
 
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                      LPSTR lpCmdLine, int nCmdShow)
@@ -74,6 +85,15 @@ void InitializeControls(HWND hWnd)
     // Load the Rich Edit library
     LoadLibrary(TEXT("Msftedit.dll"));
 
+    // Create the Tab Control
+    HWND hTabCtrl = CreateWindowEx(
+        0, WC_TABCONTROL, TEXT(""), 
+        WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | TCS_FOCUSONBUTTONDOWN | TCS_HOTTRACK,
+        0, 0, 0, 0, hWnd, (HMENU)ID_TAB_CONTROL, hInst, NULL);
+
+    // Add an initial tab (Untitled)
+    AddNewTab(hTabCtrl, TEXT("Untitled"));
+
     // Create the Edit control for code writing (multi-line, vertical scroll)
     HWND hEdit = CreateWindowEx(
         0,                      // Extended styles
@@ -112,22 +132,47 @@ void ResizeControls(HWND hWnd)
     GetClientRect(hWnd, &rcClient);
 
     // Determine sizes
+    int tabHeight = 30;
     int downloadBarHeight = 30;
-    int editHeight = rcClient.bottom - downloadBarHeight;
+    int editHeight = rcClient.bottom - tabHeight - downloadBarHeight;
+
+    // Resize Tab Control
+    HWND hTabCtrl = GetDlgItem(hWnd, ID_TAB_CONTROL);
+    if (hTabCtrl)
+    {
+        SetWindowPos(hTabCtrl, nullptr, 0, 0, rcClient.right, tabHeight, SWP_NOZORDER);
+    }
 
     // Resize Edit control
     HWND hEdit = GetDlgItem(hWnd, ID_EDIT);
     if (hEdit)
     {
-        SetWindowPos(hEdit, nullptr, 0, 0, rcClient.right, editHeight, SWP_NOZORDER);
+        SetWindowPos(hEdit, nullptr, 0, tabHeight, rcClient.right, editHeight, SWP_NOZORDER);
     }
 
     // Resize Download Bar
     HWND hDownloadBar = GetDlgItem(hWnd, ID_DOWNLOAD_BAR);
     if (hDownloadBar)
     {
-        SetWindowPos(hDownloadBar, nullptr, 0, editHeight, rcClient.right, downloadBarHeight, SWP_NOZORDER);
+        SetWindowPos(hDownloadBar, nullptr, 0, tabHeight + editHeight, rcClient.right, downloadBarHeight, SWP_NOZORDER);
     }
+}
+
+void AddNewTab(HWND hTabCtrl, const TCHAR* szFileName)
+{
+    TC_ITEM tie = {0};
+    tie.mask = TCIF_TEXT | TCIF_IMAGE;
+    tie.pszText = (LPTSTR)szFileName;
+    tie.cchTextMax = _tcslen(szFileName);
+
+    int index = TabCtrl_InsertItem(hTabCtrl, tabInfos.size(), &tie);
+
+    TabInfo newTab;
+    _tcscpy_s(newTab.fileName, MAX_PATH, szFileName);
+    tabInfos.push_back(newTab);
+
+    // Select the newly added tab
+    TabCtrl_SetCurSel(hTabCtrl, index);
 }
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -148,6 +193,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             int wmEvent = HIWORD(wParam);
 
             // Handle menu and control messages here if needed
+        }
+        break;
+
+    case WM_NOTIFY:
+        {
+            LPNMHDR pnmh = (LPNMHDR)lParam;
+            switch (pnmh->code) 
+            {
+            case TCN_SELCHANGE: 
+                {
+                    HWND hTabCtrl = GetDlgItem(hWnd, ID_TAB_CONTROL);
+                    int nTab = TabCtrl_GetCurSel(hTabCtrl);
+                    if (nTab != -1 && nTab < (int)tabInfos.size())
+                    {
+                        // Here you would update the edit control content or perform other actions based on the selected tab
+                        MessageBox(hWnd, tabInfos[nTab].fileName, TEXT("Current Tab"), MB_OK);
+                    }
+                }
+                break;
+            }
         }
         break;
 

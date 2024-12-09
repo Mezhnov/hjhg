@@ -1,4 +1,5 @@
-#define ID_EDIT         101
-#define ID_DOWNLOAD_BAR 102
-#define ID_TAB_CONTROL  103
-#define ID_FILE_PANEL   104
+#include <windows.h>
+#include <commctrl.h>   // For common controls
+#include <richedit.h>   // For Rich Edit controls
+#include <string>
+#include <vector>

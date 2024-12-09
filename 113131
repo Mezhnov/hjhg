@@ -1,4 +1,5 @@
-// IDEDesign.cpp
+// main.cpp
+
 #include <windows.h>
 #include <gdiplus.h>
 #include <wininet.h>
@@ -10,266 +11,236 @@
 #include <locale>
 #include <codecvt>
 #include <windowsx.h>
+#include <mmsystem.h> // Для PlaySound
+#include <CommCtrl.h> // Для общих контролов
+#include <richedit.h> // Для Rich Edit контролов
+#include "resource.h"
 
 #pragma comment(lib, "gdiplus.lib")
+#pragma comment(lib, "wininet.lib")
+#pragma comment(lib, "winmm.lib")
 #pragma comment(lib, "comctl32.lib")
 
 using namespace Gdiplus;
+using namespace std;
 
 // Глобальные переменные
 HINSTANCE hInst;
-HWND hToolbar, hStatusbar, hEdit;
+HWND hMainWnd;
+ULONG_PTR gdiplusToken;
 
-// Идентификаторы ресурсов
-#define IDM_FILE_NEW    1
-#define IDM_FILE_OPEN   2
-#define IDM_FILE_SAVE   3
-#define IDM_FILE_EXIT   4
-
-// Прототипы функций
+// Предварительные объявления функций
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
-VOID OnPaint(HDC hdc);
-void InitializeToolbar(HWND hWnd);
-void InitializeStatusbar(HWND hWnd);
+void InitGDIPlus();
+void ShutdownGDIPlus();
+void LoadResources();
+void UnloadResources();
+void OnPaint(HWND);
+void OnCommand(HWND, int, HWND, UINT);
+void OnDestroy(HWND);
+void PlaySoundResource(int);
 
 // Точка входа
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
-    LPSTR lpCmdLine, int nCmdShow)
+int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
+                      _In_opt_ HINSTANCE hPrevInstance,
+                      _In_ LPWSTR    lpCmdLine,
+                      _In_ int       nCmdShow)
 {
-    GdiplusStartupInput gdiplusStartupInput;
-    ULONG_PTR           gdiplusToken;
-
     // Инициализация GDI+
-    GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
-
-    // Сохранение дескриптора инстанции в глобальную переменную
-    hInst = hInstance;
+    InitGDIPlus();
 
     // Регистрация класса окна
-    WNDCLASSEX wcex;
-    ZeroMemory(&wcex, sizeof(WNDCLASSEX));
+    WNDCLASS wc = {};
+    wc.lpfnWndProc   = WndProc;
+    wc.hInstance     = hInstance;
+    wc.lpszClassName = L"MyWindowClass";
+    wc.hIcon         = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APP_ICON));
+    wc.hCursor       = LoadCursor(nullptr, IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
 
-    wcex.cbSize         = sizeof(WNDCLASSEX);
-    wcex.style          = CS_HREDRAW | CS_VREDRAW;
-    wcex.lpfnWndProc    = WndProc;
-    wcex.hInstance      = hInstance;
-    wcex.hIcon          = LoadIcon(NULL, IDI_APPLICATION);
-    wcex.hCursor        = LoadCursor(NULL, IDC_ARROW);
-    wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
-    wcex.lpszClassName  = L"IDEWindowClass";
+    RegisterClass(&wc);
 
-    if (!RegisterClassEx(&wcex))
-    {
-        MessageBox(NULL,
-            L"Не удалось зарегистрировать класс окна!",
-            L"Ошибка",
-            NULL);
-
-        return 1;
-    }
-
-    // Создание окна
-    HWND hWnd = CreateWindow(
-        L"IDEWindowClass",
-        L"Профессиональный дизайн IDE",
+    // Создание основного окна
+    hMainWnd = CreateWindowEx(
+        0,
+        wc.lpszClassName,
+        L"My Application",
         WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT,
-        1000, 700,
-        NULL,
-        NULL,
+        CW_USEDEFAULT, CW_USEDEFAULT, 800, 600,
+        nullptr,
+        LoadMenu(hInstance, MAKEINTRESOURCE(IDM_MENU)),
         hInstance,
-        NULL
+        nullptr
     );
 
-    if (!hWnd)
+    if (!hMainWnd)
     {
-        MessageBox(NULL,
-            L"Не удалось создать окно!",
-            L"Ошибка",
-            NULL);
-
-        return 1;
+        return -1;
     }
 
-    ShowWindow(hWnd, nCmdShow);
-    UpdateWindow(hWnd);
+    ShowWindow(hMainWnd, nCmdShow);
 
-    // Цикл обработки сообщений
-    MSG msg;
-
-    while (GetMessage(&msg, NULL, 0, 0))
+    // Основной цикл сообщений
+    MSG msg = {};
+    while (GetMessage(&msg, nullptr, 0, 0))
     {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
-    // Завершение работы GDI+
-    GdiplusShutdown(gdiplusToken);
+    // Завершение GDI+
+    ShutdownGDIPlus();
 
-    return (int)msg.wParam;
+    return (int) msg.wParam;
 }
 
-// Процедура окна
+// Функция инициализации GDI+
+void InitGDIPlus()
+{
+    GdiplusStartupInput gdiplusStartupInput;
+    GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, nullptr);
+}
+
+// Функция завершения GDI+
+void ShutdownGDIPlus()
+{
+    GdiplusShutdown(gdiplusToken);
+}
+
+// Обработчик сообщений окна
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
     case WM_CREATE:
         {
-            // Инициализация компонентов
-            InitializeToolbar(hWnd);
-            InitializeStatusbar(hWnd);
+            // Создание контролов
+            HWND hEdit = CreateWindowEx(0, RICHEDIT_CLASS, L"",
+                WS_CHILD | WS_VISIBLE | WS_BORDER | ES_MULTILINE,
+                10, 10, 400, 200, hWnd, (HMENU)IDC_MAIN_EDIT, hInst, nullptr);
 
-            // Создание редактора
-            hEdit = CreateWindowEx(0, L"EDIT", NULL,
-                WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE,
-                0, 0, 0, 0,
-                hWnd, NULL, hInst, NULL);
+            HWND hButton = CreateWindow(
+                L"BUTTON",  // Прекласс зарегистрирован в системе
+                L"Click Me",      // Текст на кнопке
+                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,  // Стиль окна
+                10,         // x положение
+                220,        // y положение
+                100,        // Ширина
+                30,         // Высота
+                hWnd,       // Родительское окно
+                (HMENU)IDC_MAIN_BUTTON,       // Идентификатор контролла
+                hInst,     // Инстанс приложения
+                nullptr);      // Доп. параметры
         }
         break;
-
-    case WM_SIZE:
-        {
-            // Изменение размера панели инструментов и строки состояния
-            SendMessage(hToolbar, TB_AUTOSIZE, 0, 0);
-            SendMessage(hStatusbar, WM_SIZE, 0, 0);
-
-            // Получение размеров клиентской области
-            RECT rcClient;
-            GetClientRect(hWnd, &rcClient);
-
-            // Получение размеров панели инструментов и строки состояния
-            RECT rcToolbar, rcStatus;
-            GetWindowRect(hToolbar, &rcToolbar);
-            GetWindowRect(hStatusbar, &rcStatus);
-
-            int toolbarHeight = rcToolbar.bottom - rcToolbar.top;
-            int statusHeight = rcStatus.bottom - rcStatus.top;
-
-            // Изменение размера редактора
-            MoveWindow(hEdit,
-                0, toolbarHeight,
-                rcClient.right,
-                rcClient.bottom - toolbarHeight - statusHeight,
-                TRUE);
-        }
-        break;
-
     case WM_COMMAND:
         {
-            switch (LOWORD(wParam))
-            {
-            case IDM_FILE_NEW:
-                // Обработка команды "Новый файл"
-                SetWindowText(hEdit, L"");
-                break;
-            case IDM_FILE_OPEN:
-                // Обработка команды "Открыть файл"
-                MessageBox(hWnd, L"Открыть файл", L"Информация", MB_OK);
-                break;
-            case IDM_FILE_SAVE:
-                // Обработка команды "Сохранить файл"
-                MessageBox(hWnd, L"Сохранить файл", L"Информация", MB_OK);
-                break;
-            case IDM_FILE_EXIT:
-                // Обработка команды "Выход"
-                PostQuitMessage(0);
-                break;
-            default:
-                break;
-            }
+            OnCommand(hWnd, LOWORD(wParam), (HWND)lParam, HIWORD(wParam));
         }
         break;
-
     case WM_PAINT:
         {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hWnd, &ps);
-            OnPaint(hdc);
-            EndPaint(hWnd, &ps);
+            OnPaint(hWnd);
         }
         break;
-
     case WM_DESTROY:
-        PostQuitMessage(0);
+        {
+            OnDestroy(hWnd);
+        }
         break;
-
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
-        break;
     }
-
     return 0;
 }
 
-// Функция отрисовки
-VOID OnPaint(HDC hdc)
+// Обработчик команды
+void OnCommand(HWND hWnd, int id, HWND hwndCtl, UINT codeNotify)
 {
-    // Дополнительная отрисовка при необходимости
+    switch (id)
+    {
+    case IDM_EXIT:
+        DestroyWindow(hWnd);
+        break;
+    case IDC_MAIN_BUTTON:
+        {
+            // Действие при нажатии на кнопку
+            PlaySoundResource(IDR_WAVE1);
+
+            MessageBox(hWnd, L"Button Clicked!", L"Information", MB_OK | MB_ICONINFORMATION);
+        }
+        break;
+    default:
+        break;
+    }
 }
 
-// Инициализация панели инструментов
-void InitializeToolbar(HWND hWnd)
+// Функция обработки WM_PAINT
+void OnPaint(HWND hWnd)
 {
-    // Загрузка библиотеки
-    INITCOMMONCONTROLSEX icex;
-    icex.dwSize = sizeof(icex);
-    icex.dwICC  = ICC_BAR_CLASSES;
-    InitCommonControlsEx(&icex);
+    PAINTSTRUCT ps;
+    HDC hdc = BeginPaint(hWnd, &ps);
 
-    // Создание панели инструментов
-    hToolbar = CreateWindowEx(0, TOOLBARCLASSNAME, NULL,
-        WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | TBSTYLE_WRAPABLE,
-        0, 0, 0, 0,
-        hWnd, NULL, hInst, NULL);
+    // Использование GDI+ для рисования изображения
+    Graphics graphics(hdc);
 
-    SendMessage(hToolbar, TB_BUTTONSTRUCTSIZE, (WPARAM)sizeof(TBBUTTON), 0);
+    // Загрузка изображения из ресурса
+    HRSRC hResource = FindResource(hInst, MAKEINTRESOURCE(IDB_BACKGROUND), RT_BITMAP);
+    if (hResource)
+    {
+        HGLOBAL hMemory = LoadResource(hInst, hResource);
+        if (hMemory)
+        {
+            DWORD imageSize = SizeofResource(hInst, hResource);
+            void* pResourceData = LockResource(hMemory);
+            if (pResourceData)
+            {
+                HGLOBAL hBuffer = GlobalAlloc(GMEM_FIXED, imageSize);
+                memcpy(hBuffer, pResourceData, imageSize);
+                IStream* pStream = nullptr;
+                if (CreateStreamOnHGlobal(hBuffer, TRUE, &pStream) == S_OK)
+                {
+                    // Создание изображения
+                    Bitmap* bitmap = Bitmap::FromStream(pStream);
+                    if (bitmap)
+                    {
+                        graphics.DrawImage(bitmap, 0, 0);
+                        delete bitmap;
+                    }
+                    pStream->Release();
+                }
+                GlobalFree(hBuffer);
+            }
+            FreeResource(hMemory);
+        }
+    }
 
-    // Добавление кнопок
-    TBBUTTON tbb[4] = { 0 };
-
-    tbb[0].iBitmap = STD_FILENEW;
-    tbb[0].idCommand = IDM_FILE_NEW;
-    tbb[0].fsState = TBSTATE_ENABLED;
-    tbb[0].fsStyle = TBSTYLE_BUTTON;
-
-    tbb[1].iBitmap = STD_FILEOPEN;
-    tbb[1].idCommand = IDM_FILE_OPEN;
-    tbb[1].fsState = TBSTATE_ENABLED;
-    tbb[1].fsStyle = TBSTYLE_BUTTON;
-
-    tbb[2].iBitmap = STD_FILESAVE;
-    tbb[2].idCommand = IDM_FILE_SAVE;
-    tbb[2].fsState = TBSTATE_ENABLED;
-    tbb[2].fsStyle = TBSTYLE_BUTTON;
-
-    tbb[3].iBitmap = STD_DELETE;
-    tbb[3].idCommand = IDM_FILE_EXIT;
-    tbb[3].fsState = TBSTATE_ENABLED;
-    tbb[3].fsStyle = TBSTYLE_BUTTON;
-
-    HIMAGELIST hImageList;
-    HBITMAP hBitmap;
-
-    // Загрузка стандартных изображений
-    hImageList = ImageList_LoadImage(hInst, MAKEINTRESOURCE(IDB_STD_SMALL_COLOR),
-        16, 0, CLR_DEFAULT, IMAGE_BITMAP, LR_CREATEDIBSECTION);
-
-    SendMessage(hToolbar, TB_SETIMAGELIST, 0, (LPARAM)hImageList);
-    SendMessage(hToolbar, TB_ADDBUTTONS, sizeof(tbb)/sizeof(TBBUTTON), (LPARAM)&tbb);
-    SendMessage(hToolbar, TB_AUTOSIZE, 0, 0);
-    ShowWindow(hToolbar, TRUE);
+    EndPaint(hWnd, &ps);
 }
 
-// Инициализация строки состояния
-void InitializeStatusbar(HWND hWnd)
+// Обработчик WM_DESTROY
+void OnDestroy(HWND hWnd)
 {
-    hStatusbar = CreateWindowEx(0, STATUSCLASSNAME, NULL,
-        WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP,
-        0, 0, 0, 0,
-        hWnd, NULL, hInst, NULL);
-
-    int statwidths[] = { 100, -1 };
-    SendMessage(hStatusbar, SB_SETPARTS, sizeof(statwidths)/sizeof(int), (LPARAM)statwidths);
-    SendMessage(hStatusbar, SB_SETTEXT, 0, (LPARAM)L"Готово");
+    PostQuitMessage(0);
 }
+
+// Функция для воспроизведения звука из ресурсов
+void PlaySoundResource(int resourceID)
+{
+    HRSRC hRes = FindResource(hInst, MAKEINTRESOURCE(resourceID), L"WAVE");
+    if (hRes)
+    {
+        HGLOBAL hMem = LoadResource(hInst, hRes);
+        if (hMem)
+        {
+            void* pData = LockResource(hMem);
+            if (pData)
+            {
+                DWORD size = SizeofResource(hInst, hRes);
+                PlaySound((LPCTSTR)pData, hInst, SND_MEMORY | SND_ASYNC | SND_NODEFAULT);
+            }
+            FreeResource(hMem);
+        }
+    }
+}
+

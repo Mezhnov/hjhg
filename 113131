@@ -1,38 +1,20 @@
 #include <iostream>
 #include <chrono>
-#include <thread>
-
-// Константы
-const float GRAVITY = 9.81f;    // Ускорение свободного падения (м/с^2)
-const float TIME_STEP = 0.1f;   // Шаг времени (с)
-const int SIMULATION_TIME = 5;  // Общее время симуляции (с)
 
 int main() {
-    float position = 100.0f;    // Начальная позиция (высота) в метрах
-    float velocity = 0.0f;      // Начальная скорость (м/с)
-    float time = 0.0f;          // Текущее время
+    const long long N = 1000000000;  // 1 миллиард
+    long long sum = 0;
 
-    while (time <= SIMULATION_TIME && position >= 0) {
-        // Вывод текущего состояния
-        std::cout << "Время: " << time << " с\t";
-        std::cout << "Высота: " << position << " м\t";
-        std::cout << "Скорость: " << velocity << " м/с" << std::endl;
+    auto start = std::chrono::high_resolution_clock::now();
 
-        // Обновление скорости и позиции
-        velocity += GRAVITY * TIME_STEP;      // v = v0 + a * t
-        position -= velocity * TIME_STEP;     // s = s0 + v * t
-
-        // Ожидание для имитации реального времени
-        std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(TIME_STEP * 1000)));
-
-        // Обновление времени
-        time += TIME_STEP;
+    for (long long i = 1; i <= N; ++i) {
+        sum += i;
     }
 
-    // Сообщение о приземлении
-    if (position <= 0) {
-        std::cout << "Объект достиг земли в момент времени " << time << " с." << std::endl;
-    }
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration = end - start;
 
+    std::cout << "Сумма: " << sum << std::endl;
+    std::cout << "Время выполнения: " << duration.count() << " секунд" << std::endl;
     return 0;
 }

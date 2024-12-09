@@ -1,246 +1,162 @@
-// main.cpp
-
 #include <windows.h>
-#include <gdiplus.h>
-#include <wininet.h>
+#include <commctrl.h>   // For common controls
+#include <richedit.h>   // For Rich Edit controls
 #include <string>
-#include <vector>
-#include <chrono>
-#include <iomanip>
-#include <sstream>
-#include <locale>
-#include <codecvt>
-#include <windowsx.h>
-#include <mmsystem.h> // Для PlaySound
-#include <CommCtrl.h> // Для общих контролов
-#include <richedit.h> // Для Rich Edit контролов
-#include "resource.h"
 
-#pragma comment(lib, "gdiplus.lib")
-#pragma comment(lib, "wininet.lib")
-#pragma comment(lib, "winmm.lib")
-#pragma comment(lib, "comctl32.lib")
+// Resource identifiers
+#define ID_EDIT         101
+#define ID_DOWNLOAD_BAR 102
 
-using namespace Gdiplus;
-using namespace std;
-
-// Глобальные переменные
+// Global variables
 HINSTANCE hInst;
-HWND hMainWnd;
-ULONG_PTR gdiplusToken;
 
-// Предварительные объявления функций
+// Forward declarations of functions
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
-void InitGDIPlus();
-void ShutdownGDIPlus();
-void LoadResources();
-void UnloadResources();
-void OnPaint(HWND);
-void OnCommand(HWND, int, HWND, UINT);
-void OnDestroy(HWND);
-void PlaySoundResource(int);
+void InitializeControls(HWND);
 
-// Точка входа
-int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
-                      _In_opt_ HINSTANCE hPrevInstance,
-                      _In_ LPWSTR    lpCmdLine,
-                      _In_ int       nCmdShow)
+int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+                     LPSTR lpCmdLine, int nCmdShow)
 {
-    // Инициализация GDI+
-    InitGDIPlus();
+    // Store instance handle in our global variable
+    hInst = hInstance;
 
-    // Регистрация класса окна
+    // Register the window class
     WNDCLASS wc = {};
     wc.lpfnWndProc   = WndProc;
     wc.hInstance     = hInstance;
-    wc.lpszClassName = L"MyWindowClass";
-    wc.hIcon         = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APP_ICON));
+    wc.lpszClassName = TEXT("BasicIDEWindow");
     wc.hCursor       = LoadCursor(nullptr, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
 
-    RegisterClass(&wc);
+    if (!RegisterClass(&wc))
+    {
+        MessageBox(nullptr, TEXT("Failed to register window class!"), TEXT("Error"), MB_OK | MB_ICONERROR);
+        return 0;
+    }
 
-    // Создание основного окна
-    hMainWnd = CreateWindowEx(
-        0,
+    // Create the main window
+    HWND hWnd = CreateWindow(
         wc.lpszClassName,
-        L"My Application",
+        TEXT("Basic IDE"),
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT, 800, 600,
         nullptr,
-        LoadMenu(hInstance, MAKEINTRESOURCE(IDM_MENU)),
+        nullptr,
         hInstance,
         nullptr
     );
 
-    if (!hMainWnd)
+    if (!hWnd)
     {
-        return -1;
+        MessageBox(nullptr, TEXT("Failed to create window!"), TEXT("Error"), MB_OK | MB_ICONERROR);
+        return 0;
     }
 
-    ShowWindow(hMainWnd, nCmdShow);
+    ShowWindow(hWnd, nCmdShow);
+    UpdateWindow(hWnd);
 
-    // Основной цикл сообщений
+    // Main message loop
     MSG msg = {};
     while (GetMessage(&msg, nullptr, 0, 0))
     {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
+        if (!TranslateAccelerator(hWnd, nullptr, &msg))
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
     }
-
-    // Завершение GDI+
-    ShutdownGDIPlus();
 
     return (int) msg.wParam;
 }
 
-// Функция инициализации GDI+
-void InitGDIPlus()
+void InitializeControls(HWND hWnd)
 {
-    GdiplusStartupInput gdiplusStartupInput;
-    GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, nullptr);
+    // Load the Rich Edit library
+    LoadLibrary(TEXT("Msftedit.dll"));
+
+    // Create the Edit control for code writing (multi-line, vertical scroll)
+    HWND hEdit = CreateWindowEx(
+        0,                      // Extended styles
+        MSFTEDIT_CLASS,         // Rich Edit class
+        nullptr,                // No default text
+        WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL,
+        0, 0, 0, 0,             // Will resize later
+        hWnd,
+        (HMENU)ID_EDIT,
+        hInst,
+        nullptr
+    );
+
+    // Create the "Download Bar" at the bottom
+    HWND hDownloadBar = CreateWindowEx(
+        0,
+        TEXT("STATIC"),         // Static control for simplicity
+        TEXT("Downloading: example_file.txt"), // File name displayed
+        WS_CHILD | WS_VISIBLE | SS_LEFT,
+        0, 0, 0, 0,             // Will resize later
+        hWnd,
+        (HMENU)ID_DOWNLOAD_BAR,
+        hInst,
+        nullptr
+    );
+
+    // Set font for controls
+    HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
+    SendMessage(hEdit, WM_SETFONT, (WPARAM)hFont, TRUE);
+    SendMessage(hDownloadBar, WM_SETFONT, (WPARAM)hFont, TRUE);
 }
 
-// Функция завершения GDI+
-void ShutdownGDIPlus()
+void ResizeControls(HWND hWnd)
 {
-    GdiplusShutdown(gdiplusToken);
+    RECT rcClient;
+    GetClientRect(hWnd, &rcClient);
+
+    // Determine sizes
+    int downloadBarHeight = 30;
+    int editHeight = rcClient.bottom - downloadBarHeight;
+
+    // Resize Edit control
+    HWND hEdit = GetDlgItem(hWnd, ID_EDIT);
+    if (hEdit)
+    {
+        SetWindowPos(hEdit, nullptr, 0, 0, rcClient.right, editHeight, SWP_NOZORDER);
+    }
+
+    // Resize Download Bar
+    HWND hDownloadBar = GetDlgItem(hWnd, ID_DOWNLOAD_BAR);
+    if (hDownloadBar)
+    {
+        SetWindowPos(hDownloadBar, nullptr, 0, editHeight, rcClient.right, downloadBarHeight, SWP_NOZORDER);
+    }
 }
 
-// Обработчик сообщений окна
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
     case WM_CREATE:
-        {
-            // Создание контролов
-            HWND hEdit = CreateWindowEx(0, RICHEDIT_CLASS, L"",
-                WS_CHILD | WS_VISIBLE | WS_BORDER | ES_MULTILINE,
-                10, 10, 400, 200, hWnd, (HMENU)IDC_MAIN_EDIT, hInst, nullptr);
-
-            HWND hButton = CreateWindow(
-                L"BUTTON",  // Прекласс зарегистрирован в системе
-                L"Click Me",      // Текст на кнопке
-                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,  // Стиль окна
-                10,         // x положение
-                220,        // y положение
-                100,        // Ширина
-                30,         // Высота
-                hWnd,       // Родительское окно
-                (HMENU)IDC_MAIN_BUTTON,       // Идентификатор контролла
-                hInst,     // Инстанс приложения
-                nullptr);      // Доп. параметры
-        }
+        InitializeControls(hWnd);
         break;
+
+    case WM_SIZE:
+        ResizeControls(hWnd);
+        break;
+
     case WM_COMMAND:
         {
-            OnCommand(hWnd, LOWORD(wParam), (HWND)lParam, HIWORD(wParam));
+            int wmId    = LOWORD(wParam);
+            int wmEvent = HIWORD(wParam);
+
+            // Handle menu and control messages here if needed
         }
         break;
-    case WM_PAINT:
-        {
-            OnPaint(hWnd);
-        }
-        break;
+
     case WM_DESTROY:
-        {
-            OnDestroy(hWnd);
-        }
+        PostQuitMessage(0);
         break;
+
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
     return 0;
 }
-
-// Обработчик команды
-void OnCommand(HWND hWnd, int id, HWND hwndCtl, UINT codeNotify)
-{
-    switch (id)
-    {
-    case IDM_EXIT:
-        DestroyWindow(hWnd);
-        break;
-    case IDC_MAIN_BUTTON:
-        {
-            // Действие при нажатии на кнопку
-            PlaySoundResource(IDR_WAVE1);
-
-            MessageBox(hWnd, L"Button Clicked!", L"Information", MB_OK | MB_ICONINFORMATION);
-        }
-        break;
-    default:
-        break;
-    }
-}
-
-// Функция обработки WM_PAINT
-void OnPaint(HWND hWnd)
-{
-    PAINTSTRUCT ps;
-    HDC hdc = BeginPaint(hWnd, &ps);
-
-    // Использование GDI+ для рисования изображения
-    Graphics graphics(hdc);
-
-    // Загрузка изображения из ресурса
-    HRSRC hResource = FindResource(hInst, MAKEINTRESOURCE(IDB_BACKGROUND), RT_BITMAP);
-    if (hResource)
-    {
-        HGLOBAL hMemory = LoadResource(hInst, hResource);
-        if (hMemory)
-        {
-            DWORD imageSize = SizeofResource(hInst, hResource);
-            void* pResourceData = LockResource(hMemory);
-            if (pResourceData)
-            {
-                HGLOBAL hBuffer = GlobalAlloc(GMEM_FIXED, imageSize);
-                memcpy(hBuffer, pResourceData, imageSize);
-                IStream* pStream = nullptr;
-                if (CreateStreamOnHGlobal(hBuffer, TRUE, &pStream) == S_OK)
-                {
-                    // Создание изображения
-                    Bitmap* bitmap = Bitmap::FromStream(pStream);
-                    if (bitmap)
-                    {
-                        graphics.DrawImage(bitmap, 0, 0);
-                        delete bitmap;
-                    }
-                    pStream->Release();
-                }
-                GlobalFree(hBuffer);
-            }
-            FreeResource(hMemory);
-        }
-    }
-
-    EndPaint(hWnd, &ps);
-}
-
-// Обработчик WM_DESTROY
-void OnDestroy(HWND hWnd)
-{
-    PostQuitMessage(0);
-}
-
-// Функция для воспроизведения звука из ресурсов
-void PlaySoundResource(int resourceID)
-{
-    HRSRC hRes = FindResource(hInst, MAKEINTRESOURCE(resourceID), L"WAVE");
-    if (hRes)
-    {
-        HGLOBAL hMem = LoadResource(hInst, hRes);
-        if (hMem)
-        {
-            void* pData = LockResource(hMem);
-            if (pData)
-            {
-                DWORD size = SizeofResource(hInst, hRes);
-                PlaySound((LPCTSTR)pData, hInst, SND_MEMORY | SND_ASYNC | SND_NODEFAULT);
-            }
-            FreeResource(hMem);
-        }
-    }
-}
-

@@ -1,39 +1,104 @@
+// Include necessary headers
 #include <windows.h>
-#include <commctrl.h>   // For common controls
-#include <richedit.h>   // For Rich Edit controls
-#include <string>
+#include <commctrl.h>
+#include <tchar.h>
 #include <vector>
 
-// Resource identifiers
-#define ID_EDIT         101
-#define ID_DOWNLOAD_BAR 102
-#define ID_TAB_CONTROL  103
-#define ID_FILE_PANEL   104
+#pragma comment(lib, "comctl32.lib")
 
-// Global variables
-HINSTANCE hInst;
-
-// Forward declarations of functions
-LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
-void InitializeControls(HWND);
-void ResizeControls(HWND);
-void AddNewTab(HWND hTabCtrl, const TCHAR* szFileName);
-void UpdateFilePanel(HWND hFilePanel);
-void AddNewFile(HWND hWnd, const TCHAR* szFileName);
+// Define IDs for controls
+#define ID_TAB_CONTROL 1001
+#define ID_FILE_PANEL  1002
 
 // Structure to hold tab information
 struct TabInfo {
     TCHAR fileName[MAX_PATH];
 };
 
+// Global variables
 std::vector<TabInfo> tabInfos;
+HWND hMainWnd;
 
+// Function prototypes
+void AddNewFile(HWND hWnd, const TCHAR* szFileName);
+void AddNewTab(HWND hTabCtrl, const TCHAR* szFileName);
+void UpdateFilePanel(HWND hFilePanel);
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+
+// Custom drawing function for tabs
+void InitializeCustomTabControl(HWND hTabCtrl);
+LRESULT CALLBACK TabCtrlProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+// Original tab control procedure
+WNDPROC OriginalTabCtrlProc;
+
+// Entry point
+int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+                       LPTSTR lpCmdLine, int nCmdShow)
+{
+    // Register window class, create window, etc. (omitted for brevity)
+    // ...
+
+    // Initialize common controls
+    INITCOMMONCONTROLSEX icex = { sizeof(INITCOMMONCONTROLSEX) };
+    icex.dwICC = ICC_TAB_CLASSES;
+    InitCommonControlsEx(&icex);
+
+    // Create main window (hMainWnd)
+    // ...
+
+    // Message loop
+    MSG msg;
+    while (GetMessage(&msg, nullptr, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    return (int)msg.wParam;
+}
+
+// Main window procedure
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
+    case WM_CREATE:
+    {
+        // Create tab control
+        HWND hTabCtrl = CreateWindow(WC_TABCONTROL, NULL,
+            WS_CHILD | WS_VISIBLE | TCS_OWNERDRAWFIXED,
+            0, 0, 400, 200, hWnd, (HMENU)ID_TAB_CONTROL, GetModuleHandle(NULL), NULL);
+
+        // Initialize custom drawing
+        InitializeCustomTabControl(hTabCtrl);
+
+        // Create file panel
+        HWND hFilePanel = CreateWindowEx(0, WC_STATIC, _T("File Panel"),
+            WS_CHILD | WS_VISIBLE | SS_LEFT,
+            0, 210, 400, 200, hWnd, (HMENU)ID_FILE_PANEL, GetModuleHandle(NULL), NULL);
+
+        break;
+    }
+    case WM_COMMAND:
+        // Handle menu commands, button clicks, etc.
+        break;
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+    default:
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+    return 0;
+}
+
+// Function to add a new file
 void AddNewFile(HWND hWnd, const TCHAR* szFileName)
 {
     // Add new file to the tabs
     HWND hTabCtrl = GetDlgItem(hWnd, ID_TAB_CONTROL);
 
     TabInfo newTab;
+    _tcscpy_s(newTab.fileName, MAX_PATH, szFileName);
     tabInfos.push_back(newTab);
 
     AddNewTab(hTabCtrl, newTab.fileName);
@@ -43,227 +108,89 @@ void AddNewFile(HWND hWnd, const TCHAR* szFileName)
     UpdateFilePanel(hFilePanel);
 }
 
-void UpdateFilePanel(HWND hFilePanel)
-{
-    // Clear existing items
-    SendMessage(hFilePanel, LB_RESETCONTENT, 0, 0);
-
-    // Add all files from tabInfos to the list box
-    for (const auto& tab : tabInfos) {
-        SendMessage(hFilePanel, LB_ADDSTRING, 0, (LPARAM)tab.fileName);
-    }
-}
-
+// Function to add a new tab with custom design
 void AddNewTab(HWND hTabCtrl, const TCHAR* szFileName)
 {
-    TC_ITEM tie = { 0 };
-    tie.mask = TCIF_TEXT | TCIF_IMAGE;
-    tie.pszText = (LPTSTR)szFileName;
+    TCITEM tie;
+    tie.mask = TCIF_TEXT;
+    tie.pszText = const_cast<LPTSTR>(szFileName);
 
-    int index = TabCtrl_InsertItem(hTabCtrl, tabInfos.size(), &tie);
+    TabCtrl_InsertItem(hTabCtrl, tabInfos.size() - 1, &tie);
 
-    // Select the newly added tab
-    TabCtrl_SetCurSel(hTabCtrl, index);
+    // Redraw the tab control to apply custom colors
+    InvalidateRect(hTabCtrl, NULL, TRUE);
 }
 
-int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
-    LPSTR lpCmdLine, int nCmdShow)
+// Function to update the file panel
+void UpdateFilePanel(HWND hFilePanel)
 {
-    // Store instance handle in our global variable
-    hInst = hInstance;
+    // For demonstration, we'll just update the text
+    if (!tabInfos.empty()) {
+        const TCHAR* currentFile = tabInfos.back().fileName;
+        SetWindowText(hFilePanel, currentFile);
+    }
+}
 
-    // Register the window class
-    WNDCLASS wc = {};
-    wc.lpfnWndProc = WndProc;
-    wc.hInstance = hInstance;
-    wc.lpszClassName = TEXT("BasicIDEWindow");
-    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+// Function to initialize custom drawing for tab control
+void InitializeCustomTabControl(HWND hTabCtrl)
+{
+    // Subclass the tab control
+    OriginalTabCtrlProc = (WNDPROC)SetWindowLongPtr(hTabCtrl, GWLP_WNDPROC, (LONG_PTR)TabCtrlProc);
+}
 
-    if (!RegisterClass(&wc))
+// Custom window procedure for tab control
+LRESULT CALLBACK TabCtrlProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    switch (msg) {
+    case WM_DRAWITEM:
     {
-        MessageBox(nullptr, TEXT("Failed to register window class!"), TEXT("Error"), MB_OK | MB_ICONERROR);
+        LPDRAWITEMSTRUCT lpDrawItem = (LPDRAWITEMSTRUCT)lParam;
+        // Custom drawing code (not needed here since we handle WM_PAINT)
+        return TRUE;
+    }
+    case WM_ERASEBKGND:
+        return TRUE; // Prevent flickering
+    case WM_PAINT:
+    {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
+
+        // Get the number of tabs
+        int tabCount = TabCtrl_GetItemCount(hwnd);
+
+        for (int i = 0; i < tabCount; ++i) {
+            RECT rect;
+            TabCtrl_GetItemRect(hwnd, i, &rect);
+
+            BOOL isSelected = (TabCtrl_GetCurSel(hwnd) == i);
+
+            // Set colors
+            COLORREF bgColor = isSelected ? RGB(66, 133, 244) : RGB(255, 255, 255);
+            COLORREF textColor = isSelected ? RGB(255, 255, 255) : RGB(0, 0, 0);
+
+            // Fill background
+            HBRUSH hBrush = CreateSolidBrush(bgColor);
+            FillRect(hdc, &rect, hBrush);
+            DeleteObject(hBrush);
+
+            // Draw text
+            TCITEM tie;
+            TCHAR szText[MAX_PATH];
+            tie.mask = TCIF_TEXT;
+            tie.pszText = szText;
+            tie.cchTextMax = MAX_PATH;
+            TabCtrl_GetItem(hwnd, i, &tie);
+
+            SetTextColor(hdc, textColor);
+            SetBkMode(hdc, TRANSPARENT);
+            DrawText(hdc, szText, -1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        }
+
+        EndPaint(hwnd, &ps);
         return 0;
     }
-
-    // Create the main window
-    HWND hWnd = CreateWindow(
-        wc.lpszClassName,
-        TEXT("Basic IDE"),
-        WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, 800, 600,
-        nullptr,
-        nullptr,
-        hInstance,
-        nullptr
-    );
-
-    if (!hWnd)
-    {
-        MessageBox(nullptr, TEXT("Failed to create window!"), TEXT("Error"), MB_OK | MB_ICONERROR);
-        return 0;
-    }
-
-    ShowWindow(hWnd, nCmdShow);
-    UpdateWindow(hWnd);
-
-    // Main message loop
-    MSG msg = {};
-    while (GetMessage(&msg, nullptr, 0, 0))
-    {
-        if (!TranslateAccelerator(hWnd, nullptr, &msg))
-        {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
-    }
-
-    return (int)msg.wParam;
-}
-
-void InitializeControls(HWND hWnd)
-{
-    // Load the Rich Edit library
-    LoadLibrary(TEXT("Msftedit.dll"));
-
-    // Create the Tab Control
-    HWND hTabCtrl = CreateWindowEx(
-        0, WC_TABCONTROL, TEXT(""),
-        WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | TCS_FOCUSONBUTTONDOWN | TCS_HOTTRACK,
-        0, 0, 0, 0, hWnd, (HMENU)ID_TAB_CONTROL, hInst, NULL);
-
-    // Add an initial tab (Untitled)
-    AddNewTab(hTabCtrl, TEXT("Untitled"));
-
-    // Create the Edit control for code writing (multi-line, vertical scroll)
-    HWND hEdit = CreateWindowEx(
-        0,                      // Extended styles
-        MSFTEDIT_CLASS,         // Rich Edit class
-        nullptr,                // No default text
-        WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL,
-        0, 0, 0, 0,             // Will resize later
-        hWnd,
-        (HMENU)ID_EDIT,
-        hInst,
-        nullptr
-    );
-
-    // Create the "Download Bar" at the bottom
-    HWND hDownloadBar = CreateWindowEx(
-        0,
-        TEXT("STATIC"),         // Static control for simplicity
-        TEXT("Downloading: example_file.txt"), // File name displayed
-        WS_CHILD | WS_VISIBLE | SS_LEFT,
-        0, 0, 0, 0,             // Will resize later
-        hWnd,
-        (HMENU)ID_DOWNLOAD_BAR,
-        hInst,
-        nullptr
-    );
-
-    // Create a ListBox for the file panel on the left side
-    HWND hFilePanel = CreateWindowEx(
-        0,
-        TEXT("LISTBOX"),        // ListBox class
-        nullptr,                // No default text
-        WS_CHILD | WS_VISIBLE | LBS_NOINTEGRALHEIGHT | LBS_NOTIFY | WS_BORDER,
-        0, 0, 0, 0,             // Will resize later
-        hWnd,
-        (HMENU)ID_FILE_PANEL,
-        hInst,
-        nullptr
-    );
-
-    // Set font for controls
-    HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
-    SendMessage(hEdit, WM_SETFONT, (WPARAM)hFont, TRUE);
-    SendMessage(hDownloadBar, WM_SETFONT, (WPARAM)hFont, TRUE);
-    SendMessage(hFilePanel, WM_SETFONT, (WPARAM)hFont, TRUE);
-
-    // Initialize file panel
-    UpdateFilePanel(hFilePanel);
-}
-
-void ResizeControls(HWND hWnd)
-{
-    RECT rcClient;
-    GetClientRect(hWnd, &rcClient);
-
-    // Determine sizes
-    int tabHeight = 30;
-    int downloadBarHeight = 30;
-    int filePanelWidth = 150; // Width for the file panel
-    int editHeight = rcClient.bottom - tabHeight - downloadBarHeight;
-
-    // Resize Tab Control
-    HWND hTabCtrl = GetDlgItem(hWnd, ID_TAB_CONTROL);
-    if (hTabCtrl)
-    {
-        SetWindowPos(hTabCtrl, nullptr, filePanelWidth, 0, rcClient.right - filePanelWidth, tabHeight, SWP_NOZORDER);
-    }
-
-    // Resize Edit control
-    HWND hEdit = GetDlgItem(hWnd, ID_EDIT);
-    if (hEdit)
-    {
-        SetWindowPos(hEdit, nullptr, filePanelWidth, tabHeight, rcClient.right - filePanelWidth, editHeight, SWP_NOZORDER);
-    }
-
-    // Resize Download Bar
-    HWND hDownloadBar = GetDlgItem(hWnd, ID_DOWNLOAD_BAR);
-    if (hDownloadBar)
-    {
-        SetWindowPos(hDownloadBar, nullptr, filePanelWidth, tabHeight + editHeight, rcClient.right - filePanelWidth, downloadBarHeight, SWP_NOZORDER);
-    }
-
-    // Resize File Panel
-    HWND hFilePanel = GetDlgItem(hWnd, ID_FILE_PANEL);
-    if (hFilePanel)
-    {
-        SetWindowPos(hFilePanel, nullptr, 0, tabHeight, filePanelWidth, rcClient.bottom - tabHeight, SWP_NOZORDER);
-    }
-}
-
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-    switch (message)
-    {
-    case WM_CREATE:
-        InitializeControls(hWnd);
-        break;
-
-    case WM_SIZE:
-        ResizeControls(hWnd);
-        break;
-
-
-
-    case WM_NOTIFY:
-    {
-        LPNMHDR pnmh = (LPNMHDR)lParam;
-        switch (pnmh->code)
-        {
-        case TCN_SELCHANGE:
-        {
-            HWND hTabCtrl = GetDlgItem(hWnd, ID_TAB_CONTROL);
-            int nTab = TabCtrl_GetCurSel(hTabCtrl);
-            if (nTab != -1 && nTab < (int)tabInfos.size())
-            {
-                // Here you would update the edit control content or perform other actions based on the selected tab
-                MessageBox(hWnd, tabInfos[nTab].fileName, TEXT("Current Tab"), MB_OK);
-            }
-        }
-        break;
-        }
-    }
-    break;
-
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        break;
-
     default:
-        return DefWindowProc(hWnd, message, wParam, lParam);
+        break;
     }
-    return 0;
+    return CallWindowProc(OriginalTabCtrlProc, hwnd, msg, wParam, lParam);
 }

@@ -23,7 +23,7 @@ int main() {
         position -= velocity * TIME_STEP;     // s = s0 + v * t
 
         // Ожидание для имитации реального времени
-        std::this_thread::sleep_for(std::chrono::milliseconds(int(TIME_STEP * 1000)));
+        std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(TIME_STEP * 1000)));
 
         // Обновление времени
         time += TIME_STEP;
@@ -36,8 +36,3 @@ int main() {
 
     return 0;
 }
-
-Серьезность	Код	Описание	Проект	Файл	Строка	Состояние подавления	Подробности
-Ошибка	LNK2019	ссылка на неразрешенный внешний символ WinMain в функции "int __cdecl invoke_main(void)" (?invoke_main@@YAHXZ).	WindowsProject1	C:\Users\User\source\repos\WindowsProject1\WindowsProject1\MSVCRTD.lib(exe_winmain.obj)	1		
-Серьезность	Код	Описание	Проект	Файл	Строка	Состояние подавления	Подробности
-Ошибка	LNK1120	неразрешенных внешних элементов: 1	WindowsProject1	C:\Users\User\source\repos\WindowsProject1\WindowsProject1\x64\Debug\WindowsProject1.exe	1		

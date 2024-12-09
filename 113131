@@ -1,334 +1,38 @@
-#include <windows.h>
-#include <commctrl.h>   // Для общих контролов
-#include <richedit.h>   // Для Rich Edit контролов
-#include <string>
-#include <vector>
+#include <iostream>
+#include <chrono>
+#include <thread>
 
-// Идентификаторы ресурсов
-#define ID_EDIT         101
-#define ID_DOWNLOAD_BAR 102
-#define ID_TAB_CONTROL  103
-#define ID_FILE_PANEL   104
+// Константы
+const float GRAVITY = 9.81f;    // Ускорение свободного падения (м/с^2)
+const float TIME_STEP = 0.1f;   // Шаг времени (с)
+const int SIMULATION_TIME = 5;  // Общее время симуляции (с)
 
-// Глобальные переменные
-HINSTANCE hInst;
+int main() {
+    float position = 100.0f;    // Начальная позиция (высота) в метрах
+    float velocity = 0.0f;      // Начальная скорость (м/с)
+    float time = 0.0f;          // Текущее время
 
-// Цветовые константы
-COLORREF clrBackground = RGB(30, 30, 30);         // Фон окна (темно-серый)
-COLORREF clrText = RGB(230, 230, 230);            // Цвет текста (светло-серый)
-COLORREF clrEditBackground = RGB(40, 40, 40);     // Фон редактора (серый)
-COLORREF clrHighlight = RGB(70, 130, 180);        // Цвет выделения (стальной синий)
-HFONT hFont;                                      // Шрифт по умолчанию
+    while (time <= SIMULATION_TIME && position >= 0) {
+        // Вывод текущего состояния
+        std::cout << "Время: " << time << " с\t";
+        std::cout << "Высота: " << position << " м\t";
+        std::cout << "Скорость: " << velocity << " м/с" << std::endl;
 
-// Функции предварительного объявления
-LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
-void InitializeControls(HWND);
-void ResizeControls(HWND);
-void AddNewTab(HWND hTabCtrl, const TCHAR* szFileName);
-void UpdateFilePanel(HWND hFilePanel);
-void AddNewFile(HWND hWnd, const TCHAR* szFileName);
+        // Обновление скорости и позиции
+        velocity += GRAVITY * TIME_STEP;      // v = v0 + a * t
+        position -= velocity * TIME_STEP;     // s = s0 + v * t
 
-// Структура для хранения информации о вкладках
-struct TabInfo {
-    TCHAR fileName[MAX_PATH];
-};
+        // Ожидание для имитации реального времени
+        std::this_thread::sleep_for(std::chrono::milliseconds(int(TIME_STEP * 1000)));
 
-std::vector<TabInfo> tabInfos;
-
-void AddNewFile(HWND hWnd, const TCHAR* szFileName)
-{
-    // Добавить новый файл на вкладки
-    HWND hTabCtrl = GetDlgItem(hWnd, ID_TAB_CONTROL);
-
-    TabInfo newTab;
-    _tcscpy_s(newTab.fileName, szFileName); // Копируем имя файла
-    tabInfos.push_back(newTab);
-
-    AddNewTab(hTabCtrl, newTab.fileName);
-
-    // Обновить панель файлов для отображения нового файла
-    HWND hFilePanel = GetDlgItem(hWnd, ID_FILE_PANEL);
-    UpdateFilePanel(hFilePanel);
-}
-
-void UpdateFilePanel(HWND hFilePanel)
-{
-    // Очистить существующие элементы
-    SendMessage(hFilePanel, LB_RESETCONTENT, 0, 0);
-
-    // Добавить все файлы из tabInfos в список
-    for (const auto& tab : tabInfos) {
-        SendMessage(hFilePanel, LB_ADDSTRING, 0, (LPARAM)tab.fileName);
-    }
-}
-
-void AddNewTab(HWND hTabCtrl, const TCHAR* szFileName)
-{
-    TCITEM tie = { 0 };
-    tie.mask = TCIF_TEXT;
-    tie.pszText = (LPTSTR)szFileName;
-
-    int index = TabCtrl_InsertItem(hTabCtrl, (int)tabInfos.size() - 1, &tie);
-
-    // Выбрать вновь добавленную вкладку
-    TabCtrl_SetCurSel(hTabCtrl, index);
-}
-
-int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
-    LPSTR lpCmdLine, int nCmdShow)
-{
-    // Сохраняем идентификатор экземпляра в глобальной переменной
-    hInst = hInstance;
-
-    // Регистрация класса окна
-    WNDCLASS wc = {};
-    wc.lpfnWndProc = WndProc;
-    wc.hInstance = hInstance;
-    wc.lpszClassName = TEXT("BasicIDEWindow");
-    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wc.hbrBackground = CreateSolidBrush(clrBackground); // Устанавливаем цвет фона окна
-
-    if (!RegisterClass(&wc))
-    {
-        MessageBox(nullptr, TEXT("Не удалось зарегистрировать класс окна!"), TEXT("Ошибка"), MB_OK | MB_ICONERROR);
-        return 0;
+        // Обновление времени
+        time += TIME_STEP;
     }
 
-    // Создание основного окна
-    HWND hWnd = CreateWindow(
-        wc.lpszClassName,
-        TEXT("Базовая IDE"),
-        WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, 800, 600,
-        nullptr,
-        nullptr,
-        hInstance,
-        nullptr
-    );
-
-    if (!hWnd)
-    {
-        MessageBox(nullptr, TEXT("Не удалось создать окно!"), TEXT("Ошибка"), MB_OK | MB_ICONERROR);
-        return 0;
+    // Сообщение о приземлении
+    if (position <= 0) {
+        std::cout << "Объект достиг земли в момент времени " << time << " с." << std::endl;
     }
 
-    ShowWindow(hWnd, nCmdShow);
-    UpdateWindow(hWnd);
-
-    // Основной цикл сообщений
-    MSG msg = {};
-    while (GetMessage(&msg, nullptr, 0, 0))
-    {
-        if (!TranslateAccelerator(hWnd, nullptr, &msg))
-        {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
-    }
-
-    return (int)msg.wParam;
-}
-
-void InitializeControls(HWND hWnd)
-{
-    // Загружаем библиотеку Rich Edit
-    LoadLibrary(TEXT("Msftedit.dll"));
-
-    // Создаем общий шрифт
-    hFont = CreateFont(
-        16, 0, 0, 0, FW_NORMAL,
-        FALSE, FALSE, FALSE,
-        DEFAULT_CHARSET,
-        OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-        DEFAULT_QUALITY, DEFAULT_PITCH | FF_SWISS,
-        TEXT("Segoe UI")
-    );
-
-    // Создаем Tab Control
-    HWND hTabCtrl = CreateWindowEx(
-        0, WC_TABCONTROL, TEXT(""),
-        WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | TCS_FOCUSONBUTTONDOWN | TCS_HOTTRACK,
-        0, 0, 0, 0, hWnd, (HMENU)ID_TAB_CONTROL, hInst, NULL);
-
-    SendMessage(hTabCtrl, WM_SETFONT, (WPARAM)hFont, TRUE);
-
-    // Добавляем начальную вкладку (Untitled)
-    AddNewFile(hWnd, TEXT("Untitled"));
-
-    // Создаем контрол редактирования для написания кода (многострочный, вертикальная прокрутка)
-    HWND hEdit = CreateWindowEx(
-        0,                      // Расширенные стили
-        MSFTEDIT_CLASS,         // Класс Rich Edit
-        nullptr,                // Нет начального текста
-        WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL,
-        0, 0, 0, 0,             // Размеры будут изменены позже
-        hWnd,
-        (HMENU)ID_EDIT,
-        hInst,
-        nullptr
-    );
-
-    // Создаем "Download Bar" внизу
-    HWND hDownloadBar = CreateWindowEx(
-        0,
-        TEXT("STATIC"),         // Статический контрол
-        TEXT("Скачивание: example_file.txt"), // Отображаемое имя файла
-        WS_CHILD | WS_VISIBLE | SS_LEFT,
-        0, 0, 0, 0,             // Размеры будут изменены позже
-        hWnd,
-        (HMENU)ID_DOWNLOAD_BAR,
-        hInst,
-        nullptr
-    );
-
-    // Создаем ListBox для панели файлов слева
-    HWND hFilePanel = CreateWindowEx(
-        0,
-        TEXT("LISTBOX"),        // Класс ListBox
-        nullptr,                // Нет начального текста
-        WS_CHILD | WS_VISIBLE | LBS_NOINTEGRALHEIGHT | LBS_NOTIFY | WS_BORDER,
-        0, 0, 0, 0,             // Размеры будут изменены позже
-        hWnd,
-        (HMENU)ID_FILE_PANEL,
-        hInst,
-        nullptr
-    );
-
-    // Устанавливаем шрифт для контролов
-    SendMessage(hEdit, WM_SETFONT, (WPARAM)hFont, TRUE);
-    SendMessage(hDownloadBar, WM_SETFONT, (WPARAM)hFont, TRUE);
-    SendMessage(hFilePanel, WM_SETFONT, (WPARAM)hFont, TRUE);
-}
-
-void ResizeControls(HWND hWnd)
-{
-    RECT rcClient;
-    GetClientRect(hWnd, &rcClient);
-
-    // Определяем размеры
-    int tabHeight = 30;
-    int downloadBarHeight = 30;
-    int filePanelWidth = 150; // Ширина панели файлов
-    int editHeight = rcClient.bottom - tabHeight - downloadBarHeight;
-
-    // Изменяем размер Tab Control
-    HWND hTabCtrl = GetDlgItem(hWnd, ID_TAB_CONTROL);
-    if (hTabCtrl)
-    {
-        SetWindowPos(hTabCtrl, nullptr, filePanelWidth, 0, rcClient.right - filePanelWidth, tabHeight, SWP_NOZORDER);
-    }
-
-    // Изменяем размер Edit Control
-    HWND hEdit = GetDlgItem(hWnd, ID_EDIT);
-    if (hEdit)
-    {
-        SetWindowPos(hEdit, nullptr, filePanelWidth, tabHeight, rcClient.right - filePanelWidth, editHeight, SWP_NOZORDER);
-    }
-
-    // Изменяем размер Download Bar
-    HWND hDownloadBar = GetDlgItem(hWnd, ID_DOWNLOAD_BAR);
-    if (hDownloadBar)
-    {
-        SetWindowPos(hDownloadBar, nullptr, filePanelWidth, tabHeight + editHeight, rcClient.right - filePanelWidth, downloadBarHeight, SWP_NOZORDER);
-    }
-
-    // Изменяем размер File Panel
-    HWND hFilePanel = GetDlgItem(hWnd, ID_FILE_PANEL);
-    if (hFilePanel)
-    {
-        SetWindowPos(hFilePanel, nullptr, 0, 0, filePanelWidth, rcClient.bottom, SWP_NOZORDER);
-    }
-}
-
-// Обработка настройки цветов для контролов
-HBRUSH hbrBackground = CreateSolidBrush(clrBackground);
-HBRUSH hbrEditBackground = CreateSolidBrush(clrEditBackground);
-
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-    switch (message)
-    {
-    case WM_CREATE:
-        InitializeControls(hWnd);
-        break;
-
-    case WM_SIZE:
-        ResizeControls(hWnd);
-        break;
-
-    case WM_CTLCOLORSTATIC:
-    {
-        HDC hdcStatic = (HDC)wParam;
-        SetTextColor(hdcStatic, clrText);
-        SetBkColor(hdcStatic, clrBackground);
-        return (INT_PTR)hbrBackground;
-    }
-
-    case WM_CTLCOLOREDIT:
-    {
-        HDC hdcEdit = (HDC)wParam;
-        SetTextColor(hdcEdit, clrText);
-        SetBkColor(hdcEdit, clrEditBackground);
-        return (INT_PTR)hbrEditBackground;
-    }
-
-    case WM_CTLCOLORLISTBOX:
-    {
-        HDC hdcListBox = (HDC)wParam;
-        SetTextColor(hdcListBox, clrText);
-        SetBkColor(hdcListBox, clrBackground);
-        return (INT_PTR)hbrBackground;
-    }
-
-    case WM_NOTIFY:
-    {
-        LPNMHDR pnmh = (LPNMHDR)lParam;
-        switch (pnmh->code)
-        {
-        case TCN_SELCHANGE:
-        {
-            HWND hTabCtrl = GetDlgItem(hWnd, ID_TAB_CONTROL);
-            int nTab = TabCtrl_GetCurSel(hTabCtrl);
-            if (nTab != -1 && nTab < (int)tabInfos.size())
-            {
-                // Здесь вы можете обновить содержимое редактора или выполнить другие действия на основе выбранной вкладки
-                SetWindowText(GetDlgItem(hWnd, ID_EDIT), TEXT("")); // Очищаем редактор
-            }
-        }
-        break;
-        }
-    }
-    break;
-
-    case WM_COMMAND:
-        switch (LOWORD(wParam))
-        {
-        case ID_FILE_PANEL:
-            if (HIWORD(wParam) == LBN_DBLCLK)
-            {
-                // Обработка двойного щелчка по файлу в панели файлов
-                HWND hFilePanel = GetDlgItem(hWnd, ID_FILE_PANEL);
-                int sel = (int)SendMessage(hFilePanel, LB_GETCURSEL, 0, 0);
-                if (sel != LB_ERR)
-                {
-                    TCHAR fileName[MAX_PATH];
-                    SendMessage(hFilePanel, LB_GETTEXT, sel, (LPARAM)fileName);
-                    MessageBox(hWnd, fileName, TEXT("Открыт файл"), MB_OK);
-                }
-            }
-            break;
-        }
-        break;
-
-    case WM_DESTROY:
-        DeleteObject(hbrBackground);
-        DeleteObject(hbrEditBackground);
-        DeleteObject(hFont);
-        PostQuitMessage(0);
-        break;
-
-    default:
-        return DefWindowProc(hWnd, message, wParam, lParam);
-    }
     return 0;
 }

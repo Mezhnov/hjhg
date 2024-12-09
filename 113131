@@ -1,196 +1,334 @@
-// Include necessary headers
 #include <windows.h>
-#include <commctrl.h>
-#include <tchar.h>
+#include <commctrl.h>   // Для общих контролов
+#include <richedit.h>   // Для Rich Edit контролов
+#include <string>
 #include <vector>
 
-#pragma comment(lib, "comctl32.lib")
+// Идентификаторы ресурсов
+#define ID_EDIT         101
+#define ID_DOWNLOAD_BAR 102
+#define ID_TAB_CONTROL  103
+#define ID_FILE_PANEL   104
 
-// Define IDs for controls
-#define ID_TAB_CONTROL 1001
-#define ID_FILE_PANEL  1002
+// Глобальные переменные
+HINSTANCE hInst;
 
-// Structure to hold tab information
+// Цветовые константы
+COLORREF clrBackground = RGB(30, 30, 30);         // Фон окна (темно-серый)
+COLORREF clrText = RGB(230, 230, 230);            // Цвет текста (светло-серый)
+COLORREF clrEditBackground = RGB(40, 40, 40);     // Фон редактора (серый)
+COLORREF clrHighlight = RGB(70, 130, 180);        // Цвет выделения (стальной синий)
+HFONT hFont;                                      // Шрифт по умолчанию
+
+// Функции предварительного объявления
+LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+void InitializeControls(HWND);
+void ResizeControls(HWND);
+void AddNewTab(HWND hTabCtrl, const TCHAR* szFileName);
+void UpdateFilePanel(HWND hFilePanel);
+void AddNewFile(HWND hWnd, const TCHAR* szFileName);
+
+// Структура для хранения информации о вкладках
 struct TabInfo {
     TCHAR fileName[MAX_PATH];
 };
 
-// Global variables
 std::vector<TabInfo> tabInfos;
-HWND hMainWnd;
 
-// Function prototypes
-void AddNewFile(HWND hWnd, const TCHAR* szFileName);
-void AddNewTab(HWND hTabCtrl, const TCHAR* szFileName);
-void UpdateFilePanel(HWND hFilePanel);
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-
-// Custom drawing function for tabs
-void InitializeCustomTabControl(HWND hTabCtrl);
-LRESULT CALLBACK TabCtrlProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
-// Original tab control procedure
-WNDPROC OriginalTabCtrlProc;
-
-// Entry point
-int APIENTRY _tWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
-                       LPTSTR lpCmdLine, int nCmdShow)
+void AddNewFile(HWND hWnd, const TCHAR* szFileName)
 {
-    // Register window class, create window, etc. (omitted for brevity)
-    // ...
+    // Добавить новый файл на вкладки
+    HWND hTabCtrl = GetDlgItem(hWnd, ID_TAB_CONTROL);
 
-    // Initialize common controls
-    INITCOMMONCONTROLSEX icex = { sizeof(INITCOMMONCONTROLSEX) };
-    icex.dwICC = ICC_TAB_CLASSES;
-    InitCommonControlsEx(&icex);
+    TabInfo newTab;
+    _tcscpy_s(newTab.fileName, szFileName); // Копируем имя файла
+    tabInfos.push_back(newTab);
 
-    // Create main window (hMainWnd)
-    // ...
+    AddNewTab(hTabCtrl, newTab.fileName);
 
-    // Message loop
-    MSG msg;
-    while (GetMessage(&msg, nullptr, 0, 0)) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
+    // Обновить панель файлов для отображения нового файла
+    HWND hFilePanel = GetDlgItem(hWnd, ID_FILE_PANEL);
+    UpdateFilePanel(hFilePanel);
+}
+
+void UpdateFilePanel(HWND hFilePanel)
+{
+    // Очистить существующие элементы
+    SendMessage(hFilePanel, LB_RESETCONTENT, 0, 0);
+
+    // Добавить все файлы из tabInfos в список
+    for (const auto& tab : tabInfos) {
+        SendMessage(hFilePanel, LB_ADDSTRING, 0, (LPARAM)tab.fileName);
+    }
+}
+
+void AddNewTab(HWND hTabCtrl, const TCHAR* szFileName)
+{
+    TCITEM tie = { 0 };
+    tie.mask = TCIF_TEXT;
+    tie.pszText = (LPTSTR)szFileName;
+
+    int index = TabCtrl_InsertItem(hTabCtrl, (int)tabInfos.size() - 1, &tie);
+
+    // Выбрать вновь добавленную вкладку
+    TabCtrl_SetCurSel(hTabCtrl, index);
+}
+
+int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+    LPSTR lpCmdLine, int nCmdShow)
+{
+    // Сохраняем идентификатор экземпляра в глобальной переменной
+    hInst = hInstance;
+
+    // Регистрация класса окна
+    WNDCLASS wc = {};
+    wc.lpfnWndProc = WndProc;
+    wc.hInstance = hInstance;
+    wc.lpszClassName = TEXT("BasicIDEWindow");
+    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wc.hbrBackground = CreateSolidBrush(clrBackground); // Устанавливаем цвет фона окна
+
+    if (!RegisterClass(&wc))
+    {
+        MessageBox(nullptr, TEXT("Не удалось зарегистрировать класс окна!"), TEXT("Ошибка"), MB_OK | MB_ICONERROR);
+        return 0;
+    }
+
+    // Создание основного окна
+    HWND hWnd = CreateWindow(
+        wc.lpszClassName,
+        TEXT("Базовая IDE"),
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT, 800, 600,
+        nullptr,
+        nullptr,
+        hInstance,
+        nullptr
+    );
+
+    if (!hWnd)
+    {
+        MessageBox(nullptr, TEXT("Не удалось создать окно!"), TEXT("Ошибка"), MB_OK | MB_ICONERROR);
+        return 0;
+    }
+
+    ShowWindow(hWnd, nCmdShow);
+    UpdateWindow(hWnd);
+
+    // Основной цикл сообщений
+    MSG msg = {};
+    while (GetMessage(&msg, nullptr, 0, 0))
+    {
+        if (!TranslateAccelerator(hWnd, nullptr, &msg))
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
     }
 
     return (int)msg.wParam;
 }
 
-// Main window procedure
+void InitializeControls(HWND hWnd)
+{
+    // Загружаем библиотеку Rich Edit
+    LoadLibrary(TEXT("Msftedit.dll"));
+
+    // Создаем общий шрифт
+    hFont = CreateFont(
+        16, 0, 0, 0, FW_NORMAL,
+        FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET,
+        OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        DEFAULT_QUALITY, DEFAULT_PITCH | FF_SWISS,
+        TEXT("Segoe UI")
+    );
+
+    // Создаем Tab Control
+    HWND hTabCtrl = CreateWindowEx(
+        0, WC_TABCONTROL, TEXT(""),
+        WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | TCS_FOCUSONBUTTONDOWN | TCS_HOTTRACK,
+        0, 0, 0, 0, hWnd, (HMENU)ID_TAB_CONTROL, hInst, NULL);
+
+    SendMessage(hTabCtrl, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+    // Добавляем начальную вкладку (Untitled)
+    AddNewFile(hWnd, TEXT("Untitled"));
+
+    // Создаем контрол редактирования для написания кода (многострочный, вертикальная прокрутка)
+    HWND hEdit = CreateWindowEx(
+        0,                      // Расширенные стили
+        MSFTEDIT_CLASS,         // Класс Rich Edit
+        nullptr,                // Нет начального текста
+        WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL,
+        0, 0, 0, 0,             // Размеры будут изменены позже
+        hWnd,
+        (HMENU)ID_EDIT,
+        hInst,
+        nullptr
+    );
+
+    // Создаем "Download Bar" внизу
+    HWND hDownloadBar = CreateWindowEx(
+        0,
+        TEXT("STATIC"),         // Статический контрол
+        TEXT("Скачивание: example_file.txt"), // Отображаемое имя файла
+        WS_CHILD | WS_VISIBLE | SS_LEFT,
+        0, 0, 0, 0,             // Размеры будут изменены позже
+        hWnd,
+        (HMENU)ID_DOWNLOAD_BAR,
+        hInst,
+        nullptr
+    );
+
+    // Создаем ListBox для панели файлов слева
+    HWND hFilePanel = CreateWindowEx(
+        0,
+        TEXT("LISTBOX"),        // Класс ListBox
+        nullptr,                // Нет начального текста
+        WS_CHILD | WS_VISIBLE | LBS_NOINTEGRALHEIGHT | LBS_NOTIFY | WS_BORDER,
+        0, 0, 0, 0,             // Размеры будут изменены позже
+        hWnd,
+        (HMENU)ID_FILE_PANEL,
+        hInst,
+        nullptr
+    );
+
+    // Устанавливаем шрифт для контролов
+    SendMessage(hEdit, WM_SETFONT, (WPARAM)hFont, TRUE);
+    SendMessage(hDownloadBar, WM_SETFONT, (WPARAM)hFont, TRUE);
+    SendMessage(hFilePanel, WM_SETFONT, (WPARAM)hFont, TRUE);
+}
+
+void ResizeControls(HWND hWnd)
+{
+    RECT rcClient;
+    GetClientRect(hWnd, &rcClient);
+
+    // Определяем размеры
+    int tabHeight = 30;
+    int downloadBarHeight = 30;
+    int filePanelWidth = 150; // Ширина панели файлов
+    int editHeight = rcClient.bottom - tabHeight - downloadBarHeight;
+
+    // Изменяем размер Tab Control
+    HWND hTabCtrl = GetDlgItem(hWnd, ID_TAB_CONTROL);
+    if (hTabCtrl)
+    {
+        SetWindowPos(hTabCtrl, nullptr, filePanelWidth, 0, rcClient.right - filePanelWidth, tabHeight, SWP_NOZORDER);
+    }
+
+    // Изменяем размер Edit Control
+    HWND hEdit = GetDlgItem(hWnd, ID_EDIT);
+    if (hEdit)
+    {
+        SetWindowPos(hEdit, nullptr, filePanelWidth, tabHeight, rcClient.right - filePanelWidth, editHeight, SWP_NOZORDER);
+    }
+
+    // Изменяем размер Download Bar
+    HWND hDownloadBar = GetDlgItem(hWnd, ID_DOWNLOAD_BAR);
+    if (hDownloadBar)
+    {
+        SetWindowPos(hDownloadBar, nullptr, filePanelWidth, tabHeight + editHeight, rcClient.right - filePanelWidth, downloadBarHeight, SWP_NOZORDER);
+    }
+
+    // Изменяем размер File Panel
+    HWND hFilePanel = GetDlgItem(hWnd, ID_FILE_PANEL);
+    if (hFilePanel)
+    {
+        SetWindowPos(hFilePanel, nullptr, 0, 0, filePanelWidth, rcClient.bottom, SWP_NOZORDER);
+    }
+}
+
+// Обработка настройки цветов для контролов
+HBRUSH hbrBackground = CreateSolidBrush(clrBackground);
+HBRUSH hbrEditBackground = CreateSolidBrush(clrEditBackground);
+
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
     case WM_CREATE:
+        InitializeControls(hWnd);
+        break;
+
+    case WM_SIZE:
+        ResizeControls(hWnd);
+        break;
+
+    case WM_CTLCOLORSTATIC:
     {
-        // Create tab control
-        HWND hTabCtrl = CreateWindow(WC_TABCONTROL, NULL,
-            WS_CHILD | WS_VISIBLE | TCS_OWNERDRAWFIXED,
-            0, 0, 400, 200, hWnd, (HMENU)ID_TAB_CONTROL, GetModuleHandle(NULL), NULL);
-
-        // Initialize custom drawing
-        InitializeCustomTabControl(hTabCtrl);
-
-        // Create file panel
-        HWND hFilePanel = CreateWindowEx(0, WC_STATIC, _T("File Panel"),
-            WS_CHILD | WS_VISIBLE | SS_LEFT,
-            0, 210, 400, 200, hWnd, (HMENU)ID_FILE_PANEL, GetModuleHandle(NULL), NULL);
-
-        break;
+        HDC hdcStatic = (HDC)wParam;
+        SetTextColor(hdcStatic, clrText);
+        SetBkColor(hdcStatic, clrBackground);
+        return (INT_PTR)hbrBackground;
     }
-    case WM_COMMAND:
-        // Handle menu commands, button clicks, etc.
+
+    case WM_CTLCOLOREDIT:
+    {
+        HDC hdcEdit = (HDC)wParam;
+        SetTextColor(hdcEdit, clrText);
+        SetBkColor(hdcEdit, clrEditBackground);
+        return (INT_PTR)hbrEditBackground;
+    }
+
+    case WM_CTLCOLORLISTBOX:
+    {
+        HDC hdcListBox = (HDC)wParam;
+        SetTextColor(hdcListBox, clrText);
+        SetBkColor(hdcListBox, clrBackground);
+        return (INT_PTR)hbrBackground;
+    }
+
+    case WM_NOTIFY:
+    {
+        LPNMHDR pnmh = (LPNMHDR)lParam;
+        switch (pnmh->code)
+        {
+        case TCN_SELCHANGE:
+        {
+            HWND hTabCtrl = GetDlgItem(hWnd, ID_TAB_CONTROL);
+            int nTab = TabCtrl_GetCurSel(hTabCtrl);
+            if (nTab != -1 && nTab < (int)tabInfos.size())
+            {
+                // Здесь вы можете обновить содержимое редактора или выполнить другие действия на основе выбранной вкладки
+                SetWindowText(GetDlgItem(hWnd, ID_EDIT), TEXT("")); // Очищаем редактор
+            }
+        }
         break;
+        }
+    }
+    break;
+
+    case WM_COMMAND:
+        switch (LOWORD(wParam))
+        {
+        case ID_FILE_PANEL:
+            if (HIWORD(wParam) == LBN_DBLCLK)
+            {
+                // Обработка двойного щелчка по файлу в панели файлов
+                HWND hFilePanel = GetDlgItem(hWnd, ID_FILE_PANEL);
+                int sel = (int)SendMessage(hFilePanel, LB_GETCURSEL, 0, 0);
+                if (sel != LB_ERR)
+                {
+                    TCHAR fileName[MAX_PATH];
+                    SendMessage(hFilePanel, LB_GETTEXT, sel, (LPARAM)fileName);
+                    MessageBox(hWnd, fileName, TEXT("Открыт файл"), MB_OK);
+                }
+            }
+            break;
+        }
+        break;
+
     case WM_DESTROY:
+        DeleteObject(hbrBackground);
+        DeleteObject(hbrEditBackground);
+        DeleteObject(hFont);
         PostQuitMessage(0);
         break;
+
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
     return 0;
-}
-
-// Function to add a new file
-void AddNewFile(HWND hWnd, const TCHAR* szFileName)
-{
-    // Add new file to the tabs
-    HWND hTabCtrl = GetDlgItem(hWnd, ID_TAB_CONTROL);
-
-    TabInfo newTab;
-    _tcscpy_s(newTab.fileName, MAX_PATH, szFileName);
-    tabInfos.push_back(newTab);
-
-    AddNewTab(hTabCtrl, newTab.fileName);
-
-    // Update the file panel to show the new file
-    HWND hFilePanel = GetDlgItem(hWnd, ID_FILE_PANEL);
-    UpdateFilePanel(hFilePanel);
-}
-
-// Function to add a new tab with custom design
-void AddNewTab(HWND hTabCtrl, const TCHAR* szFileName)
-{
-    TCITEM tie;
-    tie.mask = TCIF_TEXT;
-    tie.pszText = const_cast<LPTSTR>(szFileName);
-
-    TabCtrl_InsertItem(hTabCtrl, tabInfos.size() - 1, &tie);
-
-    // Redraw the tab control to apply custom colors
-    InvalidateRect(hTabCtrl, NULL, TRUE);
-}
-
-// Function to update the file panel
-void UpdateFilePanel(HWND hFilePanel)
-{
-    // For demonstration, we'll just update the text
-    if (!tabInfos.empty()) {
-        const TCHAR* currentFile = tabInfos.back().fileName;
-        SetWindowText(hFilePanel, currentFile);
-    }
-}
-
-// Function to initialize custom drawing for tab control
-void InitializeCustomTabControl(HWND hTabCtrl)
-{
-    // Subclass the tab control
-    OriginalTabCtrlProc = (WNDPROC)SetWindowLongPtr(hTabCtrl, GWLP_WNDPROC, (LONG_PTR)TabCtrlProc);
-}
-
-// Custom window procedure for tab control
-LRESULT CALLBACK TabCtrlProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
-{
-    switch (msg) {
-    case WM_DRAWITEM:
-    {
-        LPDRAWITEMSTRUCT lpDrawItem = (LPDRAWITEMSTRUCT)lParam;
-        // Custom drawing code (not needed here since we handle WM_PAINT)
-        return TRUE;
-    }
-    case WM_ERASEBKGND:
-        return TRUE; // Prevent flickering
-    case WM_PAINT:
-    {
-        PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(hwnd, &ps);
-
-        // Get the number of tabs
-        int tabCount = TabCtrl_GetItemCount(hwnd);
-
-        for (int i = 0; i < tabCount; ++i) {
-            RECT rect;
-            TabCtrl_GetItemRect(hwnd, i, &rect);
-
-            BOOL isSelected = (TabCtrl_GetCurSel(hwnd) == i);
-
-            // Set colors
-            COLORREF bgColor = isSelected ? RGB(66, 133, 244) : RGB(255, 255, 255);
-            COLORREF textColor = isSelected ? RGB(255, 255, 255) : RGB(0, 0, 0);
-
-            // Fill background
-            HBRUSH hBrush = CreateSolidBrush(bgColor);
-            FillRect(hdc, &rect, hBrush);
-            DeleteObject(hBrush);
-
-            // Draw text
-            TCITEM tie;
-            TCHAR szText[MAX_PATH];
-            tie.mask = TCIF_TEXT;
-            tie.pszText = szText;
-            tie.cchTextMax = MAX_PATH;
-            TabCtrl_GetItem(hwnd, i, &tie);
-
-            SetTextColor(hdc, textColor);
-            SetBkMode(hdc, TRANSPARENT);
-            DrawText(hdc, szText, -1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-        }
-
-        EndPaint(hwnd, &ps);
-        return 0;
-    }
-    default:
-        break;
-    }
-    return CallWindowProc(OriginalTabCtrlProc, hwnd, msg, wParam, lParam);
 }

@@ -1,20 +1,90 @@
+#include <windows.h>
 #include <iostream>
 #include <chrono>
+#include <thread>
 
-int main() {
-    const long long N = 1000000000;  // 1 миллиард
-    long long sum = 0;
+using namespace std::chrono;
 
-    auto start = std::chrono::high_resolution_clock::now();
+// Глобальные переменные для окна и таймера
+HWND hWnd, hProgress, hStatic;
+DWORD start_time;
 
-    for (long long i = 1; i <= N; ++i) {
-        sum += i;
+// Обратный вызов для обработки сообщений окна
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    switch (uMsg) {
+        case WM_DESTROY:
+            PostQuitMessage(0);
+            return 0;
+        case WM_TIMER:
+            {
+                auto now = duration_cast<seconds>(steady_clock::now().time_since_epoch()).count();
+                int seconds = now - start_time;
+                char buf[10];
+                sprintf_s(buf, "%d", seconds);
+                SetWindowTextA(hStatic, buf);
+                SendMessage(hProgress, PBM_SETPOS, (seconds % 10) * 10, 0); // Просто для примера - прогресс от 0 до 100
+            }
+            return 0;
+        default:
+            return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }
+}
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+    const char CLASS_NAME[]  = "Sample Window Class";
+    WNDCLASS wc = {};
+
+    wc.lpfnWndProc   = WindowProc;
+    wc.hInstance     = hInstance;
+    wc.lpszClassName = CLASS_NAME;
+
+    RegisterClass(&wc);
+
+    // Создаем окно
+    hWnd = CreateWindowEx(
+        0,                              // Optional window styles.
+        CLASS_NAME,                     // Window class
+        "Progress and Timer Window",    // Window text
+        WS_OVERLAPPEDWINDOW,            // Window style
+
+        // Size and position
+        CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+
+        NULL,       // Parent window    
+        NULL,       // Menu
+        hInstance,  // Instance handle
+        NULL        // Additional application data
+    );
+
+    if (hWnd == NULL) {
+        return 0;
     }
 
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> duration = end - start;
+    // Создаем прогресс-бар
+    hProgress = CreateWindowEx(
+        0, "msctls_progress32", "", WS_CHILD | WS_VISIBLE,
+        10, 30, 280, 20, hWnd, (HMENU)1, hInstance, NULL
+    );
+    SendMessage(hProgress, PBM_SETRANGE, 0, MAKELPARAM(0, 100));
 
-    std::cout << "Сумма: " << sum << std::endl;
-    std::cout << "Время выполнения: " << duration.count() << " секунд" << std::endl;
+    // Создаем метку для отображения времени
+    hStatic = CreateWindowEx(
+        0, "STATIC", "0", WS_CHILD | WS_VISIBLE | SS_CENTER,
+        10, 60, 280, 20, hWnd, (HMENU)2, hInstance, NULL
+    );
+
+    ShowWindow(hWnd, nCmdShow);
+    UpdateWindow(hWnd);
+
+    // Запускаем таймер
+    start_time = duration_cast<seconds>(steady_clock::now().time_since_epoch()).count();
+    SetTimer(hWnd, 1, 1000, NULL); // Таймер будет вызывать сообщение каждую секунду
+
+    MSG msg = {};
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
     return 0;
 }

@@ -176,3 +176,21 @@ void AddNewFile(HWND hWnd, const TCHAR* szFileName)
     HWND hFilePanel = GetDlgItem(hWnd, ID_FILE_PANEL);
     UpdateFilePanel(hFilePanel);
 }
+Сборка начата в 20:36...
+1>------ Сборка начата: проект: WindowsProject1, Конфигурация: Debug x64 ------
+1>WindowsProject1.cpp
+1>C:\Users\User\source\repos\WindowsProject1\WindowsProject1\WindowsProject1.cpp(167,38): error C2065: ID_TAB_CONTROL: необъявленный идентификатор
+1>C:\Users\User\source\repos\WindowsProject1\WindowsProject1\WindowsProject1.cpp(169,5): error C2065: TabInfo: необъявленный идентификатор
+1>C:\Users\User\source\repos\WindowsProject1\WindowsProject1\WindowsProject1.cpp(169,13): error C2146: синтаксическая ошибка: отсутствие ";" перед идентификатором "newTab"
+1>C:\Users\User\source\repos\WindowsProject1\WindowsProject1\WindowsProject1.cpp(169,13): error C2065: newTab: необъявленный идентификатор
+1>C:\Users\User\source\repos\WindowsProject1\WindowsProject1\WindowsProject1.cpp(170,15): error C2065: newTab: необъявленный идентификатор
+1>C:\Users\User\source\repos\WindowsProject1\WindowsProject1\WindowsProject1.cpp(170,5): error C3861: _tcscpy_s: идентификатор не найден
+1>C:\Users\User\source\repos\WindowsProject1\WindowsProject1\WindowsProject1.cpp(171,5): error C2065: tabInfos: необъявленный идентификатор
+1>C:\Users\User\source\repos\WindowsProject1\WindowsProject1\WindowsProject1.cpp(171,24): error C2065: newTab: необъявленный идентификатор
+1>C:\Users\User\source\repos\WindowsProject1\WindowsProject1\WindowsProject1.cpp(173,25): error C2065: newTab: необъявленный идентификатор
+1>C:\Users\User\source\repos\WindowsProject1\WindowsProject1\WindowsProject1.cpp(173,5): error C3861: AddNewTab: идентификатор не найден
+1>C:\Users\User\source\repos\WindowsProject1\WindowsProject1\WindowsProject1.cpp(176,40): error C2065: ID_FILE_PANEL: необъявленный идентификатор
+1>C:\Users\User\source\repos\WindowsProject1\WindowsProject1\WindowsProject1.cpp(177,5): error C3861: UpdateFilePanel: идентификатор не найден
+1>Сборка проекта "WindowsProject1.vcxproj" завершена с ошибкой.
+========== Сборка: успешно выполнено — 0 , со сбоем — 1, в актуальном состоянии — 0, пропущено — 0 ==========
+========== Сборка завершено в 20:36 и заняло 00,710 с ==========

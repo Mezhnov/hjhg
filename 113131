@@ -1,3 +1,165 @@
+#include <windows.h>
+#include <commctrl.h>   // For common controls
+#include <richedit.h>   // For Rich Edit controls
+#include <string>
+
+// Resource identifiers
+#define ID_EDIT         101
+#define ID_DOWNLOAD_BAR 102
+
+// Global variables
+HINSTANCE hInst;
+
+// Forward declarations of functions
+LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+void InitializeControls(HWND);
+
+int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+    LPSTR lpCmdLine, int nCmdShow)
+{
+    // Store instance handle in our global variable
+    hInst = hInstance;
+
+    // Register the window class
+    WNDCLASS wc = {};
+    wc.lpfnWndProc = WndProc;
+    wc.hInstance = hInstance;
+    wc.lpszClassName = TEXT("BasicIDEWindow");
+    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+
+    if (!RegisterClass(&wc))
+    {
+        MessageBox(nullptr, TEXT("Failed to register window class!"), TEXT("Error"), MB_OK | MB_ICONERROR);
+        return 0;
+    }
+
+    // Create the main window
+    HWND hWnd = CreateWindow(
+        wc.lpszClassName,
+        TEXT("Basic IDE"),
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT, 800, 600,
+        nullptr,
+        nullptr,
+        hInstance,
+        nullptr
+    );
+
+    if (!hWnd)
+    {
+        MessageBox(nullptr, TEXT("Failed to create window!"), TEXT("Error"), MB_OK | MB_ICONERROR);
+        return 0;
+    }
+
+    ShowWindow(hWnd, nCmdShow);
+    UpdateWindow(hWnd);
+
+    // Main message loop
+    MSG msg = {};
+    while (GetMessage(&msg, nullptr, 0, 0))
+    {
+        if (!TranslateAccelerator(hWnd, nullptr, &msg))
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+    }
+
+    return (int)msg.wParam;
+}
+
+void InitializeControls(HWND hWnd)
+{
+    // Load the Rich Edit library
+    LoadLibrary(TEXT("Msftedit.dll"));
+
+    // Create the Edit control for code writing (multi-line, vertical scroll)
+    HWND hEdit = CreateWindowEx(
+        0,                      // Extended styles
+        MSFTEDIT_CLASS,         // Rich Edit class
+        nullptr,                // No default text
+        WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL,
+        0, 0, 0, 0,             // Will resize later
+        hWnd,
+        (HMENU)ID_EDIT,
+        hInst,
+        nullptr
+    );
+
+    // Create the "Download Bar" at the bottom
+    HWND hDownloadBar = CreateWindowEx(
+        0,
+        TEXT("STATIC"),         // Static control for simplicity
+        TEXT("Downloading: example_file.txt"), // File name displayed
+        WS_CHILD | WS_VISIBLE | SS_LEFT,
+        0, 0, 0, 0,             // Will resize later
+        hWnd,
+        (HMENU)ID_DOWNLOAD_BAR,
+        hInst,
+        nullptr
+    );
+
+    // Set font for controls
+    HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
+    SendMessage(hEdit, WM_SETFONT, (WPARAM)hFont, TRUE);
+    SendMessage(hDownloadBar, WM_SETFONT, (WPARAM)hFont, TRUE);
+}
+
+void ResizeControls(HWND hWnd)
+{
+    RECT rcClient;
+    GetClientRect(hWnd, &rcClient);
+
+    // Determine sizes
+    int downloadBarHeight = 30;
+    int editHeight = rcClient.bottom - downloadBarHeight;
+
+    // Resize Edit control
+    HWND hEdit = GetDlgItem(hWnd, ID_EDIT);
+    if (hEdit)
+    {
+        SetWindowPos(hEdit, nullptr, 0, 0, rcClient.right, editHeight, SWP_NOZORDER);
+    }
+
+    // Resize Download Bar
+    HWND hDownloadBar = GetDlgItem(hWnd, ID_DOWNLOAD_BAR);
+    if (hDownloadBar)
+    {
+        SetWindowPos(hDownloadBar, nullptr, 0, editHeight, rcClient.right, downloadBarHeight, SWP_NOZORDER);
+    }
+}
+
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
+    case WM_CREATE:
+        InitializeControls(hWnd);
+        break;
+
+    case WM_SIZE:
+        ResizeControls(hWnd);
+        break;
+
+    case WM_COMMAND:
+    {
+        int wmId = LOWORD(wParam);
+        int wmEvent = HIWORD(wParam);
+
+        // Handle menu and control messages here if needed
+    }
+    break;
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+
+    default:
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+    return 0;
+}
 // Somewhere in your code, e.g., in response to a menu command
 void AddNewFile(HWND hWnd, const TCHAR* szFileName)
 {
